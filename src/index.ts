@@ -10,5 +10,8 @@ export { dateKeyStrategy } from './key-strategy/index.js';
 export type { EntityStore, StoreEntry, PartitionMap, StoreOptions } from './store/index.js';
 export { createEntityStore } from './store/index.js';
 
-export type { PartitionBlob } from './persistence/index.js';
-export { serialize, deserialize } from './persistence/index.js';
+export type { PartitionBlob, BlobAdapter, PartitionMetadata } from './persistence/index.js';
+export { serialize, deserialize, createMemoryBlobAdapter, loadPartition, storePartition, fnv1a, computePartitionMetadata } from './persistence/index.js';
+
+export type { Hlc } from './hlc/index.js';
+export { createHlc, tickLocal, tickRemote, compareHlc } from './hlc/index.js';

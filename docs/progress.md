@@ -28,3 +28,27 @@
 - None
 
 ---
+
+## Sprint 002 — 2026-03-21
+
+**Goal**: Build the in-memory entity store with partitioned CRUD and deterministic blob serialization for the persistence layer.
+
+### Highlights
+- Delivered `store` module with full partitioned CRUD (`get`, `getAll`, `save`, `delete`) and cross-partition entity lookup
+- Delivered `persistence` module with deterministic sorted-key JSON serialization and schema-validated deserialization
+- All 130 tests pass with zero failures
+- BUG-001 from Sprint 001 confirmed resolved; no regressions
+
+### Lowlights
+- No issues or shortcomings identified this sprint
+- No bugs found
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None
+
+---
