@@ -81,13 +81,19 @@ export function createEntityStore(options?: StoreOptions): EntityStore {
         trackPartition(entityKey);
         options?.onPartitionCreated?.(entityKey);
       }
+      const isNew = !partition.has(entity.id);
       partition.set(entity.id, entity);
+      options?.onEntitySaved?.(entityKey, entity, isNew);
     },
 
     delete(entityKey: string, id: string): boolean {
       const partition = partitions.get(entityKey);
       if (!partition) return false;
-      return partition.delete(id);
+      const deleted = partition.delete(id);
+      if (deleted) {
+        options?.onEntityDeleted?.(entityKey, id);
+      }
+      return deleted;
     },
 
     getById(id: string): StoreEntry | undefined {

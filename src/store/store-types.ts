@@ -6,6 +6,8 @@ export type PartitionMap = ReadonlyMap<string, StoreEntry>;
 
 export type StoreOptions = {
   readonly onPartitionCreated?: (entityKey: string) => void;
+  readonly onEntitySaved?: (entityKey: string, entity: StoreEntry, isNew: boolean) => void;
+  readonly onEntityDeleted?: (entityKey: string, id: string) => void;
 };
 
 export type EntityStore = {

@@ -26,3 +26,14 @@ export {
   mergePartitionEntities, recomputeMetadata, isStale,
   createDirtyTracker, createSyncScheduler,
 } from './sync/index.js';
+
+export type {
+  EntityEventType, EntityEvent, EntityEventListener,
+  EntityEventBus, EntityObservable, CollectionObservable,
+} from './reactive/index.js';
+export {
+  createEntityEventBus, observeEntity, observeCollection,
+} from './reactive/index.js';
+
+export type { GetAllOptions, Repository, RepositoryOptions } from './repository/index.js';
+export { createRepository } from './repository/index.js';

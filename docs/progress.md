@@ -76,3 +76,27 @@
 - None
 
 ---
+
+## Sprint 004 — 2026-03-21
+
+**Goal**: Implement the sync engine with metadata-first diffing, HLC-based conflict resolution, dirty tracking with batched scheduling, and stale write protection.
+
+### Highlights
+- Delivered full `sync` module: metadata-first diff, deep diff, conflict resolution, sync apply, stale write protection, dirty tracking, and sync scheduling
+- Metadata-first diff compares partition-level timestamps/hashes and categorizes changes into three buckets (a-only, b-only, mismatched)
+- Deep diff performs entity-level HLC comparison with one-way-copy optimization for mismatched partitions
+- Conflict resolution uses last-writer-wins via HLC with delete-wins-on-equal-HLC rule
+- Sync scheduler provides batched, deduplicated queue with coalescing of rapid writes
+
+### Lowlights
+- No issues or bugs found this sprint
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None
+
+---
