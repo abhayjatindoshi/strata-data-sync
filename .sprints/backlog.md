@@ -25,7 +25,7 @@ Items are moved to sprint plans by the Scrum Master. Completed items are marked 
 - Tenant entity (base + extendable via `defineTenant<T>`)
 - Tenant manager (`list`, `create`, `load`, `switch`)
 - Tenant key namespacing (framework constructs scoped keys)
-- `createStrata` factory function (initialization, wiring)
+- ~~`createStrata` factory function (initialization, wiring)~~
 - React context providers
 - React hooks (`useRepo`, `useTenant`)
 - React HOCs (auto-subscribe observables)

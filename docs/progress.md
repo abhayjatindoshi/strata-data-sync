@@ -124,3 +124,27 @@
 - None
 
 ---
+
+## Sprint 006 — 2026-03-21
+
+**Goal**: Add query capabilities to the repository and build the multi-tenancy system (tenant entity, manager, scoped key namespacing).
+
+### Highlights
+- Delivered `store/query` module: `QueryOptions<T>` with ID filtering, field matching (`where`), and multi-field sorting (`orderBy`); pure `applyQuery` function
+- Integrated query options into repository `getAll` and `observeAll` methods
+- Delivered `tenant` module: `BaseTenant` type, `defineTenant` helper, tenant key namespacing (`tenant:{tenantId}:{entityName}:{partitionKey}`), and `TenantManager` with list/create/load/switch and `activeTenant$` observable
+- Wired tenant scoping into `EntityStore` and persistence `loadPartition`/`storePartition`
+- 503 tests passing (unit + integration)
+
+### Lowlights
+- BUG-001 (major): `observeAll` did not react to entity changes in tenant-scoped stores — scoped key extraction produced a prefixed entity name that never matched the observable's unscoped filter; fixed by emitting events with the unscoped entity name
+
+### Metrics
+- Tasks planned: 7
+- Tasks completed: 7
+- Bugs found: 1 (critical: 0, major: 1, minor: 0)
+
+### Carry Forward
+- None
+
+---

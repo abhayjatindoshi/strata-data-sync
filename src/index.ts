@@ -44,3 +44,6 @@ export {
   TENANT_LIST_KEY, scopeEntityKey, scopeMetadataKey, unscopeEntityKey, scopePrefix,
   scopeStore,
 } from './tenant/index.js';
+
+export type { Strata, StrataConfig } from './strata/index.js';
+export { createStrata } from './strata/index.js';
