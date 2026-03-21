@@ -148,3 +148,27 @@
 - None
 
 ---
+
+## Sprint 007 — 2026-03-21
+
+**Goal**: Implement the `createStrata` factory function — the single entry point that wires together all framework modules into a ready-to-use `Strata` instance.
+
+### Highlights
+- Delivered `strata` module with `createStrata` factory wiring all framework modules (store, event bus, HLC, dirty tracker, sync scheduler, persistence adapters)
+- `repo()` method lazily creates and caches a typed `Repository<TFields>` per entity definition
+- Tenant switching via `load(tenantId)` re-scopes store and persistence, clearing stale in-memory data
+- `dispose()` tears down RxJS subscriptions, sync scheduler, and adapter references to prevent memory leaks
+- All 548 tests pass with zero failures
+
+### Lowlights
+- No issues or bugs found this sprint
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None
+
+---
