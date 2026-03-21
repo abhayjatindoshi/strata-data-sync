@@ -52,3 +52,27 @@
 - None
 
 ---
+
+## Sprint 003 — 2026-03-21
+
+**Goal**: Establish the persistence adapter contract, partition-level load/store operations, HLC-based timestamps, and partition metadata hashing to prepare for sync.
+
+### Highlights
+- Defined `BlobAdapter` interface (read, write, delete, list) and created `MemoryBlobAdapter` reference implementation
+- Implemented `loadPartition` and `storePartition` for blob-backed persistence round-trips
+- Introduced `hlc` module with `createHlc`, `tickLocal`, `tickRemote`, and `compareHlc` — full HLC clock with total ordering
+- Implemented partition metadata with FNV-1a content hashing and HLC timestamp per partition
+- All 193 tests pass with zero failures
+
+### Lowlights
+- No issues or bugs found this sprint
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None
+
+---

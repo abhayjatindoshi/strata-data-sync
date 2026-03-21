@@ -15,3 +15,14 @@ export { serialize, deserialize, createMemoryBlobAdapter, loadPartition, storePa
 
 export type { Hlc } from './hlc/index.js';
 export { createHlc, tickLocal, tickRemote, compareHlc } from './hlc/index.js';
+
+export type {
+  SyncDirection, PartitionMeta, EntityHlc, EntityMetadataMap,
+  MetadataDiffResult, EntityDiffEntry, DeepDiffResult, MergeResult,
+  SyncEntity, ApplyResult, SyncResult, DirtyTracker, SyncTask, SyncScheduler,
+} from './sync/index.js';
+export {
+  compareEntityHlc, resolveConflict, metadataDiff, deepDiff,
+  mergePartitionEntities, recomputeMetadata, isStale,
+  createDirtyTracker, createSyncScheduler,
+} from './sync/index.js';
