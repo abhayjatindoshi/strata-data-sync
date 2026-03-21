@@ -7,6 +7,7 @@ import type { BaseEntity } from '../entity/index.js';
 import type { GetAllOptions, Repository } from './repository-types.js';
 import { composeEntityId, getEntityKey, buildEntityKey } from '../entity/index.js';
 import { loadPartition } from '../persistence/index.js';
+import { applyQuery } from '../store/index.js';
 import { observeEntity } from '../reactive/observe-entity.js';
 import { observeCollection } from '../reactive/observe-collection.js';
 
@@ -53,7 +54,7 @@ export function createRepository<TName extends string, TFields>(
     loadedPartitions.add(entityKey);
   }
 
-  function getAllFromStore(opts?: GetAllOptions): ReadonlyArray<Readonly<FullEntity<TFields>>> {
+  function getAllFromStore(opts?: GetAllOptions<TFields>): ReadonlyArray<Readonly<FullEntity<TFields>>> {
     const partitionKeys = store.listPartitions(entityDef.name);
     const results: Readonly<FullEntity<TFields>>[] = [];
 
@@ -68,7 +69,7 @@ export function createRepository<TName extends string, TFields>(
       }
     }
 
-    return results;
+    return applyQuery(results, opts);
   }
 
   return {
@@ -79,7 +80,7 @@ export function createRepository<TName extends string, TFields>(
       return entry as unknown as Readonly<FullEntity<TFields>> | undefined;
     },
 
-    async getAll(opts?: GetAllOptions): Promise<ReadonlyArray<Readonly<FullEntity<TFields>>>> {
+    async getAll(opts?: GetAllOptions<TFields>): Promise<ReadonlyArray<Readonly<FullEntity<TFields>>>> {
       if (opts?.partitionKey) {
         const entityKey = buildEntityKey(entityDef.name, opts.partitionKey);
         await ensurePartitionLoaded(entityKey);
@@ -130,7 +131,7 @@ export function createRepository<TName extends string, TFields>(
       return observable;
     },
 
-    observeAll(opts?: GetAllOptions) {
+    observeAll(opts?: GetAllOptions<TFields>) {
       const { observable } = observeCollection<FullEntity<TFields>>(
         eventBus,
         entityDef.name,

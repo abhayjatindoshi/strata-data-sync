@@ -37,3 +37,10 @@ export {
 
 export type { GetAllOptions, Repository, RepositoryOptions } from './repository/index.js';
 export { createRepository } from './repository/index.js';
+
+export type { BaseTenant, TenantDef, TenantManager, TenantManagerOptions } from './tenant/index.js';
+export {
+  defineTenant, createTenantManager,
+  TENANT_LIST_KEY, scopeEntityKey, scopeMetadataKey, unscopeEntityKey, scopePrefix,
+  scopeStore,
+} from './tenant/index.js';

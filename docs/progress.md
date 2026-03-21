@@ -100,3 +100,27 @@
 - None
 
 ---
+
+## Sprint 005 — 2026-03-21
+
+**Goal**: Build the reactive layer (events + observables) and repository API with lazy loading to provide a unified read/write interface over the store and persistence tiers.
+
+### Highlights
+- Delivered `reactive` module: `EntityEventBus` with emit/on/off for entity mutation events, single-entity and collection observables via `BehaviorSubject` with `distinctUntilChanged`
+- Wired entity events into `EntityStore` — store `put` and `delete` automatically emit `created`/`updated`/`deleted` events
+- Delivered `repository` module: `Repository<T>` with full CRUD (`get`, `getAll`, `save`, `delete`) plus `observe` and `observeAll` methods
+- Implemented three-tier lazy loading in repository: in-memory → local adapter → cloud adapter
+- All 388 tests pass with zero failures
+
+### Lowlights
+- No issues or bugs found this sprint
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None
+
+---

@@ -17,10 +17,10 @@ Items are moved to sprint plans by the Scrum Master. Completed items are marked 
 - ~~Conflict resolution (last-writer-wins via HLC, delete-wins-on-equal)~~
 - ~~Dirty tracking and sync scheduling (batched, deduplicated)~~
 - ~~Stale write protection~~
-- Reactive event system (entity events on mutation)
-- Entity observables (`observe`, `observeAll` with `distinctUntilChanged`)
-- Repository API (`get`, `getAll`, `save`, `delete`, `observe`, `observeAll`)
-- Lazy loading (store miss → local → cloud)
+- ~~Reactive event system (entity events on mutation)~~
+- ~~Entity observables (`observe`, `observeAll` with `distinctUntilChanged`)~~
+- ~~Repository API (`get`, `getAll`, `save`, `delete`, `observe`, `observeAll`)~~
+- ~~Lazy loading (store miss → local → cloud)~~
 - Query options (ID filtering, field matching, multi-field sorting)
 - Tenant entity (base + extendable via `defineTenant<T>`)
 - Tenant manager (`list`, `create`, `load`, `switch`)
