@@ -1,0 +1,24 @@
+import type { BaseEntity } from '../entity/index.js';
+
+export type StoreEntry = BaseEntity & Readonly<Record<string, unknown>>;
+
+export type PartitionMap = ReadonlyMap<string, StoreEntry>;
+
+export type StoreOptions = {
+  readonly onPartitionCreated?: (entityKey: string) => void;
+};
+
+export type EntityStore = {
+  readonly createPartition: (entityKey: string) => void;
+  readonly getPartition: (entityKey: string) => PartitionMap | undefined;
+  readonly listPartitions: (entityName: string) => readonly string[];
+  readonly deletePartition: (entityKey: string) => boolean;
+  readonly hasPartition: (entityKey: string) => boolean;
+
+  readonly get: (entityKey: string, id: string) => StoreEntry | undefined;
+  readonly getAll: (entityKey: string) => readonly StoreEntry[];
+  readonly save: (entityKey: string, entity: StoreEntry) => void;
+  readonly delete: (entityKey: string, id: string) => boolean;
+
+  readonly getById: (id: string) => StoreEntry | undefined;
+};

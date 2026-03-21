@@ -4,11 +4,11 @@ Items are moved to sprint plans by the Scrum Master. Completed items are marked 
 
 ## Features
 
-- Entity definition system (`defineEntity<T>`, `EntityDef`, `BaseEntity` types)
-- Entity key and ID generation (partition key encoding, unique ID suffix)
-- Key strategy interface and date-based strategy implementation
-- In-memory store (per-entity CRUD, partition management)
-- Blob serialization/deserialization (deterministic sorted-key JSON)
+- ~~Entity definition system (`defineEntity<T>`, `EntityDef`, `BaseEntity` types)~~
+- ~~Entity key and ID generation (partition key encoding, unique ID suffix)~~
+- ~~Key strategy interface and date-based strategy implementation~~
+- ~~In-memory store (per-entity CRUD, partition management)~~
+- ~~Blob serialization/deserialization (deterministic sorted-key JSON)~~
 - Blob adapter interface (`BlobAdapter`)
 - Persistence layer (load/store partitions via adapters)
 - Metadata system (partition-level hashes, entity-level HLCs)

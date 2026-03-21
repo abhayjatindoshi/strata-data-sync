@@ -1,6 +1,5 @@
 # Active Sprint
 
-**Sprint:** 001
+**Sprint:** 002
 **Status:** complete
-**Plan:** [sprint-001/plan.md](sprint-001/plan.md)
-**Review:** [sprint-001/review.md](sprint-001/review.md)
+**Plan:** [sprint-002/plan.md](sprint-002/plan.md)
