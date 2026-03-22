@@ -43,6 +43,7 @@ export type SyncEngine = {
   readonly sync: () => Promise<void>;
   readonly startPeriodicSync: () => void;
   readonly stopPeriodicSync: () => void;
+  readonly markDirty: (entityKey: string) => void;
   readonly isDirty: () => boolean;
   readonly isDirty$: Observable<boolean>;
   readonly onEvent: (type: SyncEventType, listener: () => void) => void;

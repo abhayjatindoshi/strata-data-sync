@@ -274,6 +274,19 @@ export function createSyncEngine(config: SyncEngineConfig): SyncEngine {
         );
         if (!blob) continue;
         await writeJson(cloudAdapter, cloudMeta, key, blob, serialize);
+        if (!store.hasPartition(key)) {
+          loadBlobsIntoStore(new Map([[key, blob]]));
+        }
+      }
+
+      // 5b. Hydrate unchanged partitions into store if not already in memory
+      for (const key of diff.unchanged) {
+        if (!store.hasPartition(key)) {
+          const blob = await readJson<PartitionBlob>(
+            localAdapter, undefined, key, deserialize,
+          );
+          if (blob) loadBlobsIntoStore(new Map([[key, blob]]));
+        }
       }
 
       // 6. Merge changed partitions
@@ -378,6 +391,7 @@ export function createSyncEngine(config: SyncEngineConfig): SyncEngine {
     sync,
     startPeriodicSync,
     stopPeriodicSync,
+    markDirty,
     isDirty,
     isDirty$,
     onEvent,
