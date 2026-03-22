@@ -13,13 +13,20 @@ applyTo: "**"
 
 ## Protected Files — DO NOT MODIFY
 The following files are frozen. No agent may edit them under any circumstances:
-- `README.md`
-- `docs/architecture.md`
-- `docs/entities.md`
-- `docs/partitioning.md`
-- `docs/sync.md`
-- `docs/tenancy.md`
-- `docs/api.md`
+- `design/v2-decisions.md`
+- `design/v2-architecture.md`
+- `design/v2-adapter.md`
+- `design/v2-tenant.md`
+- `design/v2-persistence-sync.md`
+- `design/v2-reactive.md`
+- `design/v2-schema-repository.md`
+- `design/v2-lifecycle.md`
+- `design/README.md`
+
+## Design Reference
+- All implementation must follow the v2 design in `design/`. When in doubt, consult the relevant design doc.
+- Rejected options in `design/v2-decisions.md` must NOT be reconsidered during implementation.
+- If a design gap is found, raise it — do not invent a solution that contradicts existing decisions.
 
 ## Git Rules
 - Only commit on the `sprint` branch. Never use `main` or `master`.
