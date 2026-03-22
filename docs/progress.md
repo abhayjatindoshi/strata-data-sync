@@ -45,3 +45,26 @@
 - None
 
 ---
+
+## Sprint 003 — 2026-03-22
+
+**Goal**: Build the Repository module (full API, query engine, singleton) and lay the Sync Engine foundation (scheduler, flush, diff, merge)
+
+### Highlights
+- All 8 tasks delivered: query types, in-memory query engine, `Repository<T>` full API, `SingletonRepository<T>`, sync scheduler, memory→local flush, partition diff, bidirectional merge
+- 289 unit tests and 43 integration tests passing with zero failures
+- 2 modules delivered: repository (developer-facing API surface) and sync (engine foundation)
+- Sync engine foundation in place: single-sync-at-a-time scheduler, partition hash diff with copy optimization, HLC-based tombstone-aware merge
+
+### Lowlights
+- None
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None
+
+---
