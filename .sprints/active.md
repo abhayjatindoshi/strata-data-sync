@@ -1,3 +1,5 @@
 # Active Sprint
 
-No sprint is currently active. Awaiting Scrum Master to create Sprint 001.
+**Sprint:** 001
+**Status:** planning
+**Plan:** [sprint-001/plan.md](sprint-001/plan.md)
