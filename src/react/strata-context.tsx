@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
-import type { Strata } from '../strata/index.js';
-import type { StrataProviderProps } from './react-types.js';
+import type { Strata } from '@strata/strata';
+import type { StrataProviderProps } from './react-types';
 
 const StrataContext = createContext<Strata | null>(null);
 

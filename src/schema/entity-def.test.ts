@@ -1,6 +1,6 @@
 import { describe, it, expect, expectTypeOf } from 'vitest';
-import { defineEntity, type EntityDef } from './entity-def.js';
-import type { Entity } from '../entity/base-entity.js';
+import { defineEntity, type EntityDef } from './entity-def';
+import type { Entity } from '@strata/entity/base-entity';
 
 describe('defineEntity', () => {
   it('returns an object with the given name', () => {

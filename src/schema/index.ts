@@ -1,2 +1,2 @@
-export type { EntityDef } from './entity-def.js';
-export { defineEntity } from './entity-def.js';
+export type { EntityDef } from './entity-def';
+export { defineEntity } from './entity-def';

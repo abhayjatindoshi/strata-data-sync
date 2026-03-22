@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createDirtyTracker } from './dirty-tracker.js';
+import { createDirtyTracker } from './dirty-tracker';
 
 describe('createDirtyTracker', () => {
   it('starts with version 0 and no dirty partitions', () => {

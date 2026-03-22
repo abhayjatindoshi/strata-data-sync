@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { deepDiff } from './deep-diff.js';
-import type { EntityMetadataMap } from './sync-types.js';
+import { deepDiff } from './deep-diff';
+import type { EntityMetadataMap } from './sync-types';
 
 describe('deepDiff', () => {
   it('returns empty for identical metadata', () => {

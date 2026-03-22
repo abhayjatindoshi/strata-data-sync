@@ -1,5 +1,5 @@
-import type { EntityStore, StoreEntry, StoreOptions } from './store-types.js';
-import { getEntityKey } from '../entity/index.js';
+import type { EntityStore, StoreEntry, StoreOptions } from './store-types';
+import { getEntityKey } from '@strata/entity';
 
 function getEntityNameFromKey(entityKey: string): string {
   const dotIndex = entityKey.indexOf('.');

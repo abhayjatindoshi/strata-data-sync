@@ -1,4 +1,4 @@
-import type { PartitionMeta } from './sync-types.js';
+import type { PartitionMeta } from './sync-types';
 
 export function isStale(
   before: Readonly<Record<string, PartitionMeta>>,

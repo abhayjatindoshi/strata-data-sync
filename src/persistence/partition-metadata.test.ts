@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fnv1a, computePartitionMetadata } from './partition-metadata.js';
+import { fnv1a, computePartitionMetadata } from './partition-metadata';
 
 describe('fnv1a', () => {
   it('produces consistent hashes', () => {

@@ -17,7 +17,10 @@
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": false
+    "exactOptionalPropertyTypes": false,
+    "paths": {
+      "@strata/*": ["./src/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

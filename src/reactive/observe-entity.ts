@@ -1,8 +1,8 @@
 import { BehaviorSubject } from 'rxjs';
 import { distinctUntilChanged } from 'rxjs/operators';
-import type { EntityEventBus } from './entity-event-bus.js';
-import type { EntityEventListener } from './event-types.js';
-import { serialize } from '../persistence/index.js';
+import type { EntityEventBus } from './entity-event-bus';
+import type { EntityEventListener } from './event-types';
+import { serialize } from '@strata/persistence';
 
 export type EntityObservable<T> = {
   readonly observable: BehaviorSubject<Readonly<T> | undefined>;

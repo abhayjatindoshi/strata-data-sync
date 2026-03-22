@@ -1,7 +1,7 @@
 import { useState, useCallback, type FormEvent } from 'react';
-import type { BaseTenant } from '../tenant/index.js';
-import type { TenantCreationWizardProps } from './react-types.js';
-import { useTenant } from './use-tenant.js';
+import type { BaseTenant } from '@strata/tenant';
+import type { TenantCreationWizardProps } from './react-types';
+import { useTenant } from './use-tenant';
 
 type WizardStep = 'name' | 'confirm' | 'done';
 

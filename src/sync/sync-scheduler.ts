@@ -1,4 +1,4 @@
-import type { SyncDirection, SyncTask, SyncScheduler } from './sync-types.js';
+import type { SyncDirection, SyncTask, SyncScheduler } from './sync-types';
 
 export function createSyncScheduler(): SyncScheduler {
   const queue = new Map<string, SyncTask>();

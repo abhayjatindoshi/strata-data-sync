@@ -172,3 +172,30 @@
 - None
 
 ---
+
+## Sprint 008 — 2026-03-21
+
+**Goal**: Implement the React integration layer — context providers, hooks, HOCs, and UI components — completing the final framework module.
+
+### Highlights
+- Delivered `react` module: `StrataProvider` and `TenantProvider` context providers exposing Strata and tenant instances to the component tree
+- Implemented `useRepo<T>` hook with typed repository access and reactive state via entity observables
+- Implemented `useTenant` hook providing current tenant, tenant list, and tenant switching
+- Built `withObservable` and `withCollection` HOCs for auto-subscribing to entity and collection observables
+- Delivered `TenantPicker` and `TenantCreationWizard` UI components; all 592 tests pass with zero bugs
+
+### Lowlights
+- No issues or bugs found this sprint
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None — backlog is empty
+
+### Project Complete
+All eight sprints are finished. The Strata framework is fully implemented across every planned module: schema, entity, store, persistence, HLC, sync, reactive, repository, tenant, strata factory, and React bindings. 592 tests pass with zero open bugs.
+
+---

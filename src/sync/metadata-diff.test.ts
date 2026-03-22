@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { metadataDiff } from './metadata-diff.js';
+import { metadataDiff } from './metadata-diff';
 
 describe('metadataDiff', () => {
   it('returns empty buckets for empty maps', () => {

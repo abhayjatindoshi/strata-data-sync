@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createEntityStore } from '../store/index.js';
-import { createEntityEventBus } from '../reactive/index.js';
-import { defineEntity } from '../schema/index.js';
-import { dateKeyStrategy } from '../key-strategy/index.js';
-import { createRepository } from './repository.js';
-import { createMemoryBlobAdapter, storePartition } from '../persistence/index.js';
-import type { EntityEvent } from '../reactive/index.js';
+import { createEntityStore } from '@strata/store';
+import { createEntityEventBus } from '@strata/reactive';
+import { defineEntity } from '@strata/schema';
+import { dateKeyStrategy } from '@strata/key-strategy';
+import { createRepository } from './repository';
+import { createMemoryBlobAdapter, storePartition } from '@strata/persistence';
+import type { EntityEvent } from '@strata/reactive';
 
 const Account = defineEntity<{ name: string; balance: number }>('Account');
 

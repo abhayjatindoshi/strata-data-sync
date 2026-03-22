@@ -1,7 +1,12 @@
-// App code — consumes the Strata framework
-// Run: npx tsc --strict --noEmit app.ts
+// App code — consumes the Strata framework as an installed package
+// Run: npm run demo
 
-import { defineEntity, createStrata, createMemoryBlobAdapter, dateKeyStrategy } from './src/index.js';
+import {
+  defineEntity,
+  createStrata,
+  createMemoryBlobAdapter,
+  dateKeyStrategy,
+} from 'strata-data-sync';
 
 // --- 1. Define entities (type-safe tokens) ---
 

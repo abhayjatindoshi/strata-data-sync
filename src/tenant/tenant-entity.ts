@@ -1,6 +1,6 @@
-import type { BaseEntity } from '../entity/index.js';
-import type { EntityDef } from '../schema/index.js';
-import { defineEntity } from '../schema/index.js';
+import type { BaseEntity } from '@strata/entity';
+import type { EntityDef } from '@strata/schema';
+import { defineEntity } from '@strata/schema';
 
 export type BaseTenant = BaseEntity & {
   readonly name: string;

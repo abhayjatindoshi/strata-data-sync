@@ -1,9 +1,9 @@
-export type { PartitionBlob } from './deserialize.js';
-export type { BlobAdapter } from './blob-adapter.js';
-export type { PartitionMetadata } from './partition-metadata.js';
-export { serialize } from './serialize.js';
-export { deserialize } from './deserialize.js';
-export { createMemoryBlobAdapter } from './memory-blob-adapter.js';
-export { loadPartition } from './load-partition.js';
-export { storePartition } from './store-partition.js';
-export { fnv1a, computePartitionMetadata } from './partition-metadata.js';
+export type { PartitionBlob } from './deserialize';
+export type { BlobAdapter } from './blob-adapter';
+export type { PartitionMetadata } from './partition-metadata';
+export { serialize } from './serialize';
+export { deserialize } from './deserialize';
+export { createMemoryBlobAdapter } from './memory-blob-adapter';
+export { loadPartition } from './load-partition';
+export { storePartition } from './store-partition';
+export { fnv1a, computePartitionMetadata } from './partition-metadata';

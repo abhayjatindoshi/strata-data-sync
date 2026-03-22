@@ -1,8 +1,8 @@
-import type { BlobAdapter } from './blob-adapter.js';
-import type { EntityDef } from '../schema/index.js';
-import { serialize } from './serialize.js';
-import { buildEntityKey } from '../entity/index.js';
-import { scopeEntityKey } from '../tenant/index.js';
+import type { BlobAdapter } from './blob-adapter';
+import type { EntityDef } from '@strata/schema';
+import { serialize } from './serialize';
+import { buildEntityKey } from '@strata/entity';
+import { scopeEntityKey } from '@strata/tenant';
 
 export async function storePartition<TName extends string, TFields>(
   adapter: BlobAdapter,

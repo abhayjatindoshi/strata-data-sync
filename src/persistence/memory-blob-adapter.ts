@@ -1,4 +1,4 @@
-import type { BlobAdapter } from './blob-adapter.js';
+import type { BlobAdapter } from './blob-adapter';
 
 export function createMemoryBlobAdapter(): BlobAdapter {
   const storage = new Map<string, Uint8Array>();

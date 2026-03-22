@@ -1,6 +1,6 @@
-import type { KeyStrategy } from '../key-strategy/key-strategy.js';
-import { generateId } from './id-generation.js';
-import { buildEntityId } from './entity-key.js';
+import type { KeyStrategy } from '@strata/key-strategy/key-strategy';
+import { generateId } from './id-generation';
+import { buildEntityId } from './entity-key';
 
 export function composeEntityId(
   strategy: KeyStrategy,

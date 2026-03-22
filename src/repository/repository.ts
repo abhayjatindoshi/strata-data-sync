@@ -1,15 +1,15 @@
-import type { EntityDef } from '../schema/index.js';
-import type { EntityStore, StoreEntry } from '../store/index.js';
-import type { KeyStrategy } from '../key-strategy/index.js';
-import type { BlobAdapter } from '../persistence/index.js';
-import type { EntityEventBus } from '../reactive/index.js';
-import type { BaseEntity } from '../entity/index.js';
-import type { GetAllOptions, Repository } from './repository-types.js';
-import { composeEntityId, getEntityKey, buildEntityKey } from '../entity/index.js';
-import { loadPartition } from '../persistence/index.js';
-import { applyQuery } from '../store/index.js';
-import { observeEntity } from '../reactive/observe-entity.js';
-import { observeCollection } from '../reactive/observe-collection.js';
+import type { EntityDef } from '@strata/schema';
+import type { EntityStore, StoreEntry } from '@strata/store';
+import type { KeyStrategy } from '@strata/key-strategy';
+import type { BlobAdapter } from '@strata/persistence';
+import type { EntityEventBus } from '@strata/reactive';
+import type { BaseEntity } from '@strata/entity';
+import type { GetAllOptions, Repository } from './repository-types';
+import { composeEntityId, getEntityKey, buildEntityKey } from '@strata/entity';
+import { loadPartition } from '@strata/persistence';
+import { applyQuery } from '@strata/store';
+import { observeEntity } from '@strata/reactive/observe-entity';
+import { observeCollection } from '@strata/reactive/observe-collection';
 
 export type RepositoryOptions<TName extends string, TFields> = {
   readonly entityDef: EntityDef<TName, TFields>;

@@ -1,13 +1,13 @@
-import type { EntityDef } from '../schema/index.js';
-import type { Repository } from '../repository/index.js';
-import type { EntityEvent } from '../reactive/index.js';
-import type { StrataConfig, Strata } from './strata-types.js';
-import { createEntityStore } from '../store/index.js';
-import { createEntityEventBus } from '../reactive/index.js';
-import { createHlc } from '../hlc/index.js';
-import { createDirtyTracker, createSyncScheduler } from '../sync/index.js';
-import { createTenantManager, scopeStore } from '../tenant/index.js';
-import { createRepository } from '../repository/index.js';
+import type { EntityDef } from '@strata/schema';
+import type { Repository } from '@strata/repository';
+import type { EntityEvent } from '@strata/reactive';
+import type { StrataConfig, Strata } from './strata-types';
+import { createEntityStore } from '@strata/store';
+import { createEntityEventBus } from '@strata/reactive';
+import { createHlc } from '@strata/hlc';
+import { createDirtyTracker, createSyncScheduler } from '@strata/sync';
+import { createTenantManager, scopeStore } from '@strata/tenant';
+import { createRepository } from '@strata/repository';
 import type { Subscription } from 'rxjs';
 
 export function createStrata(config: StrataConfig): Strata {

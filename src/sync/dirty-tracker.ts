@@ -1,4 +1,4 @@
-import type { DirtyTracker } from './sync-types.js';
+import type { DirtyTracker } from './sync-types';
 
 export function createDirtyTracker(): DirtyTracker {
   const dirty = new Set<string>();

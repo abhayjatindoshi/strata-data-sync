@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { defineEntity } from '../schema/index.js';
-import { dateKeyStrategy } from '../key-strategy/index.js';
-import { createMemoryBlobAdapter, serialize } from '../persistence/index.js';
-import { createStrata } from './create-strata.js';
+import { defineEntity } from '@strata/schema';
+import { dateKeyStrategy } from '@strata/key-strategy';
+import { createMemoryBlobAdapter, serialize } from '@strata/persistence';
+import { createStrata } from './create-strata';
 
 const Account = defineEntity<{ name: string; balance: number }>('Account');
 const Transaction = defineEntity<{ amount: number; date: Date; accountId: string }>('Transaction');

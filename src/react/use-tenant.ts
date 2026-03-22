@@ -1,5 +1,5 @@
-import type { TenantContextValue } from './react-types.js';
-import { useTenantContext } from './tenant-context.js';
+import type { TenantContextValue } from './react-types';
+import { useTenantContext } from './tenant-context';
 
 export function useTenant(): TenantContextValue {
   return useTenantContext();

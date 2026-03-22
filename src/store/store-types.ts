@@ -1,4 +1,4 @@
-import type { BaseEntity } from '../entity/index.js';
+import type { BaseEntity } from '@strata/entity';
 
 export type StoreEntry = BaseEntity & Readonly<Record<string, unknown>>;
 

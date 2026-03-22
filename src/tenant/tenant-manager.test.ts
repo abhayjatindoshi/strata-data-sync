@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createTenantManager } from './tenant-manager.js';
-import { createEntityStore } from '../store/index.js';
-import { createMemoryBlobAdapter } from '../persistence/index.js';
+import { createTenantManager } from './tenant-manager';
+import { createEntityStore } from '@strata/store';
+import { createMemoryBlobAdapter } from '@strata/persistence';
 
 function setup() {
   const store = createEntityStore();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateId } from './id-generation.js';
+import { generateId } from './id-generation';
 
 describe('generateId', () => {
   it('returns a string of default length 8', () => {

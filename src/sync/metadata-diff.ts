@@ -1,4 +1,4 @@
-import type { PartitionMeta, MetadataDiffResult } from './sync-types.js';
+import type { PartitionMeta, MetadataDiffResult } from './sync-types';
 
 export function metadataDiff(
   a: Readonly<Record<string, PartitionMeta>>,

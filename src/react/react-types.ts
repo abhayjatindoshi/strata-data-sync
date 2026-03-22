@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import type { Strata } from '../strata/index.js';
-import type { BaseTenant } from '../tenant/index.js';
+import type { Strata } from '@strata/strata';
+import type { BaseTenant } from '@strata/tenant';
 
 export type StrataProviderProps = {
   readonly strata: Strata;

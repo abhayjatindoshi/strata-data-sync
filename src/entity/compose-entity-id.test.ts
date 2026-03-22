@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { composeEntityId } from './compose-entity-id.js';
-import { parseEntityId } from './entity-key.js';
-import { dateKeyStrategy } from '../key-strategy/date-key-strategy.js';
-import type { KeyStrategy } from '../key-strategy/key-strategy.js';
+import { composeEntityId } from './compose-entity-id';
+import { parseEntityId } from './entity-key';
+import { dateKeyStrategy } from '@strata/key-strategy/date-key-strategy';
+import type { KeyStrategy } from '@strata/key-strategy/key-strategy';
 
 describe('composeEntityId', () => {
   it('produces a valid three-part entity ID', () => {

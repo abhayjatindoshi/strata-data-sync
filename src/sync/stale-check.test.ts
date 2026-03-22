@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStale } from './stale-check.js';
+import { isStale } from './stale-check';
 
 describe('isStale', () => {
   it('returns false when metadata is unchanged', () => {

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import type { EntityDef } from '../schema/index.js';
-import type { Repository } from '../repository/index.js';
-import { useStrataContext } from './strata-context.js';
+import type { EntityDef } from '@strata/schema';
+import type { Repository } from '@strata/repository';
+import { useStrataContext } from './strata-context';
 
 export function useRepo<TName extends string, TFields>(
   def: EntityDef<TName, TFields>,

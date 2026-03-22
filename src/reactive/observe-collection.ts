@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { distinctUntilChanged } from 'rxjs/operators';
-import type { EntityEventBus } from './entity-event-bus.js';
-import type { EntityEventListener } from './event-types.js';
+import type { EntityEventBus } from './entity-event-bus';
+import type { EntityEventListener } from './event-types';
 
 export type CollectionObservable<T> = {
   readonly observable: BehaviorSubject<ReadonlyArray<Readonly<T>>>;

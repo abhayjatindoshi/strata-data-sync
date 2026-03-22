@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serialize } from './serialize.js';
+import { serialize } from './serialize';
 
 describe('serialize', () => {
   it('sorts top-level keys alphabetically', () => {

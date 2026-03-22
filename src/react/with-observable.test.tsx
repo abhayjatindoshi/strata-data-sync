@@ -4,7 +4,7 @@ import { render, screen, act, cleanup } from '@testing-library/react';
 
 afterEach(cleanup);
 import { BehaviorSubject } from 'rxjs';
-import { withObservable } from './with-observable.js';
+import { withObservable } from './with-observable';
 
 describe('withObservable', () => {
   it('subscribes and passes initial data as prop', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from './memory-blob-adapter.js';
+import { createMemoryBlobAdapter } from './memory-blob-adapter';
 
 describe('createMemoryBlobAdapter', () => {
   it('returns null for non-existent key', async () => {

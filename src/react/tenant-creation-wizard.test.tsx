@@ -5,12 +5,12 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 afterEach(cleanup);
 import type { ReactNode } from 'react';
 import { BehaviorSubject } from 'rxjs';
-import type { Strata } from '../strata/index.js';
-import type { TenantManager } from '../tenant/index.js';
-import type { BaseTenant } from '../tenant/index.js';
-import { StrataProvider } from './strata-context.js';
-import { TenantProvider } from './tenant-context.js';
-import { TenantCreationWizard } from './tenant-creation-wizard.js';
+import type { Strata } from '@strata/strata';
+import type { TenantManager } from '@strata/tenant';
+import type { BaseTenant } from '@strata/tenant';
+import { StrataProvider } from './strata-context';
+import { TenantProvider } from './tenant-context';
+import { TenantCreationWizard } from './tenant-creation-wizard';
 
 function makeTenant(id: string, name: string): BaseTenant {
   return { id, name, createdAt: new Date(), updatedAt: new Date(), version: 1, device: 'test' };

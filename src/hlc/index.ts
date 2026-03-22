@@ -1,2 +1,2 @@
-export type { Hlc } from './hlc.js';
-export { createHlc, tickLocal, tickRemote, compareHlc } from './hlc.js';
+export type { Hlc } from './hlc';
+export { createHlc, tickLocal, tickRemote, compareHlc } from './hlc';

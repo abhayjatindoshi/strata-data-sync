@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '../persistence/index.js';
-import { loadPartition } from '../persistence/load-partition.js';
-import { storePartition } from '../persistence/store-partition.js';
-import { defineEntity } from '../schema/index.js';
-import { scopeEntityKey } from './tenant-keys.js';
+import { createMemoryBlobAdapter } from '@strata/persistence';
+import { loadPartition } from '@strata/persistence/load-partition';
+import { storePartition } from '@strata/persistence/store-partition';
+import { defineEntity } from '@strata/schema';
+import { scopeEntityKey } from './tenant-keys';
 
 const Account = defineEntity<{ name: string; balance: number }>('Account');
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createEntityEventBus } from './entity-event-bus.js';
-import type { EntityEvent } from './event-types.js';
+import { createEntityEventBus } from './entity-event-bus';
+import type { EntityEvent } from './event-types';
 
 function makeEvent(overrides: Partial<EntityEvent> = {}): EntityEvent {
   return {

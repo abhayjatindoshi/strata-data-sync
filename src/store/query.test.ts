@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { applyQuery } from './query.js';
-import type { BaseEntity } from '../entity/index.js';
+import { applyQuery } from './query';
+import type { BaseEntity } from '@strata/entity';
 
 type TestEntity = BaseEntity & {
   readonly name: string;

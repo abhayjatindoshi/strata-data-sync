@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { defineTenant } from './tenant-entity.js';
-import type { BaseTenant, TenantDef } from './tenant-entity.js';
+import { defineTenant } from './tenant-entity';
+import type { BaseTenant, TenantDef } from './tenant-entity';
 
 describe('defineTenant', () => {
   it('creates a tenant entity definition with name __tenant', () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { storePartition } from './store-partition.js';
-import { loadPartition } from './load-partition.js';
-import { createMemoryBlobAdapter } from './memory-blob-adapter.js';
-import { defineEntity } from '../schema/index.js';
+import { storePartition } from './store-partition';
+import { loadPartition } from './load-partition';
+import { createMemoryBlobAdapter } from './memory-blob-adapter';
+import { defineEntity } from '@strata/schema';
 
 const TestEntity = defineEntity<{ name: string }>('TestEntity');
 

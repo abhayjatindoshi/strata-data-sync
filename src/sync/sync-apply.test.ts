@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergePartitionEntities, recomputeMetadata } from './sync-apply.js';
-import type { EntityMetadataMap, SyncEntity } from './sync-types.js';
+import { mergePartitionEntities, recomputeMetadata } from './sync-apply';
+import type { EntityMetadataMap, SyncEntity } from './sync-types';
 
 describe('mergePartitionEntities', () => {
   it('includes a-only entities', () => {

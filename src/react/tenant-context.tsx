@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import type { BaseTenant } from '../tenant/index.js';
-import type { TenantContextValue } from './react-types.js';
-import { useStrataContext } from './strata-context.js';
+import type { BaseTenant } from '@strata/tenant';
+import type { TenantContextValue } from './react-types';
+import { useStrataContext } from './strata-context';
 
 const TenantContext = createContext<TenantContextValue | null>(null);
 

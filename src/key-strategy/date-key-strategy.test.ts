@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dateKeyStrategy } from './date-key-strategy.js';
+import { dateKeyStrategy } from './date-key-strategy';
 
 describe('dateKeyStrategy', () => {
   describe('year period', () => {

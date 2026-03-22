@@ -1,5 +1,5 @@
 import { useCallback, type ChangeEvent } from 'react';
-import { useTenant } from './use-tenant.js';
+import { useTenant } from './use-tenant';
 
 export function TenantPicker(): React.JSX.Element {
   const { activeTenant, tenants, switchTenant, loading } = useTenant();

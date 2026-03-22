@@ -1,5 +1,5 @@
-import type { EntityMetadataMap, DeepDiffResult, EntityDiffEntry } from './sync-types.js';
-import { resolveConflict } from './conflict-resolution.js';
+import type { EntityMetadataMap, DeepDiffResult, EntityDiffEntry } from './sync-types';
+import { resolveConflict } from './conflict-resolution';
 
 export function deepDiff(
   a: EntityMetadataMap,

@@ -1,11 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
-import type { BlobAdapter } from '../persistence/index.js';
-import type { EntityStore } from '../store/index.js';
-import type { BaseTenant } from './tenant-entity.js';
-import { TENANT_LIST_KEY } from './tenant-keys.js';
-import { generateId } from '../entity/index.js';
-import { serialize } from '../persistence/index.js';
-import { deserialize } from '../persistence/index.js';
+import type { BlobAdapter } from '@strata/persistence';
+import type { EntityStore } from '@strata/store';
+import type { BaseTenant } from './tenant-entity';
+import { TENANT_LIST_KEY } from './tenant-keys';
+import { generateId } from '@strata/entity';
+import { serialize } from '@strata/persistence';
+import { deserialize } from '@strata/persistence';
 
 export type TenantManager<TCustom = object> = {
   readonly list: () => Promise<ReadonlyArray<Readonly<BaseTenant & TCustom>>>;

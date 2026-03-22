@@ -4,7 +4,7 @@ import { render, screen, act, cleanup } from '@testing-library/react';
 
 afterEach(cleanup);
 import { BehaviorSubject } from 'rxjs';
-import { withCollection } from './with-collection.js';
+import { withCollection } from './with-collection';
 
 describe('withCollection', () => {
   it('subscribes and passes initial data array', () => {

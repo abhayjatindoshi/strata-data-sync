@@ -1,8 +1,8 @@
-import type { EntityDef } from '../schema/index.js';
-import type { KeyStrategy } from '../key-strategy/index.js';
-import type { BlobAdapter } from '../persistence/index.js';
-import type { Repository } from '../repository/index.js';
-import type { TenantManager } from '../tenant/index.js';
+import type { EntityDef } from '@strata/schema';
+import type { KeyStrategy } from '@strata/key-strategy';
+import type { BlobAdapter } from '@strata/persistence';
+import type { Repository } from '@strata/repository';
+import type { TenantManager } from '@strata/tenant';
 
 export type StrataConfig = {
   readonly entities: ReadonlyArray<EntityDef<string, unknown>>;

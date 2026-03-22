@@ -1,4 +1,4 @@
-import type { EntityEvent, EntityEventListener } from './event-types.js';
+import type { EntityEvent, EntityEventListener } from './event-types';
 
 export type EntityEventBus = {
   readonly emit: (event: EntityEvent) => void;

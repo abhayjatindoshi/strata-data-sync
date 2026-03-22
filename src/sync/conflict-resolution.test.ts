@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { compareEntityHlc, resolveConflict } from './conflict-resolution.js';
-import type { EntityHlc } from './sync-types.js';
+import { compareEntityHlc, resolveConflict } from './conflict-resolution';
+import type { EntityHlc } from './sync-types';
 
 describe('compareEntityHlc', () => {
   it('returns 0 for equal HLCs', () => {

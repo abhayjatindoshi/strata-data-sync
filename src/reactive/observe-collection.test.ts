@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createEntityEventBus } from './entity-event-bus.js';
-import { observeCollection } from './observe-collection.js';
+import { createEntityEventBus } from './entity-event-bus';
+import { observeCollection } from './observe-collection';
 
 describe('observeCollection', () => {
   it('emits initial values from getCurrentValues', () => {

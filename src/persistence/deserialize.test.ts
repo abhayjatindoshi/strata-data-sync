@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deserialize } from './deserialize.js';
+import { deserialize } from './deserialize';
 
 const VALID_BLOB = JSON.stringify({
   Account: {

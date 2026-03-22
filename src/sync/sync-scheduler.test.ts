@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSyncScheduler } from './sync-scheduler.js';
+import { createSyncScheduler } from './sync-scheduler';
 
 describe('createSyncScheduler', () => {
   it('starts with zero pending', () => {

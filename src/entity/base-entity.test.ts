@@ -1,5 +1,5 @@
 import { describe, it, expectTypeOf } from 'vitest';
-import type { BaseEntity, Entity } from './base-entity.js';
+import type { BaseEntity, Entity } from './base-entity';
 
 describe('BaseEntity', () => {
   it('has expected fields', () => {

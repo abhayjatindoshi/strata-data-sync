@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseEntityId, buildEntityId, getEntityKey, buildEntityKey } from './entity-key.js';
+import { parseEntityId, buildEntityId, getEntityKey, buildEntityKey } from './entity-key';
 
 describe('parseEntityId', () => {
   it('parses a valid entity ID', () => {

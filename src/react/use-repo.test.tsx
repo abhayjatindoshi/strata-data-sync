@@ -5,12 +5,12 @@ import { renderHook, cleanup } from '@testing-library/react';
 afterEach(cleanup);
 import type { ReactNode } from 'react';
 import { BehaviorSubject } from 'rxjs';
-import type { Strata } from '../strata/index.js';
-import type { TenantManager } from '../tenant/index.js';
-import type { Repository } from '../repository/index.js';
-import { defineEntity } from '../schema/index.js';
-import { StrataProvider } from './strata-context.js';
-import { useRepo } from './use-repo.js';
+import type { Strata } from '@strata/strata';
+import type { TenantManager } from '@strata/tenant';
+import type { Repository } from '@strata/repository';
+import { defineEntity } from '@strata/schema';
+import { StrataProvider } from './strata-context';
+import { useRepo } from './use-repo';
 
 type Todo = { readonly title: string };
 

@@ -13,12 +13,12 @@ export type {
   DirtyTracker,
   SyncTask,
   SyncScheduler,
-} from './sync-types.js';
+} from './sync-types';
 
-export { compareEntityHlc, resolveConflict } from './conflict-resolution.js';
-export { metadataDiff } from './metadata-diff.js';
-export { deepDiff } from './deep-diff.js';
-export { mergePartitionEntities, recomputeMetadata } from './sync-apply.js';
-export { isStale } from './stale-check.js';
-export { createDirtyTracker } from './dirty-tracker.js';
-export { createSyncScheduler } from './sync-scheduler.js';
+export { compareEntityHlc, resolveConflict } from './conflict-resolution';
+export { metadataDiff } from './metadata-diff';
+export { deepDiff } from './deep-diff';
+export { mergePartitionEntities, recomputeMetadata } from './sync-apply';
+export { isStale } from './stale-check';
+export { createDirtyTracker } from './dirty-tracker';
+export { createSyncScheduler } from './sync-scheduler';

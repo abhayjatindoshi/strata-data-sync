@@ -5,7 +5,7 @@ import {
   scopeMetadataKey,
   unscopeEntityKey,
   scopePrefix,
-} from './tenant-keys.js';
+} from './tenant-keys';
 
 describe('tenant key namespacing', () => {
   describe('TENANT_LIST_KEY', () => {

@@ -1,6 +1,6 @@
 import type { BehaviorSubject } from 'rxjs';
-import type { BaseEntity } from '../entity/index.js';
-import type { QueryOptions } from '../store/index.js';
+import type { BaseEntity } from '@strata/entity';
+import type { QueryOptions } from '@strata/store';
 
 export type GetAllOptions<T = Record<string, unknown>> = {
   readonly partitionKey?: string;

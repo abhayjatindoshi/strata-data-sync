@@ -1,6 +1,6 @@
-import type { EntityMetadataMap, EntityHlc, SyncEntity, ApplyResult, PartitionMeta } from './sync-types.js';
-import { resolveConflict } from './conflict-resolution.js';
-import { fnv1a } from '../persistence/index.js';
+import type { EntityMetadataMap, EntityHlc, SyncEntity, ApplyResult, PartitionMeta } from './sync-types';
+import { resolveConflict } from './conflict-resolution';
+import { fnv1a } from '@strata/persistence';
 
 type EntityPairResult = {
   source: 'a' | 'b' | undefined;

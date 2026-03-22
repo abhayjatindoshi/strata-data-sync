@@ -1,5 +1,5 @@
-export type { BaseEntity, Entity } from './base-entity.js';
-export type { EntityIdParts } from './entity-key.js';
-export { generateId } from './id-generation.js';
-export { parseEntityId, buildEntityId, getEntityKey, buildEntityKey } from './entity-key.js';
-export { composeEntityId } from './compose-entity-id.js';
+export type { BaseEntity, Entity } from './base-entity';
+export type { EntityIdParts } from './entity-key';
+export { generateId } from './id-generation';
+export { parseEntityId, buildEntityId, getEntityKey, buildEntityKey } from './entity-key';
+export { composeEntityId } from './compose-entity-id';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createEntityStore } from './entity-store.js';
-import type { StoreEntry } from './store-types.js';
+import { createEntityStore } from './entity-store';
+import type { StoreEntry } from './store-types';
 
 function makeEntry(id: string, extra: Record<string, unknown> = {}): StoreEntry {
   return {

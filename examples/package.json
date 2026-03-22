@@ -1,0 +1,12 @@
+{
+  "name": "strata-examples",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "npx tsx --tsconfig ../tsconfig.json app.ts"
+  },
+  "dependencies": {
+    "strata-data-sync": "file:.."
+  }
+}

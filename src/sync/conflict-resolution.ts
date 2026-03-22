@@ -1,4 +1,4 @@
-import type { EntityHlc, MergeResult } from './sync-types.js';
+import type { EntityHlc, MergeResult } from './sync-types';
 
 export function compareEntityHlc(a: EntityHlc, b: EntityHlc): -1 | 0 | 1 {
   if (a.updatedAt !== b.updatedAt) return a.updatedAt < b.updatedAt ? -1 : 1;

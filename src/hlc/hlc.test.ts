@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createHlc, tickLocal, tickRemote, compareHlc } from './hlc.js';
-import type { Hlc } from './hlc.js';
+import { createHlc, tickLocal, tickRemote, compareHlc } from './hlc';
+import type { Hlc } from './hlc';
 
 describe('createHlc', () => {
   beforeEach(() => { vi.useFakeTimers(); });

@@ -1,7 +1,7 @@
-import type { EntityStore, StoreEntry, PartitionMap } from '../store/index.js';
-import type { EntityEventBus } from '../reactive/index.js';
-import { scopeEntityKey, scopePrefix, unscopeEntityKey } from './tenant-keys.js';
-import { getEntityKey } from '../entity/index.js';
+import type { EntityStore, StoreEntry, PartitionMap } from '@strata/store';
+import type { EntityEventBus } from '@strata/reactive';
+import { scopeEntityKey, scopePrefix, unscopeEntityKey } from './tenant-keys';
+import { getEntityKey } from '@strata/entity';
 
 export function scopeStore(store: EntityStore, tenantId: string, eventBus?: EntityEventBus): EntityStore {
   const prefix = scopePrefix(tenantId);

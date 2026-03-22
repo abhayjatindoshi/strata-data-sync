@@ -1,4 +1,4 @@
-import type { KeyStrategy } from './key-strategy.js';
+import type { KeyStrategy } from './key-strategy';
 
 export type DatePeriod = 'year' | 'month' | 'day';
 

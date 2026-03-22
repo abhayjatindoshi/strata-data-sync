@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createEntityStore } from '../store/index.js';
-import { scopeStore } from './tenant-scoped-store.js';
-import type { StoreEntry } from '../store/index.js';
+import { createEntityStore } from '@strata/store';
+import { scopeStore } from './tenant-scoped-store';
+import type { StoreEntry } from '@strata/store';
 
 function makeEntry(id: string, extra: Record<string, unknown> = {}): StoreEntry {
   return {
