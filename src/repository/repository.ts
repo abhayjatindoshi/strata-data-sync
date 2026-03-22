@@ -51,7 +51,7 @@ export function createRepository<TName extends string, TFields>(
       }
     }
 
-    loadedPartitions.add(entityKey);
+    // Don't cache the miss — storage may be populated later by sync
   }
 
   function getAllFromStore(opts?: GetAllOptions<TFields>): ReadonlyArray<Readonly<FullEntity<TFields>>> {
@@ -101,6 +101,7 @@ export function createRepository<TName extends string, TFields>(
         ?? composeEntityId(keyStrategy, entityDef.name, entityRecord);
 
       const entityKey = getEntityKey(id);
+      await ensurePartitionLoaded(entityKey);
       const existing = store.get(entityKey, id);
 
       const full: StoreEntry = {
@@ -118,6 +119,7 @@ export function createRepository<TName extends string, TFields>(
 
     async delete(id: string): Promise<boolean> {
       const entityKey = getEntityKey(id);
+      await ensurePartitionLoaded(entityKey);
       return store.delete(entityKey, id);
     },
 

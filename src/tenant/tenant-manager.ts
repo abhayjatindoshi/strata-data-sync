@@ -36,7 +36,11 @@ export function createTenantManager<TCustom = object>(
     const blob = deserialize(json);
     const tenantsGroup = blob.entities['__tenants'];
     if (!tenantsGroup) return [];
-    return Object.values(tenantsGroup) as Tenant[];
+    return (Object.values(tenantsGroup) as Record<string, unknown>[]).map((t) => ({
+      ...t,
+      createdAt: new Date(t.createdAt as string | number),
+      updatedAt: new Date(t.updatedAt as string | number),
+    })) as Tenant[];
   }
 
   async function writeTenantList(tenants: readonly Tenant[]): Promise<void> {

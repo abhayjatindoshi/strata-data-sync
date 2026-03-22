@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { BaseTenant } from '@strata/tenant';
 import type { TenantContextValue } from './react-types';
@@ -25,17 +25,25 @@ export function TenantProvider({ children }: TenantProviderProps): React.JSX.Ele
     return () => sub.unsubscribe();
   }, [tenantManager]);
 
+  const opCounter = useRef(0);
+
   useEffect(() => {
+    let cancelled = false;
     void tenantManager.list().then((list) => {
-      setTenants(list as ReadonlyArray<Readonly<BaseTenant>>);
-      setLoading(false);
+      if (!cancelled) {
+        setTenants(list as ReadonlyArray<Readonly<BaseTenant>>);
+        setLoading(false);
+      }
     });
+    return () => { cancelled = true; };
   }, [tenantManager]);
 
   const switchTenant = useCallback(async (tenantId: string) => {
+    const opId = ++opCounter.current;
     setLoading(true);
     await tenantManager.switch(tenantId);
     const list = await tenantManager.list();
+    if (opId !== opCounter.current) return; // stale — discard
     setTenants(list as ReadonlyArray<Readonly<BaseTenant>>);
     setLoading(false);
   }, [tenantManager]);

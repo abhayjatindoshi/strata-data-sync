@@ -5,7 +5,8 @@ export function createMemoryBlobAdapter(): BlobAdapter {
 
   return {
     async read(key) {
-      return storage.get(key) ?? null;
+      const value = storage.get(key);
+      return value ? new Uint8Array(value) : null;
     },
     async write(key, data) {
       storage.set(key, new Uint8Array(data));
