@@ -91,3 +91,26 @@
 - None
 
 ---
+
+## Sprint 005 — 2026-03-22
+
+**Goal**: Strata entry point — final P0 sprint
+
+### Highlights
+- All 8 tasks delivered: `StrataConfig` type & validation, `createStrata` bootstrap, `strata.repo(def)` cached lookup, `strata.tenants`, `strata.sync()`, dirty tracking, `strata.dispose()` graceful shutdown, public API barrel exports
+- 386 unit tests and 42 integration tests passing (428 total) with zero failures
+- `src/index.ts` now re-exports public APIs from all 12 modules — framework has a single entry point
+- All P0 backlog items complete — the core framework is feature-complete
+
+### Lowlights
+- BUG-001 (critical): `createStrata` did not wire repository writes to sync engine dirty tracking, causing `sync()` to flush nothing. Found and fixed during sprint.
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 1 (critical: 1, major: 0, minor: 0)
+
+### Carry Forward
+- None — all P0 backlog items delivered
+
+---

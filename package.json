@@ -15,9 +15,19 @@
   "dependencies": {
     "rxjs": "^7.8.2"
   },
+  "peerDependencies": {
+    "react": ">=17.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
     "eslint": "^10.1.0",
+    "react": "^19.2.4",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.1",
     "vitest": "^4.1.0"
