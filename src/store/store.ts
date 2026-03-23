@@ -1,4 +1,4 @@
-import type { BaseEntity } from '../entity/index.js';
+import type { BaseEntity } from '@strata/entity';
 import type { EntityStore, PartitionLoader } from './types.js';
 
 function extractEntityName(entityKey: string): string {

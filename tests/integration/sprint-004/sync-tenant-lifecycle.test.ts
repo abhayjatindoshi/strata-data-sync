@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { firstValueFrom, take, toArray, skip } from 'rxjs';
-import { MemoryBlobAdapter } from '../../../src/adapter/index.js';
-import type { BlobAdapter, CloudMeta } from '../../../src/adapter/index.js';
-import { createEntityStore } from '../../../src/store/index.js';
-import { serialize, deserialize, computePartitionHash } from '../../../src/persistence/index.js';
-import type { PartitionBlob, PartitionIndex, Tombstone } from '../../../src/persistence/index.js';
-import { createSyncEngine, purgeExpiredTombstones, createTombstone } from '../../../src/sync/index.js';
-import type { SyncEngine, SyncEventType } from '../../../src/sync/index.js';
-import { createTenantManager, deriveTenantId } from '../../../src/tenant/index.js';
-import type { Tenant, TenantManager } from '../../../src/tenant/index.js';
-import type { BaseEntity } from '../../../src/entity/index.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { firstValueFrom, skip } from 'rxjs';
+import { MemoryBlobAdapter } from '@strata/adapter';
+import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import { createEntityStore } from '@strata/store';
+import { serialize, deserialize, computePartitionHash } from '@strata/persistence';
+import type { PartitionBlob, PartitionIndex, Tombstone } from '@strata/persistence';
+import { createSyncEngine, purgeExpiredTombstones, createTombstone } from '@strata/sync';
+import type { SyncEngine, SyncEventType } from '@strata/sync';
+import { createTenantManager, deriveTenantId } from '@strata/tenant';
+import type { Tenant, TenantManager } from '@strata/tenant';
+import type { BaseEntity } from '@strata/entity';
 
 // ---------------------------------------------------------------------------
 // Helpers

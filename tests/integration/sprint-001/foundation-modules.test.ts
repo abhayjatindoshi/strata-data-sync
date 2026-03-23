@@ -1,13 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildEntityId, parseEntityId, getEntityKey, deriveId } from '../../../src/entity/index.js';
-import type { BaseEntity } from '../../../src/entity/index.js';
-import { defineEntity } from '../../../src/schema/index.js';
-import type { EntityDefinition } from '../../../src/schema/index.js';
-import { singleton, global, partitioned, monthlyPartition } from '../../../src/key-strategy/index.js';
-import { createHlc, tickLocal, tickRemote, compareHlc } from '../../../src/hlc/index.js';
-import type { Hlc } from '../../../src/hlc/index.js';
-import { MemoryBlobAdapter } from '../../../src/adapter/index.js';
+import { buildEntityId, parseEntityId, getEntityKey, deriveId } from '@strata/entity';
+import type { BaseEntity } from '@strata/entity';
+import { defineEntity } from '@strata/schema';
+import { singleton, global, partitioned, monthlyPartition } from '@strata/key-strategy';
+import { createHlc, tickLocal, tickRemote, compareHlc } from '@strata/hlc';
+import type { Hlc } from '@strata/hlc';
+import { MemoryBlobAdapter } from '@strata/adapter';
 
 // ── App-level entity types ───────────────────────────────────────────
 
@@ -19,11 +18,6 @@ type TodoEntity = BaseEntity & {
 type SettingsEntity = BaseEntity & {
   readonly theme: 'light' | 'dark';
   readonly locale: string;
-};
-
-type LogEntry = BaseEntity & {
-  readonly message: string;
-  readonly level: 'info' | 'warn' | 'error';
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────

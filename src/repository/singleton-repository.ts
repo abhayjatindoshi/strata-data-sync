@@ -1,11 +1,11 @@
-import type { BaseEntity } from '../entity/index.js';
-import type { EntityStore } from '../store/index.js';
-import type { ChangeSignal } from '../reactive/index.js';
+import type { BaseEntity } from '@strata/entity';
+import type { EntityStore } from '@strata/store';
+import type { ChangeSignal } from '@strata/reactive';
 import {
   observe as reactiveObserve,
   entityEquals,
-} from '../reactive/index.js';
-import type { EntityDefinition } from '../schema/index.js';
+} from '@strata/reactive';
+import type { EntityDefinition } from '@strata/schema';
 import type { SingletonRepository } from './types.js';
 
 export function createSingletonRepository<T extends BaseEntity>(

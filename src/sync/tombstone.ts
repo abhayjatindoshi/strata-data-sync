@@ -1,4 +1,4 @@
-import type { Tombstone, PartitionBlob } from '../persistence/index.js';
+import type { Tombstone, PartitionBlob } from '@strata/persistence';
 
 const DEFAULT_RETENTION_DAYS = 90;
 const MS_PER_DAY = 86_400_000;

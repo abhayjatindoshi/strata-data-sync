@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Observable } from 'rxjs';
-import type { BaseEntity } from '../entity/index.js';
-import type { Repository, QueryOptions } from '../repository/index.js';
+import type { BaseEntity } from '@strata/entity';
+import type { Repository, QueryOptions } from '@strata/repository';
 
 export function useObserve<T extends BaseEntity>(
   repo: Repository<T>,

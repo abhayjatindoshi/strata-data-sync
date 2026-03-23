@@ -1,4 +1,4 @@
-import type { PartitionIndex } from '../persistence/index.js';
+import type { PartitionIndex } from '@strata/persistence';
 import type { PartitionDiff } from './types.js';
 
 export function comparePartitionIndexes(

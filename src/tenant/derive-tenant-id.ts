@@ -1,4 +1,4 @@
-import { fnvHash } from '../persistence/index.js';
+import { fnvHash } from '@strata/persistence';
 
 export function deriveTenantId(
   cloudMeta: Readonly<Record<string, unknown>>,

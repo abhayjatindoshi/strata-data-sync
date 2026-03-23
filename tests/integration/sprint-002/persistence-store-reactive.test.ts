@@ -1,25 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   serialize,
   deserialize,
   fnvHash,
   computePartitionHash,
-} from '../../../src/persistence/index.js';
-import { createEntityStore } from '../../../src/store/index.js';
+} from '@strata/persistence';
+import { createEntityStore } from '@strata/store';
 import {
   createChangeSignal,
   observe,
   observeQuery,
-  entityEquals,
   entityArrayEquals,
   createEventBus,
-} from '../../../src/reactive/index.js';
+} from '@strata/reactive';
 import {
   gzip,
   applyEncodeTransforms,
   applyDecodeTransforms,
-} from '../../../src/adapter/index.js';
-import type { BaseEntity } from '../../../src/entity/index.js';
+} from '@strata/adapter';
+import type { BaseEntity } from '@strata/entity';
 import { firstValueFrom, take, toArray } from 'rxjs';
 
 // ---------------------------------------------------------------------------

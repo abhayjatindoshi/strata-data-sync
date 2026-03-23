@@ -1,5 +1,5 @@
-import type { BlobAdapter, CloudMeta } from '../adapter/index.js';
-import { serialize, deserialize } from '../persistence/index.js';
+import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import { serialize, deserialize } from '@strata/persistence';
 import type { Tenant } from './types.js';
 
 const TENANTS_BLOB = '__tenants';

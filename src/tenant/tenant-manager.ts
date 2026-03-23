@@ -1,5 +1,5 @@
 import { BehaviorSubject } from 'rxjs';
-import type { BlobAdapter } from '../adapter/index.js';
+import type { BlobAdapter } from '@strata/adapter';
 import type { Tenant, CreateTenantInput, SetupInput, TenantManager } from './types.js';
 import { deriveTenantId } from './derive-tenant-id.js';
 import {

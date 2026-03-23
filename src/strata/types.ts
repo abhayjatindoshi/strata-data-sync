@@ -1,9 +1,9 @@
 import type { Observable } from 'rxjs';
-import type { BlobAdapter } from '../adapter/index.js';
-import type { BaseEntity } from '../entity/index.js';
-import type { EntityDefinition } from '../schema/index.js';
-import type { Repository, SingletonRepository } from '../repository/index.js';
-import type { TenantManager } from '../tenant/index.js';
+import type { BlobAdapter } from '@strata/adapter';
+import type { BaseEntity } from '@strata/entity';
+import type { EntityDefinition } from '@strata/schema';
+import type { Repository, SingletonRepository } from '@strata/repository';
+import type { TenantManager } from '@strata/tenant';
 
 export type StrataConfig = {
   readonly entities: ReadonlyArray<EntityDefinition<any>>;

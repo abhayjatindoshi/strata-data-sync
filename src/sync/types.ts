@@ -1,6 +1,6 @@
 import type { Observable } from 'rxjs';
-import type { BlobAdapter } from '../adapter/index.js';
-import type { EntityStore } from '../store/index.js';
+import type { BlobAdapter } from '@strata/adapter';
+import type { EntityStore } from '@strata/store';
 
 export type SyncScheduler = {
   readonly schedule: (fn: () => Promise<void>) => Promise<void>;

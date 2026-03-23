@@ -1,6 +1,6 @@
-import type { BaseEntity, DeriveIdFn } from '../entity/index.js';
-import type { KeyStrategy } from '../key-strategy/index.js';
-import { global as globalStrategy } from '../key-strategy/index.js';
+import type { BaseEntity, DeriveIdFn } from '@strata/entity';
+import type { KeyStrategy } from '@strata/key-strategy';
+import { global as globalStrategy } from '@strata/key-strategy';
 import type { EntityDefinition } from './types.js';
 
 export function defineEntity<T extends BaseEntity>(

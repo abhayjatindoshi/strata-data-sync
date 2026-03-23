@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { Tenant } from '../tenant/index.js';
+import type { Tenant } from '@strata/tenant';
 import { useStrata } from './strata-provider.js';
 
 export function useTenant(): Tenant | null {

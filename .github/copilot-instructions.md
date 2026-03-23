@@ -55,7 +55,7 @@ npm run lint         # Lint the codebase
 - **Serialization**: JSON with type marker replacer/reviver. No sorted keys.
 - **Hashing**: FNV-1a on sorted entity `id:hlcTimestamp:hlcCounter:hlcNodeId` pairs. Not on blob content.
 - **RxJS**: One `Subject<void>` per entity type. Return `Observable` (not `BehaviorSubject`). Always `distinctUntilChanged`.
-- **Testing**: Vitest. Co-locate test files (`foo.ts` → `foo.test.ts`). Use `MemoryBlobAdapter` for tests.
+- **Testing**: Vitest. Test files go in `tests/{module}/foo.test.ts` mirroring `src/{module}/`. Use `MemoryBlobAdapter` for tests.
 - **Dependencies**: Core modules have zero framework dependencies. Only `react` module depends on React.
 - **Adapter pattern**: `BlobAdapter` is the only adapter interface. 4 methods. Consumers implement for their storage (IDB, Drive, S3).
 - **No generics in app code**: No `TTenant`, no `<AppTenant>`. Types inferred from entity definitions.

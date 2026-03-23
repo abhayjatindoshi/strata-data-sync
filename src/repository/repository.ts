@@ -1,14 +1,14 @@
-import type { BaseEntity } from '../entity/index.js';
-import { getEntityKey } from '../entity/index.js';
-import type { EntityStore } from '../store/index.js';
-import type { ChangeSignal } from '../reactive/index.js';
+import type { BaseEntity } from '@strata/entity';
+import { getEntityKey } from '@strata/entity';
+import type { EntityStore } from '@strata/store';
+import type { ChangeSignal } from '@strata/reactive';
 import {
   observe as reactiveObserve,
   observeQuery as reactiveObserveQuery,
   entityEquals,
   entityArrayEquals,
-} from '../reactive/index.js';
-import type { EntityDefinition } from '../schema/index.js';
+} from '@strata/reactive';
+import type { EntityDefinition } from '@strata/schema';
 import type { Repository, QueryOptions } from './types.js';
 import { executeQuery } from './query-engine.js';
 

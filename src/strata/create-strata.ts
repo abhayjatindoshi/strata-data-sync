@@ -1,14 +1,14 @@
-import type { BaseEntity } from '../entity/index.js';
-import type { EntityDefinition } from '../schema/index.js';
-import type { Repository, SingletonRepository } from '../repository/index.js';
-import type { ChangeSignal } from '../reactive/index.js';
-import { createChangeSignal } from '../reactive/index.js';
-import { createEntityStore } from '../store/index.js';
-import { serialize, deserialize, computePartitionHash } from '../persistence/index.js';
-import { createSyncEngine } from '../sync/index.js';
-import { createTenantManager } from '../tenant/index.js';
-import { createRepository, createSingletonRepository } from '../repository/index.js';
-import { MemoryBlobAdapter } from '../adapter/index.js';
+import type { BaseEntity } from '@strata/entity';
+import type { EntityDefinition } from '@strata/schema';
+import type { Repository, SingletonRepository } from '@strata/repository';
+import type { ChangeSignal } from '@strata/reactive';
+import { createChangeSignal } from '@strata/reactive';
+import { createEntityStore } from '@strata/store';
+import { serialize, deserialize, computePartitionHash } from '@strata/persistence';
+import { createSyncEngine } from '@strata/sync';
+import { createTenantManager } from '@strata/tenant';
+import { createRepository, createSingletonRepository } from '@strata/repository';
+import { MemoryBlobAdapter } from '@strata/adapter';
 import type { Strata, StrataConfig } from './types.js';
 import { validateConfig } from './validate-config.js';
 

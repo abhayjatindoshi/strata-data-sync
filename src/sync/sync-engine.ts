@@ -1,14 +1,14 @@
 import { BehaviorSubject } from 'rxjs';
 import { distinctUntilChanged } from 'rxjs';
-import type { CloudMeta } from '../adapter/index.js';
-import type { PartitionBlob, PartitionIndex } from '../persistence/index.js';
-import type { BaseEntity } from '../entity/index.js';
+import type { CloudMeta } from '@strata/adapter';
+import type { PartitionBlob, PartitionIndex } from '@strata/persistence';
+import type { BaseEntity } from '@strata/entity';
 import type { SyncEngine, SyncEngineConfig, SyncEventType } from './types.js';
 import { createSyncScheduler } from './sync-scheduler.js';
 import { comparePartitionIndexes } from './partition-diff.js';
 import { mergePartitionBlobs } from './merge.js';
 import { purgeExpiredTombstones } from './tombstone.js';
-import { createEventBus } from '../reactive/index.js';
+import { createEventBus } from '@strata/reactive';
 
 const INDEX_KEY = '__partition_index';
 const DEFAULT_PERIODIC_MS = 300_000;

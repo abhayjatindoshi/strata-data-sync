@@ -1,5 +1,5 @@
-import type { BaseEntity, DeriveIdFn } from '../entity/index.js';
-import type { KeyStrategy } from '../key-strategy/index.js';
+import type { BaseEntity, DeriveIdFn } from '@strata/entity';
+import type { KeyStrategy } from '@strata/key-strategy';
 
 export type EntityDefinition<T extends BaseEntity> = {
   readonly name: string;

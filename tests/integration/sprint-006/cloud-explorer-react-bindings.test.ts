@@ -5,10 +5,9 @@ import type {
   ExplorerDataSource,
   CloudFileService,
   CloudObjectService,
-  CloudExplorerProps,
-} from '../../../src/cloud-explorer/index.js';
-import { createExplorerSource } from '../../../src/cloud-explorer/index.js';
-import type { Tenant } from '../../../src/tenant/index.js';
+} from '@strata/cloud-explorer';
+import { createExplorerSource } from '@strata/cloud-explorer';
+import type { Tenant } from '@strata/tenant';
 
 // ---------------------------------------------------------------------------
 // Helpers

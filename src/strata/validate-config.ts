@@ -1,5 +1,5 @@
 import type { StrataConfig } from './types.js';
-import type { EntityDefinition } from '../schema/index.js';
+import type { EntityDefinition } from '@strata/schema';
 
 export function validateConfig(config: StrataConfig): void {
   if (!config.entities || config.entities.length === 0) {

@@ -1,4 +1,4 @@
-import type { BaseEntityHlc } from '../entity/index.js';
+import type { BaseEntityHlc } from '@strata/entity';
 
 export type TypeMarker = {
   readonly __t: string;

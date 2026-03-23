@@ -114,3 +114,27 @@
 - None — all P0 backlog items delivered
 
 ---
+
+## Sprint 006 — 2026-03-23
+
+**Goal**: Implement all P1 items: React bindings (`src/react/`) and Cloud Explorer interfaces/component
+
+### Highlights
+- All 8 tasks delivered: `StrataProvider`, `useRepo`, `useObserve`/`useQuery`, `useTenant`/`useTenantList`/`useIsDirty`, `ExplorerDataSource` interface, `CloudFileService`/`CloudObjectService` interfaces, `CloudExplorer` component, claimed tenant matching
+- 450 unit tests and 21 integration tests passing (471 total) with zero failures
+- `src/react/` is the only module with a React dependency; all other modules remain framework-agnostic
+- Cloud Explorer defines contracts only — adapter-specific implementations (Drive, S3) remain P2 scope
+- All P1 backlog items complete
+
+### Lowlights
+- None
+
+### Metrics
+- Tasks planned: 8
+- Tasks completed: 8
+- Bugs found: 0 (critical: 0, major: 0, minor: 0)
+
+### Carry Forward
+- None — all P1 backlog items delivered
+
+---

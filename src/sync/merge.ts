@@ -1,6 +1,6 @@
-import { compareHlc } from '../hlc/index.js';
-import type { Hlc } from '../hlc/index.js';
-import type { PartitionBlob, Tombstone } from '../persistence/index.js';
+import { compareHlc } from '@strata/hlc';
+import type { Hlc } from '@strata/hlc';
+import type { PartitionBlob, Tombstone } from '@strata/persistence';
 
 type EntityWithHlc = {
   readonly hlc: Hlc;

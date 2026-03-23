@@ -214,9 +214,9 @@ describe('strata.repo() — global key strategy', () => {
       makeTodo('t3', 'Task 3'),
     ];
     repo.saveMany(todos);
-    expect(repo.get(todos[0].id)).toEqual(todos[0]);
-    expect(repo.get(todos[1].id)).toEqual(todos[1]);
-    expect(repo.get(todos[2].id)).toEqual(todos[2]);
+    expect(repo.get(todos[0]!.id)).toEqual(todos[0]);
+    expect(repo.get(todos[1]!.id)).toEqual(todos[1]);
+    expect(repo.get(todos[2]!.id)).toEqual(todos[2]);
   });
 
   it('queries all entities without options', () => {
@@ -246,9 +246,9 @@ describe('strata.repo() — global key strategy', () => {
     repo.save(makeTodo('t2', 'Alpha'));
     repo.save(makeTodo('t3', 'Mike'));
     const sorted = repo.query({ orderBy: [{ field: 'title', direction: 'asc' }] });
-    expect(sorted[0].title).toBe('Alpha');
-    expect(sorted[1].title).toBe('Mike');
-    expect(sorted[2].title).toBe('Zulu');
+    expect(sorted[0]!.title).toBe('Alpha');
+    expect(sorted[1]!.title).toBe('Mike');
+    expect(sorted[2]!.title).toBe('Zulu');
   });
 
   it('queries with limit and offset', () => {

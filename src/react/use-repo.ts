@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import type { BaseEntity } from '../entity/index.js';
-import type { EntityDefinition } from '../schema/index.js';
-import type { Repository, SingletonRepository } from '../repository/index.js';
+import type { BaseEntity } from '@strata/entity';
+import type { EntityDefinition } from '@strata/schema';
+import type { Repository, SingletonRepository } from '@strata/repository';
 import { useStrata } from './strata-provider.js';
 
 export function useRepo<T extends BaseEntity>(

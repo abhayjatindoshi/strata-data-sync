@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
-import type { Strata } from '../strata/index.js';
+import type { Strata } from '@strata/strata';
 
 const StrataContext = createContext<Strata | null>(null);
 

@@ -1,15 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
-import { createRepository, createSingletonRepository } from '../../../src/repository/index.js';
-import { defineEntity } from '../../../src/schema/index.js';
-import { createEntityStore } from '../../../src/store/index.js';
-import { createChangeSignal } from '../../../src/reactive/index.js';
-import { global as globalStrategy, singleton as singletonStrategy } from '../../../src/key-strategy/index.js';
-import { buildEntityId } from '../../../src/entity/index.js';
-import { createSyncScheduler, createFlushMechanism, comparePartitionIndexes, mergePartitionBlobs } from '../../../src/sync/index.js';
-import { computePartitionHash } from '../../../src/persistence/index.js';
-import type { BaseEntity } from '../../../src/entity/index.js';
-import type { PartitionBlob, PartitionIndex } from '../../../src/persistence/index.js';
-import type { Hlc } from '../../../src/hlc/index.js';
+import { describe, it, expect } from 'vitest';
+import { createRepository, createSingletonRepository } from '@strata/repository';
+import { defineEntity } from '@strata/schema';
+import { createEntityStore } from '@strata/store';
+import { createChangeSignal } from '@strata/reactive';
+import { global as globalStrategy, singleton as singletonStrategy } from '@strata/key-strategy';
+import { buildEntityId } from '@strata/entity';
+import { createSyncScheduler, createFlushMechanism, comparePartitionIndexes, mergePartitionBlobs } from '@strata/sync';
+import { computePartitionHash } from '@strata/persistence';
+import type { BaseEntity } from '@strata/entity';
+import type { PartitionBlob, PartitionIndex } from '@strata/persistence';
+import type { Hlc } from '@strata/hlc';
 import { firstValueFrom, take, toArray } from 'rxjs';
 
 // ---------------------------------------------------------------------------
@@ -201,8 +201,8 @@ describe('Sprint 003 Integration — Repository', () => {
       limit: 2,
     });
     expect(results).toHaveLength(2);
-    expect(results[0].priority).toBe(8);
-    expect(results[1].priority).toBe(6);
+    expect(results[0]!.priority).toBe(8);
+    expect(results[1]!.priority).toBe(6);
   });
 
   it('deletes entities', () => {
@@ -232,9 +232,9 @@ describe('Sprint 003 Integration — Repository', () => {
     ids.forEach(id => repo.save(makeTask({ id })));
     expect(repo.query()).toHaveLength(3);
 
-    repo.deleteMany([ids[0], ids[2]]);
+    repo.deleteMany([ids[0]!, ids[2]!]);
     expect(repo.query()).toHaveLength(1);
-    expect(repo.get(ids[1])).toBeDefined();
+    expect(repo.get(ids[1]!)).toBeDefined();
   });
 });
 
@@ -474,7 +474,7 @@ describe('Sprint 003 Integration — Partition Diff', () => {
     const local = makeIndex({ a: { hash: 1, count: 1 }, b: { hash: 2, count: 2 } });
     const cloud = makeIndex({ a: { hash: 1, count: 1 }, b: { hash: 2, count: 2 } });
     const diff = comparePartitionIndexes(local, cloud);
-    expect(diff.unchanged.sort()).toEqual(['a', 'b']);
+    expect([...diff.unchanged].sort()).toEqual(['a', 'b']);
     expect(diff.added).toHaveLength(0);
     expect(diff.removed).toHaveLength(0);
     expect(diff.changed).toHaveLength(0);
@@ -576,7 +576,7 @@ describe('Sprint 003 Integration — Merge', () => {
     const merged = mergePartitionBlobs(local, cloud);
     expect(merged.entities['x']).toBeUndefined();
     expect(merged.deleted['x']).toBeDefined();
-    expect(merged.deleted['x'].hlc.timestamp).toBe(200);
+    expect(merged.deleted['x']!.hlc.timestamp).toBe(200);
   });
 
   it('live entity with higher HLC wins over tombstone', () => {
@@ -600,7 +600,7 @@ describe('Sprint 003 Integration — Merge', () => {
       x: { id: 'x', hlc: hlc(200), deletedAt: '2025-06-01T00:00:00Z' },
     });
     const merged = mergePartitionBlobs(local, cloud);
-    expect(merged.deleted['x'].hlc.timestamp).toBe(200);
+    expect(merged.deleted['x']!.hlc.timestamp).toBe(200);
   });
 
   it('handles empty local blob', () => {
@@ -707,12 +707,12 @@ describe('Sprint 003 Integration — End-to-End Scenario', () => {
 
     // Simulate merge: cloud has updated version of task 2
     const localBlob = makeBlob({
-      [tasks[1].id]: { ...tasks[1] },
+      [tasks[1]!.id]: { ...tasks[1]! },
     });
     const cloudBlob: PartitionBlob = {
       entities: {
-        [tasks[1].id]: {
-          ...tasks[1],
+        [tasks[1]!.id]: {
+          ...tasks[1]!,
           title: 'Write MORE code',
           hlc: { timestamp: 1700000099999, counter: 0, nodeId: 'cloud-1' },
         },
@@ -721,7 +721,7 @@ describe('Sprint 003 Integration — End-to-End Scenario', () => {
     };
 
     const merged = mergePartitionBlobs(localBlob, cloudBlob);
-    const mergedEntity = merged.entities[tasks[1].id] as Task;
+    const mergedEntity = merged.entities[tasks[1]!.id] as Task;
     expect(mergedEntity.title).toBe('Write MORE code');
   });
 });

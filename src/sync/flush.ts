@@ -1,5 +1,5 @@
-import type { PartitionBlob } from '../persistence/index.js';
-import { createDebouncedFlush } from '../persistence/index.js';
+import type { PartitionBlob } from '@strata/persistence';
+import { createDebouncedFlush } from '@strata/persistence';
 import type { FlushMechanism } from './types.js';
 
 export function createFlushMechanism(

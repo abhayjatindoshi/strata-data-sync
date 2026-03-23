@@ -1,4 +1,4 @@
-import type { Tenant } from '../tenant/index.js';
+import type { Tenant } from '@strata/tenant';
 import type { ExplorerDataSource, ExplorerItem } from './types.js';
 
 function markClaimed(

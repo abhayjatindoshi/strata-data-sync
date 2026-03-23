@@ -1,5 +1,5 @@
 import type { Observable } from 'rxjs';
-import type { BaseEntity } from '../entity/index.js';
+import type { BaseEntity } from '@strata/entity';
 
 export type WhereClause<T> = {
   readonly field: keyof T;

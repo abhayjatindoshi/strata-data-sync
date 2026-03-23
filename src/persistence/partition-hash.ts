@@ -1,4 +1,4 @@
-import type { BaseEntity } from '../entity/index.js';
+import type { BaseEntity } from '@strata/entity';
 import { fnvHash } from './fnv-hash.js';
 
 export function computePartitionHash(
