@@ -1,12 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { hello } from '@strata/index';
+import {
+  createHlc,
+  createMemoryBlobAdapter,
+  defineEntity,
+  createEventBus,
+} from '@strata/index';
 
-describe('hello', () => {
-  it('returns greeting with the given name', () => {
-    expect(hello('World')).toBe('Hello, World!');
+describe('index barrel exports', () => {
+  it('exports HLC module', () => {
+    expect(createHlc).toBeDefined();
   });
 
-  it('handles empty string', () => {
-    expect(hello('')).toBe('Hello, !');
+  it('exports adapter module', () => {
+    expect(createMemoryBlobAdapter).toBeDefined();
+  });
+
+  it('exports schema module', () => {
+    expect(defineEntity).toBeDefined();
+  });
+
+  it('exports reactive module', () => {
+    expect(createEventBus).toBeDefined();
   });
 });

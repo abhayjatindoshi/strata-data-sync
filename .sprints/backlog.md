@@ -2,12 +2,12 @@
 
 | # | Epic | Component | Design Doc | Status |
 |---|------|-----------|------------|--------|
-| E1 | HLC — types, tick, compare | `hlc/` | `docs/persistence-sync.md` (HLC section) | pending |
-| E2 | Schema — defineEntity, ID gen, key strategies | `schema/` | `docs/schema-repository.md` (Entity Definition, Entity IDs, Key Strategies) | pending |
-| E3 | Adapter — BlobAdapter interface & types | `adapter/` | `docs/adapter.md` (Interface, cloudMeta, keys) | pending |
-| E4 | Adapter — MemoryBlobAdapter | `adapter/` | `docs/adapter.md` (MemoryBlobAdapter section) | pending |
+| E1 | HLC — types, tick, compare | `hlc/` | `docs/persistence-sync.md` (HLC section) | done |
+| E2 | Schema — defineEntity, ID gen, key strategies | `schema/` | `docs/schema-repository.md` (Entity Definition, Entity IDs, Key Strategies) | done |
+| E3 | Adapter — BlobAdapter interface & types | `adapter/` | `docs/adapter.md` (Interface, cloudMeta, keys) | done |
+| E4 | Adapter — MemoryBlobAdapter | `adapter/` | `docs/adapter.md` (MemoryBlobAdapter section) | done |
 | E5 | Adapter — Transform pipeline | `adapter/` | `docs/adapter.md` (Transform Pipeline section) | pending |
-| E6 | Reactive — Event bus & Subject signals | `reactive/` | `docs/reactive.md` (Event Bus, Entity Type Subject) | pending |
+| E6 | Reactive — Event bus & Subject signals | `reactive/` | `docs/reactive.md` (Event Bus, Entity Type Subject) | done |
 | E7 | Store — In-memory Map, lazy loading, dirty tracking | `store/` | `docs/schema-repository.md` (In-Memory Store) | pending |
 | E8 | Store — Debounced flush to adapter | `store/` | `docs/persistence-sync.md` (Flush Timing) | pending |
 | E9 | Persistence — JSON serialization & type markers | `persistence/` | `docs/persistence-sync.md` (Serialization, Type Markers) | pending |
