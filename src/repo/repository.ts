@@ -1,9 +1,11 @@
 import debug from 'debug';
+import { Subject } from 'rxjs';
+import { startWith, map, distinctUntilChanged } from 'rxjs/operators';
 import type { Hlc } from '@strata/hlc';
 import { tickLocal } from '@strata/hlc';
 import type { EntityDefinition, BaseEntity } from '@strata/schema';
 import { generateId, formatEntityId } from '@strata/schema';
-import type { EntityEventBus } from '@strata/reactive';
+import type { EntityEventBus, EntityEventListener } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { Repository, QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
@@ -15,12 +17,41 @@ function parseEntityKey(id: string): string {
   return id.substring(0, lastDot);
 }
 
+function entityComparator<T extends BaseEntity>(
+  a: (T & BaseEntity) | undefined,
+  b: (T & BaseEntity) | undefined,
+): boolean {
+  if (a === undefined && b === undefined) return true;
+  if (a === undefined || b === undefined) return false;
+  return a.id === b.id && a.version === b.version;
+}
+
+function resultsChanged<T extends BaseEntity>(
+  prev: ReadonlyArray<T>,
+  next: ReadonlyArray<T>,
+): boolean {
+  if (prev.length !== next.length) return true;
+  for (let i = 0; i < prev.length; i++) {
+    if (prev[i].id !== next[i].id || prev[i].version !== next[i].version) return true;
+  }
+  return false;
+}
+
 export function createRepository<T>(
   definition: EntityDefinition<T>,
   store: EntityStore,
   hlc: { current: Hlc },
   eventBus: EntityEventBus,
 ): Repository<T> {
+  const changeSignal = new Subject<void>();
+
+  const listener: EntityEventListener = (event) => {
+    if (event.entityName === definition.name) {
+      changeSignal.next();
+    }
+  };
+  eventBus.on(listener);
+
   function get(id: string): (T & BaseEntity) | undefined {
     const entityKey = parseEntityKey(id);
     return store.get(entityKey, id) as (T & BaseEntity) | undefined;
@@ -124,5 +155,21 @@ export function createRepository<T>(
     return entities;
   }
 
-  return { get, query, save, saveMany, delete: deleteEntity, deleteMany };
+  function observe(id: string) {
+    return changeSignal.pipe(
+      startWith(undefined as void),
+      map(() => get(id)),
+      distinctUntilChanged(entityComparator),
+    );
+  }
+
+  function observeQuery(opts?: QueryOptions<T>) {
+    return changeSignal.pipe(
+      startWith(undefined as void),
+      map(() => query(opts)),
+      distinctUntilChanged((prev, next) => !resultsChanged(prev, next)),
+    );
+  }
+
+  return { get, query, save, saveMany, delete: deleteEntity, deleteMany, observe, observeQuery };
 }

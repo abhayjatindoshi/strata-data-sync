@@ -30,6 +30,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "debug": "^4.4.3"
+    "debug": "^4.4.3",
+    "rxjs": "^7.8.2"
   }
 }

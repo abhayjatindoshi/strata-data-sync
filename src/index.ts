@@ -16,8 +16,8 @@ export type { PartitionIndexEntry, PartitionIndex } from '@strata/persistence';
 export { createStore, flushPartition, flushAll, createFlushScheduler } from '@strata/store';
 export type { EntityStore, FlushScheduler, FlushSchedulerOptions } from '@strata/store';
 
-export { createRepository, applyWhere, applyRange, applyOrderBy, applyPagination } from '@strata/repo';
-export type { Repository, QueryOptions } from '@strata/repo';
+export { createRepository, createSingletonRepository, applyWhere, applyRange, applyOrderBy, applyPagination } from '@strata/repo';
+export type { Repository, QueryOptions, SingletonRepository } from '@strata/repo';
 
-export { loadTenantList, saveTenantList, createTenantManager } from '@strata/tenant';
-export type { Tenant, CreateTenantOptions, SetupTenantOptions, TenantManagerOptions, Subscribable, TenantManager } from '@strata/tenant';
+export { loadTenantList, saveTenantList, createTenantManager, mergeTenantLists, pushTenantList, pullTenantList, saveTenantPrefs, loadTenantPrefs } from '@strata/tenant';
+export type { Tenant, CreateTenantOptions, SetupTenantOptions, TenantManagerOptions, Subscribable, TenantManager, TenantPrefs } from '@strata/tenant';

@@ -143,3 +143,39 @@ Epics: E8 (Store — Debounced flush), E12 (Repository — CRUD & query), E16 (T
 | 20 | Implement `TenantManager.setup(opts)` — reads `__strata` marker blob from `cloudMeta` location to detect existing workspace, reads tenant prefs (name/icon/color), derives deterministic tenant ID, adds to local tenant list | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
 | 21 | Implement `TenantManager.delink(tenantId)` — removes tenant from local list only, persists updated list; does NOT delete cloud data | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
 | 22 | Implement `TenantManager.delete(tenantId)` — removes tenant from local list AND deletes all blobs at the tenant's `cloudMeta` location via adapter | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+
+## Sprint 4 — Reactive Observe, SingletonRepository & Tenant Sync
+Started: 2026-03-23T22:00:00Z
+
+Epics: E14 (Reactive — observe, observeQuery, distinctUntilChanged), E13 (SingletonRepository), E17 (Tenant list storage & sync)
+
+### E14 — Reactive: observe, observeQuery, distinctUntilChanged (Layer 5)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 1 | Create per-entity-type `Subject<void>` (changeSignal) during repository creation; register event bus listener that calls `changeSignal.next()` when event's `entityName` matches the repo's entity definition name | E14 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 2 | Implement single-entity `distinctUntilChanged` comparator — returns equality `true` when both `a?.id === b?.id` and `a?.version === b?.version`; handles `undefined` values | E14 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 3 | Implement `Repository.observe(id)` — returns `Observable<T \| undefined>` via `changeSignal.pipe(startWith(undefined), map(() => store.get(entityKey, id)), distinctUntilChanged(entityComparator))` | E14 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 4 | Implement `resultsChanged` comparator for query results — returns `true` (changed) if array lengths differ or any element-wise `id`/`version` mismatch; `false` if all elements match | E14 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 5 | Implement `Repository.observeQuery(opts?)` — returns `Observable<ReadonlyArray<T>>` via `changeSignal.pipe(startWith(undefined), map(() => query(opts)), distinctUntilChanged(resultsChanged))` | E14 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+
+### E13 — SingletonRepository\<T\> (Layer 5)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 6 | Define `SingletonRepository<T>` type with `get(): T \| undefined`, `save(entity: T): void`, `delete(): boolean`, and `observe(): Observable<T \| undefined>` method signatures in `src/repo/` | E13 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 7 | Implement `createSingletonRepository<T>(definition, store, hlc, eventBus)` factory — creates internal Repository using the singleton key strategy, computes deterministic entity ID (`entityName._.entityName`), returns `SingletonRepository<T>` | E13 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 8 | Implement `SingletonRepository.get()` — delegates to internal `Repository.get(deterministicId)`, returns entity or `undefined` | E13 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 9 | Implement `SingletonRepository.save(entity)` — delegates to internal `Repository.save()` with the deterministic singleton ID, stamps `createdAt`/`updatedAt`/`version`/`hlc` via `tickLocal`, emits entity event | E13 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 10 | Implement `SingletonRepository.delete()` — delegates to internal `Repository.delete(deterministicId)`, returns `boolean` | E13 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 11 | Implement `SingletonRepository.observe()` — returns `Observable<T \| undefined>` via changeSignal pipe using the singleton's deterministic ID, same `startWith → map → distinctUntilChanged` pattern as `Repository.observe` | E13 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+
+### E17 — Tenant list storage & sync (Layer 5)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 12 | Implement `mergeTenantLists(local, remote)` — produces union by tenant ID; for matching IDs keeps entry with latest `updatedAt`; returns merged `Tenant[]` array | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 13 | Implement `pushTenantList(localAdapter, cloudAdapter)` — reads local `__tenants` blob (`cloudMeta = undefined`), writes to cloud adapter at `__tenants` key | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 14 | Implement `pullTenantList(localAdapter, cloudAdapter)` — reads cloud `__tenants` blob, merges with local list via `mergeTenantLists`, writes merged result back to local adapter | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 15 | Implement `saveTenantPrefs(adapter, cloudMeta, prefs)` — serializes tenant preferences (`name`, `icon?`, `color?`) to a prefs blob at the tenant's `cloudMeta` location for cross-device sharing | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+| 16 | Implement `loadTenantPrefs(adapter, cloudMeta)` — reads tenant preferences blob from `cloudMeta` location, deserializes, returns `{ name, icon?, color? }` or `undefined` if blob not found | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |

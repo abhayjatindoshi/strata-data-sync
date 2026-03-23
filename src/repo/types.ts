@@ -1,3 +1,4 @@
+import type { Observable } from 'rxjs';
 import type { BaseEntity } from '@strata/schema';
 
 export type QueryOptions<T> = {
@@ -24,4 +25,13 @@ export type Repository<T> = {
   saveMany(entities: ReadonlyArray<T & Partial<BaseEntity>>): ReadonlyArray<string>;
   delete(id: string): boolean;
   deleteMany(ids: ReadonlyArray<string>): void;
+  observe(id: string): Observable<(T & BaseEntity) | undefined>;
+  observeQuery(opts?: QueryOptions<T>): Observable<ReadonlyArray<T & BaseEntity>>;
+};
+
+export type SingletonRepository<T> = {
+  get(): (T & BaseEntity) | undefined;
+  save(entity: T & Partial<BaseEntity>): void;
+  delete(): boolean;
+  observe(): Observable<(T & BaseEntity) | undefined>;
 };

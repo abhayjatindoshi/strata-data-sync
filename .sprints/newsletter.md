@@ -102,3 +102,41 @@ Append-only log of sprint outcomes. Most recent entry at the bottom.
 - Flush: flushPartition serialization, flushAll dirty iteration and clearing, scheduler debounce timing, manual flush, dispose lifecycle
 - Repository: get by ID, save with HLC stamping and ID generation, saveMany batch, delete/deleteMany, query where filtering, range comparisons, orderBy multi-field sorting, offset/limit pagination
 - TenantManager: create with marker blob, load and activeTenant$ update, setup workspace detection, delink local-only removal, delete with cloud cleanup, list caching from __tenants blob
+
+---
+
+## Sprint 4 — Reactive Observe, SingletonRepository & Tenant Sync — 2026-03-23T22:00:00Z
+
+### What's New
+- **Reactive observe** (`src/reactive/`): `observe(id)` returns `Observable<T | undefined>` with per-entity-type `Subject<void>` change signal; `observeQuery(opts?)` returns `Observable<ReadonlyArray<T>>` for live query results; `distinctUntilChanged` with version-based comparators for both single-entity and query-result streams
+- **SingletonRepository\<T\>** (`src/repo/`): `createSingletonRepository<T>()` with deterministic ID (`entityName._.entityName`), delegates to internal `Repository<T>`; exposes `get()`, `save()`, `delete()`, `observe()` — all routed through the singleton's fixed ID
+- **Tenant list sync** (`src/tenant/`): `mergeTenantLists(local, remote)` produces union by tenant ID with latest-`updatedAt` wins; `pushTenantList()` and `pullTenantList()` for bidirectional sync between local and cloud adapters; `saveTenantPrefs()`/`loadTenantPrefs()` for cross-device tenant preference sharing
+- Added `rxjs` dependency for Observable-based reactive streams
+
+### What We Support
+- HLC creation, local/remote tick, and deterministic comparison
+- Pluggable blob storage via `BlobAdapter` interface
+- In-memory blob adapter for testing and offline use
+- Entity definition with flexible key strategies and ID generation
+- Reactive event bus for entity change notifications
+- Transform pipeline for composable blob encoding/decoding
+- JSON serialization with Date type preservation
+- FNV-1a content hashing for partition change detection
+- In-memory entity store with dirty tracking and lazy loading
+- Partition index for tracking partition metadata
+- Debounced flush scheduler with manual flush and graceful dispose
+- Repository CRUD with HLC-stamped writes and query pipeline
+- Multi-tenant management with create/load/setup/delink/delete lifecycle
+- Reactive observe streams for single entities and query results with change detection
+- SingletonRepository for single-instance entities with deterministic IDs
+- Tenant list merge and bidirectional push/pull sync with preference sharing
+
+### Quality
+- Unit tests: 173 passing (34 new)
+- Integration tests: 0 (not yet applicable)
+- Known issues: 0
+
+### Coverage Improvements
+- Reactive observe: per-entity-type Subject wiring, observe(id) emits on change, observeQuery live results, distinctUntilChanged entity comparator (id + version), query results comparator (length + element-wise)
+- SingletonRepository: deterministic ID generation, get/save/delete delegation, observe via change signal, singleton key strategy enforcement
+- Tenant sync: mergeTenantLists union by ID with latest-updatedAt wins, pushTenantList local-to-cloud, pullTenantList cloud-to-local merge, saveTenantPrefs/loadTenantPrefs round-trip
