@@ -1,71 +1,66 @@
-# Strata
-`strata-data-sync`
+# Strata v2 — Technical Design
 
-An offline-first, reactive data framework for TypeScript applications that need to store data locally and optionally synchronize it to the cloud. It handles the full lifecycle: entity definition, identity generation, partitioned storage, multi-tier persistence, automatic synchronization, conflict resolution, and reactive UI bindings.
+Strata is an offline-first, reactive data framework for TypeScript/JavaScript. It handles entity storage, multi-device sync via cloud blob storage, HLC-based conflict resolution, multi-tenancy, and reactive UI bindings.
 
----
-
-## What It Does
-
-The framework lets an application define domain entities as lightweight TypeScript type tokens, persist them across three storage tiers (in-memory, local, cloud), and keep all tiers in sync automatically. The application interacts with a single repository API for reads and writes. Everything else — lazy loading from lower tiers, dirty tracking, sync scheduling, conflict resolution, and reactive change propagation — happens behind the scenes.
-
-## Quick Start
-
-```typescript
-import { defineEntity, createStrata } from "strata-data-sync";
-
-// 1. Define entities — lightweight type tokens, no schema library needed
-const Transaction = defineEntity<{
-  amount: number;
-  date: Date;
-  accountId: string;
-}>("Transaction");
-
-const Account = defineEntity<{
-  name: string;
-  balance: number;
-}>("Account");
-
-// 2. Create the framework instance
-const strata = createStrata({
-  entities: [Transaction, Account],
-  localAdapter: myLocalAdapter,        // app-implemented blob storage
-  keyStrategy: dateKeyStrategy({ period: "year" }),
-  deviceId: "phone_1",
-});
-
-// 3. Load a tenant and start working
-await strata.load("default");
-
-// 4. Use type-safe repositories — zero casts
-const txnRepo = strata.repo(Transaction);
-
-const id = await txnRepo.save({ amount: 50, date: new Date(), accountId: "acct_1" });
-const txn = await txnRepo.get(id);    // fully typed: { id, createdAt, ..., amount, date, accountId }
-
-txnRepo.observe(id).subscribe(t => {
-  console.log(t?.amount);             // ✅ number, no cast
-});
-```
-
-## Documentation
+## Design Documents
 
 | Document | Description |
-|----------|-------------|
-| [Architecture](docs/architecture.md) | Three-tier storage (in-memory → local → cloud), lazy loading |
-| [Entities & Type System](docs/entities.md) | `defineEntity`, base fields, framework entities, type inference deep dive |
-| [Partitioning](docs/partitioning.md) | Entity keys, partition strategies, identity format, blob persistence format |
-| [Sync & Conflict Resolution](docs/sync.md) | Dirty tracking, metadata-first sync, HLC clocks, resolution rules |
-| [Multi-Tenancy](docs/tenancy.md) | Tenant isolation, lifecycle, extending tenant shape |
-| [API Reference](docs/api.md) | Initialization, repository API, tenant manager, query options, adapters, React integration |
+|---|---|
+| [Architecture Overview](docs/architecture.md) | High-level component diagram, design principles, data flow summary |
+| [Schema & Repository](docs/schema-repository.md) | Entity definitions, ID generation, key strategies, repository API surface |
+| [Adapter Contract](docs/adapter.md) | `BlobAdapter` interface, `cloudMeta` per-call, transform pipeline |
+| [Tenant System](docs/tenant.md) | Multi-tenancy, `cloudMeta`, tenant lifecycle, sharing, tenant list storage |
+| [Persistence & Sync](docs/persistence-sync.md) | Serialization, hashing, flush timing, sync phases, conflict resolution, tombstones |
+| [Reactive Layer](docs/reactive.md) | Event bus, shared subjects, observables, change detection, batch writes |
+| [App Lifecycle](docs/lifecycle.md) | Full lifecycle sequence diagram (init → tenant → query → save → sync → dispose) |
+| [Decisions Tracker](docs/decisions.md) | All accepted, rejected, and future decisions with rationale |
 
-## Design Principles
+## Key Design Choices
 
-- **Offline-first** — the app works fully without a network. Cloud sync is opportunistic.
-- **Zero-cast type safety** — entity types flow from definition tokens through repositories, queries, and observables without any manual casting.
-- **Deterministic serialization** — all blobs serialize with sorted keys so identical data always produces the same hash.
-- **Metadata-driven sync** — never load entity data unless metadata proves something has changed.
-- **Event-driven reactivity** — every mutation emits an event. Observers are always consistent with the latest state.
-- **Partition isolation** — operations on one partition never affect another. Sync, loading, and hashing are all per-partition.
-- **Delete tracking** — deletions are recorded, not erased, allowing sync to propagate deletes correctly.
-- **Global adapters** — storage adapters are stateless singletons, key-based, with no awareness of tenants or entity types.
+- **In-memory Map is source of truth** — all reads are sync. Adapters are persistence only.
+- **One `BlobAdapter` interface** — 4 methods, same for local and cloud. No query delegation.
+- **One `Subject<void>` per entity type** — all observers pipe off it with `distinctUntilChanged`.
+- **Three-phase sync** — hydrate on load, periodic persist, manual full sync. One sync at a time globally.
+- **`cloudMeta` per-call** — adapters receive opaque tenant location info. No generics. No tenant type pollution.
+- **JSON with type markers** — `Date` wrapped as `{ __t: 'D', v: iso }`. No sorted keys needed.
+- **ID+HLC partition hash** — FNV-1a. No blob content hashing. Catches cross-device version collisions.
+
+## Status
+
+React bindings design is pending. All other components have finalized designs.
+
+```mermaid
+flowchart TD
+    CEO["🎯 CEO\nKick off sprint cycle"]
+    SM["🗂 Scrum Master\nCreate sprint plan"]
+    VP["⚡ VP\nExecute tasks sequentially"]
+    DEV["👨‍💻 Developer\nImplement one task"]
+    REV["🔍 Reviewer\nCheck code vs design"]
+    TEST["🧪 Testing Lead\nRun unit tests, write missing ones"]
+    IT["🔗 Integration Tester\nWrite & run integration tests"]
+    DOC["📝 Documenter\nUpdate progress log & backlog"]
+
+    CEO -->|"start sprint"| SM
+    SM -->|"sprint plan ready"| VP
+    VP -->|"pick task"| DEV
+    DEV -->|"task done"| REV
+    REV -->|"approved"| VP
+    REV -->|"issues found"| DEV
+    VP -->|"all tasks done"| TEST
+    TEST -->|"tests pass"| IT
+    TEST -->|"code bug"| DEV
+    IT -->|"all pass"| DOC
+    IT -->|"code bug"| DEV
+    IT -->|"test bug"| IT
+    DOC -->|"sprint logged"| CEO
+    CEO -->|"next sprint"| SM
+
+    style CEO fill:#FFEBEE,stroke:#B71C1C
+    style SM fill:#E3F2FD,stroke:#1565C0
+    style VP fill:#F3E5F5,stroke:#7B1FA2
+    style DEV fill:#EDE7F6,stroke:#4527A0
+    style REV fill:#FFF3E0,stroke:#E65100
+    style TEST fill:#E8F5E9,stroke:#2E7D32
+    style IT fill:#E8F5E9,stroke:#2E7D32
+    style DOC fill:#F5F5F5,stroke:#616161
+```

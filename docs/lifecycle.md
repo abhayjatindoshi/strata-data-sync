@@ -1,0 +1,146 @@
+# App Lifecycle & Data Flow
+
+## Lifecycle Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App as App / UI
+    participant Strata as createStrata()
+    participant Tenant as Tenant Manager
+    participant Repo as Repository
+    participant Store as In-Memory Store
+    participant Signal as Entity Subject
+    participant Local as Local BlobAdapter
+    participant Cloud as Cloud BlobAdapter
+    participant Sync as Sync Engine
+
+    Note over App,Sync: ═══ PHASE 1: INITIALIZATION ═══
+
+    App->>Strata: createStrata({ entities, adapters, deviceId })
+    Strata->>Strata: validate entity defs, init HLC
+    Strata->>Signal: create Subject<void> per entity type
+    Strata->>Sync: create sync scheduler (idle)
+    Strata-->>App: strata instance
+
+    Note over App,Sync: ═══ PHASE 2: TENANT LOAD ═══
+
+    App->>Tenant: strata.tenants.list()
+    Tenant->>Local: read(undefined, '__tenants')
+    Local-->>Tenant: tenant list blob (or null)
+    Tenant-->>App: tenants[]
+
+    App->>Tenant: strata.tenants.load(tenantId)
+    Tenant->>Tenant: set active tenant, resolve cloudMeta
+
+    Note over App,Sync: ═══ PHASE 3: HYDRATE (cloud → local → memory) ═══
+
+    Sync->>Cloud: read(cloudMeta, '__index.transaction')
+    Cloud-->>Sync: cloud partition index (or null if unreachable)
+
+    alt Cloud reachable
+        Sync->>Sync: compare cloud index vs local index
+        loop For each changed/new partition
+            Sync->>Cloud: read(cloudMeta, partition blob)
+            Cloud-->>Sync: blob
+            Sync->>Sync: deserialize + merge with local
+            Sync->>Local: write(cloudMeta, merged blob)
+            Sync->>Store: upsert merged entities into Map
+            Store->>Signal: subject.next()
+        end
+    else Cloud unreachable
+        Sync->>App: emit cloud-unreachable event
+    end
+
+    Sync->>Local: read partition blobs for loaded entity types
+    Local-->>Sync: blobs
+    Sync->>Store: deserialize + load into Map
+
+    Note over App,Sync: ═══ PHASE 4: FIRST QUERY ═══
+
+    App->>Repo: repo.query({ where: { status: 'pending' } })
+    Repo->>Store: scan Map (sync), filter, sort, paginate
+    Store-->>Repo: results
+    Repo-->>App: transactions[]
+
+    Note over App,Sync: ═══ PHASE 5: MUTATION ═══
+
+    User->>App: creates new transaction
+    App->>Repo: repo.save({ amount: 50, date: new Date() })
+    Repo->>Repo: assign ID, set createdAt/updatedAt/version/hlc
+    Repo->>Store: Map.set(entityKey, id, entity) [sync]
+    Store->>Signal: subject.next() [sync]
+    Repo-->>App: entity ID (immediate, sync)
+
+    Note right of Signal: All observers pipe fires:<br/>map(() => readFromMap)<br/>distinctUntilChanged<br/>emit only if changed
+
+    par Async Flush (debounced 2s)
+        Store->>Store: mark partition dirty
+        Store->>Local: serialize + write blob (after 2s idle)
+        Store->>Store: update partition index
+    end
+
+    Note over App,Sync: ═══ PHASE 6: REACTIVE OBSERVATION ═══
+
+    App->>Repo: repo.observeQuery({ where: { status: 'pending' } })
+    Repo->>Signal: pipe(startWith, map(() => query(opts)), distinctUntilChanged)
+    Signal-->>App: Observable emits initial results
+
+    User->>App: saves another transaction
+    App->>Repo: repo.save(entity)
+    Repo->>Store: Map.set [sync]
+    Store->>Signal: subject.next() [sync]
+    Signal-->>App: Observer re-scans Map, emits updated results
+
+    Note over App,Sync: ═══ PHASE 7: PERIODIC SYNC (background) ═══
+
+    Note right of Sync: Every 2s: memory → local flush<br/>Every 5m: local → cloud sync
+
+    Sync->>Store: read dirty partitions from Map
+    Sync->>Sync: serialize entities from Map
+    Sync->>Local: write partition blobs
+    Sync->>Sync: compute partition hashes (ID+HLC)
+
+    Sync->>Cloud: read cloud partition index
+    Cloud-->>Sync: cloud index
+    Sync->>Sync: compare hashes
+    loop For each dirty partition
+        Sync->>Cloud: read cloud blob (if hash mismatch)
+        Sync->>Sync: merge (HLC conflict resolution)
+        Sync->>Cloud: write merged blob
+        Sync->>Local: write merged blob
+        Sync->>Store: upsert if cloud had newer data
+        Store->>Signal: subject.next() (if Map changed)
+    end
+
+    Note over App,Sync: ═══ PHASE 8: MANUAL SYNC ═══
+
+    App->>Strata: strata.sync()
+    Strata->>Sync: enqueue memory→local→cloud (immediate)
+    Sync->>Store: flush all dirty partitions to local
+    Sync->>Sync: local↔cloud bidirectional merge
+    Sync-->>App: Promise<SyncResult>
+
+    Note over App,Sync: ═══ PHASE 9: DISPOSE ═══
+
+    App->>Strata: strata.dispose()
+    Strata->>Sync: wait for in-flight sync
+    Strata->>Store: force flush all dirty to local (bypass debounce)
+    Store->>Local: write remaining blobs
+    Strata->>Signal: complete all subjects
+    Strata->>Strata: remove all event bus listeners
+```
+
+## Phase Summary
+
+| Phase | What happens | Blocking? |
+|---|---|---|
+| 1. Init | Create strata, validate schemas, init HLC | Sync — instant |
+| 2. Tenant | Load tenant list from local, set active | Async — local adapter read |
+| 3. Hydrate | Cloud → local → memory. Cloud unreachable = load from local only | Async — adapter I/O |
+| 4. First Query | Scan in-memory Map | Sync — instant |
+| 5. Mutation | Map.set + emit signal | Sync — instant. Flush is async background. |
+| 6. Observe | Pipe off entity subject, re-scan Map on signal | Sync — no adapter I/O |
+| 7. Periodic Sync | memory→local (2s), local→cloud (5m) | Async — background, one at a time |
+| 8. Manual Sync | memory→local→cloud, immediate | Async — returns Promise |
+| 9. Dispose | Wait for sync, flush, complete subjects | Async — waits for completion |
