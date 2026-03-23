@@ -21,3 +21,6 @@ export type { Repository, QueryOptions, SingletonRepository } from '@strata/repo
 
 export { loadTenantList, saveTenantList, createTenantManager, mergeTenantLists, pushTenantList, pullTenantList, saveTenantPrefs, loadTenantPrefs, writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/tenant';
 export type { Tenant, CreateTenantOptions, SetupTenantOptions, TenantManagerOptions, Subscribable, TenantManager, TenantPrefs, MarkerBlob } from '@strata/tenant';
+
+export { loadIndexPair, diffPartitions, copyPartitionToCloud, copyPartitionToLocal, syncCopyPhase, resolveConflict, resolveEntityTombstone, diffEntityMaps, mergePartition, syncMergePhase, updateIndexesAfterSync, applyMergedToStore } from '@strata/sync';
+export type { PartitionDiffResult, EntityDiffResult, MergeResult, MergedPartitionResult, SyncEntity } from '@strata/sync';

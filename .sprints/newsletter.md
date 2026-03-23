@@ -183,3 +183,51 @@ Append-only log of sprint outcomes. Most recent entry at the bottom.
 - Dispose: dispose() completes active Observable subscriptions, disposed Repository rejects further operations, event bus listener removed after dispose, SingletonRepository dispose delegates correctly
 - MarkerBlob: writeMarkerBlob/readMarkerBlob round-trip, readMarkerBlob returns undefined for missing blob, validateMarkerBlob accepts version 1 and rejects unsupported versions, entity types array persisted correctly
 - Sharing flow: setup() reads marker blob and detects existing workspace, derives same tenant ID via deriveTenantId, merges tenant prefs into local list, rejects location without valid marker blob
+
+---
+
+## Sprint 6 — Sync Engine: Diff, Copy & Merge — 2026-03-23T23:00:00Z
+
+### What's New
+- **Partition diff** (`src/sync/`): `loadIndexPair()` fetches local and cloud partition indexes in parallel; `diffPartitions()` categorizes partition keys into `localOnly`, `cloudOnly`, `diverged`, and `unchanged` buckets by comparing FNV-1a hashes
+- **Copy optimization** (`src/sync/`): `copyPartitionToCloud()` and `copyPartitionToLocal()` transfer partition blobs directly without deserialization; `syncCopyPhase()` orchestrates bulk copy for all `localOnly` and `cloudOnly` partitions
+- **Conflict resolution** (`src/sync/`): `resolveConflict()` implements HLC last-writer-wins (timestamp → counter → nodeId tiebreaker); `resolveEntityTombstone()` resolves entity-vs-delete conflicts via HLC comparison
+- **Bidirectional merge** (`src/sync/`): `diffEntityMaps()` categorizes entities across local/cloud including tombstones; `mergePartition()` deserializes both blobs, resolves all conflicts, produces merged entity and tombstone maps; `syncMergePhase()` processes all diverged partitions and writes merged results to both adapters
+- **Post-sync housekeeping** (`src/sync/`): `updateIndexesAfterSync()` recomputes partition hashes and persists updated indexes; `applyMergedToStore()` upserts merged entities into the in-memory store and emits reactive events
+
+### What We Support
+- HLC creation, local/remote tick, and deterministic comparison
+- Pluggable blob storage via `BlobAdapter` interface
+- In-memory blob adapter for testing and offline use
+- Entity definition with flexible key strategies and ID generation
+- Reactive event bus for entity change notifications
+- Transform pipeline for composable blob encoding/decoding
+- JSON serialization with Date type preservation
+- FNV-1a content hashing for partition change detection
+- In-memory entity store with dirty tracking and lazy loading
+- Partition index for tracking partition metadata
+- Debounced flush scheduler with manual flush and graceful dispose
+- Repository CRUD with HLC-stamped writes and query pipeline
+- Multi-tenant management with create/load/setup/delink/delete lifecycle
+- Reactive observe streams for single entities and query results with change detection
+- SingletonRepository for single-instance entities with deterministic IDs
+- Tenant list merge and bidirectional push/pull sync with preference sharing
+- Batch writes with single-signal emission for saveMany/deleteMany
+- Repository and SingletonRepository dispose with observer completion and listener cleanup
+- MarkerBlob creation, reading, and version validation for workspace detection
+- Tenant sharing flow with marker blob validation and deterministic ID derivation
+- Partition diff and hash-based copy optimization for sync
+- Bidirectional merge with HLC last-writer-wins conflict resolution
+- Entity-vs-tombstone resolution and merged store application with reactive events
+
+### Quality
+- Unit tests: 256 passing (49 new)
+- Integration tests: 0 (not yet applicable)
+- Known issues: 0
+
+### Coverage Improvements
+- Diff: all partitions unchanged, all local-only, all cloud-only, mixed categories, empty indexes, single diverged partition with hash mismatch
+- Copy: copyPartitionToCloud/ToLocal blob transfer, no-op on null source, syncCopyPhase processes all localOnly and cloudOnly partitions
+- Conflict resolution: resolveConflict picks higher timestamp, counter tiebreaker, nodeId string tiebreaker; resolveEntityTombstone both directions
+- Partition merge: mergePartition includes local-only entities, cloud-only entities, HLC-resolved conflicts, tombstone vs entity both directions, symmetric merged results
+- Full sync integration: syncMergePhase processes all diverged keys, updateIndexesAfterSync recomputes hashes and persists both indexes, applyMergedToStore upserts and emits entity events
