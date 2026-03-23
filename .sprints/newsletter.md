@@ -64,3 +64,41 @@ Append-only log of sprint outcomes. Most recent entry at the bottom.
 - Hashing: known FNV-1a test vectors, deterministic output, HLC sensitivity, sort-order independence, empty input
 - Store: CRUD get/set/delete, auto-creating partitions, dirty tracking lifecycle, partition key prefix filtering, lazy load caching
 - Partition index: missing blob returns empty, save/load round-trip, create/update entries, key format validation
+
+---
+
+## Sprint 3 — Store Flush, Repository CRUD & Tenant Manager — 2026-03-23T21:30:00Z
+
+### What's New
+- **Debounced flush** (`src/store/`): `flushPartition()` serializes dirty partition data (entities + tombstone placeholders) to blob format and writes via adapter; `flushAll()` iterates all dirty keys and clears dirty flags after successful write; `createFlushScheduler()` with configurable idle debounce (`schedule`/`flush`/`dispose` lifecycle)
+- **Repository\<T\> CRUD & query** (`src/repo/`): `createRepository<T>()` factory bound to entity definition; full CRUD — `get(id)`, `save(entity)`, `saveMany(entities)`, `delete(id)`, `deleteMany(ids)` with HLC stamping, ID generation, and event emission; query pipeline — `where` (shallow partial match), `range` (gt/gte/lt/lte), `orderBy` (multi-field asc/desc), `offset`/`limit` pagination
+- **TenantManager** (`src/tenant/`): `createTenantManager()` with full tenant lifecycle — `create` (generates ID, writes `__strata` marker blob), `load` (sets active tenant on `activeTenant$`), `setup` (detects existing workspace via marker blob, derives deterministic ID), `delink` (local-only removal), `delete` (removes local + cloud data), `list` (cached `__tenants` blob persistence)
+
+### Design Decisions
+- **Subscribable\<T\>** used instead of rxjs `Observable` for `activeTenant$` — keeps the framework dependency-light
+- **Flush includes tombstone placeholder** — partition blob format reserves `deleted` key for future tombstone sync support
+
+### What We Support
+- HLC creation, local/remote tick, and deterministic comparison
+- Pluggable blob storage via `BlobAdapter` interface
+- In-memory blob adapter for testing and offline use
+- Entity definition with flexible key strategies and ID generation
+- Reactive event bus for entity change notifications
+- Transform pipeline for composable blob encoding/decoding
+- JSON serialization with Date type preservation
+- FNV-1a content hashing for partition change detection
+- In-memory entity store with dirty tracking and lazy loading
+- Partition index for tracking partition metadata
+- Debounced flush scheduler with manual flush and graceful dispose
+- Repository CRUD with HLC-stamped writes and query pipeline
+- Multi-tenant management with create/load/setup/delink/delete lifecycle
+
+### Quality
+- Unit tests: 139 passing (54 new)
+- Integration tests: 0 (not yet applicable)
+- Known issues: 0
+
+### Coverage Improvements
+- Flush: flushPartition serialization, flushAll dirty iteration and clearing, scheduler debounce timing, manual flush, dispose lifecycle
+- Repository: get by ID, save with HLC stamping and ID generation, saveMany batch, delete/deleteMany, query where filtering, range comparisons, orderBy multi-field sorting, offset/limit pagination
+- TenantManager: create with marker blob, load and activeTenant$ update, setup workspace detection, delink local-only removal, delete with cloud cleanup, list caching from __tenants blob

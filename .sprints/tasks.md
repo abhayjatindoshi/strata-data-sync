@@ -101,3 +101,45 @@ Epics: E5 (Transform pipeline), E9 (Serialization), E10 (FNV-1a hashing), E7 (In
 | 18 | Implement `savePartitionIndex(adapter, cloudMeta, entityName, index): Promise<void>` — serializes index with `serialize` and writes to `__index.{entityName}` blob via adapter | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
 | 19 | Implement `updatePartitionIndexEntry(index, partitionKey, hash, count): PartitionIndex` — creates or updates entry for given partition key with hash, count, and current timestamp | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
 | 20 | Write unit tests for partition index — load returns empty object for missing blob, save/load round-trip, updateEntry creates new entry and updates existing, key format uses `__index.{entityName}` | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+
+## Sprint 3 — Store Flush, Repository CRUD & Tenant Manager
+Started: 2026-03-23T21:30:00Z
+
+Epics: E8 (Store — Debounced flush), E12 (Repository — CRUD & query), E16 (Tenant — TenantManager CRUD)
+
+### E8 — Store: Debounced flush to adapter (Layer 4)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 1 | Implement `flushPartition(adapter, store, entityKey)` — reads dirty partition from store, serializes entity map to blob format (`{ [entityName]: { ...entities }, deleted: { [entityName]: { ...tombstones } } }`), writes via `adapter.write()` | E8 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 2 | Implement `flushAll(adapter, store, entityNames)` — iterates `store.getDirtyKeys()`, calls `flushPartition` for each dirty key, clears dirty flag per partition after successful write | E8 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 3 | Implement `createFlushScheduler(adapter, store, options)` — returns scheduler object; on `schedule()` call, resets debounce timer and triggers `flushAll` after configurable idle ms (default 2000) | E8 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 4 | Implement `flushScheduler.flush()` — cancels any pending debounce timer and forces immediate `flushAll`, returns promise that resolves when flush completes | E8 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 5 | Implement `flushScheduler.dispose()` — cancels pending timer and forces immediate flush of all dirty data; no-op if no dirty partitions; scheduler rejects further `schedule()` calls after dispose | E8 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+
+### E12 — Repository: Repository\<T\> CRUD & query (Layer 4)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 6 | Define `Repository<T>` type (get, query, save, saveMany, delete, deleteMany) and `QueryOptions<T>` type (where, range, orderBy, limit, offset) in `src/repo/` | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 7 | Implement `createRepository<T>(definition, store, hlc, eventBus)` factory — returns `Repository<T>` bound to the entity definition's name and key strategy | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 8 | Implement `Repository.get(id)` — parses entity key from ID format `entityName.partitionKey.uniqueId`, looks up partition in store, returns entity or `undefined` | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 9 | Implement `Repository.save(entity)` — generates ID (random via `generateId` or deterministic via `deriveId`), derives partition key from key strategy, stamps `createdAt`/`updatedAt`/`version`/`hlc` (via `tickLocal`), writes to store, emits entity event, returns ID | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 10 | Implement `Repository.saveMany(entities)` — batch save applying same logic as `save` per entity, returns array of IDs | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 11 | Implement `Repository.delete(id)` — removes entity from store partition, emits entity event, returns `boolean`; and `deleteMany(ids)` — batch delete for multiple IDs | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 12 | Implement query filtering — `applyWhere(entities, where)` filters by shallow partial field match; `applyRange(entities, range)` filters by field `gt`/`gte`/`lt`/`lte` comparisons | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 13 | Implement query sorting and pagination — `applyOrderBy(entities, orderBy)` sorts by multiple fields with `asc`/`desc`; `applyPagination(entities, offset, limit)` slices result array | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 14 | Implement `Repository.query(opts?)` — scans all partitions for entity type (using `store.getAllPartitionKeys`), collects entities, applies pipeline: where → range → orderBy → offset/limit; returns `ReadonlyArray<T>` | E12 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+
+### E16 — Tenant: Tenant model & TenantManager CRUD (Layer 4)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 15 | Define `Tenant` type (`id`, `name`, `icon?`, `color?`, `cloudMeta`, `createdAt`, `updatedAt`) and `TenantManager` type (list, create, setup, load, delink, delete, `activeTenant$`) in `src/tenant/` | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 16 | Implement tenant list persistence — `loadTenantList(adapter): Promise<Tenant[]>` reads `__tenants` blob with `cloudMeta = undefined`, deserializes; `saveTenantList(adapter, tenants): Promise<void>` serializes and writes | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 17 | Implement `TenantManager.list()` — returns all tenants from local adapter via `loadTenantList`, cached after first load | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 18 | Implement `TenantManager.create(opts)` — generates or derives tenant ID (via `deriveTenantId` if configured), creates `Tenant` record with timestamps, appends to tenant list, writes `__strata` marker blob at `cloudMeta` location | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 19 | Implement `TenantManager.load(tenantId)` — finds tenant by ID in list, sets as active tenant, updates `activeTenant$` observable; throws if tenant ID not found | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 20 | Implement `TenantManager.setup(opts)` — reads `__strata` marker blob from `cloudMeta` location to detect existing workspace, reads tenant prefs (name/icon/color), derives deterministic tenant ID, adds to local tenant list | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 21 | Implement `TenantManager.delink(tenantId)` — removes tenant from local list only, persists updated list; does NOT delete cloud data | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |
+| 22 | Implement `TenantManager.delete(tenantId)` — removes tenant from local list AND deletes all blobs at the tenant's `cloudMeta` location via adapter | E16 | developer | done | plan | 2026-03-23T21:30:00Z | 2026-03-23T22:13:00Z |

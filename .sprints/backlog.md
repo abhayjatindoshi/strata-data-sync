@@ -9,15 +9,15 @@
 | E5 | Adapter — Transform pipeline | `adapter/` | `docs/adapter.md` (Transform Pipeline section) | done |
 | E6 | Reactive — Event bus & Subject signals | `reactive/` | `docs/reactive.md` (Event Bus, Entity Type Subject) | done |
 | E7 | Store — In-memory Map, lazy loading, dirty tracking | `store/` | `docs/schema-repository.md` (In-Memory Store) | done |
-| E8 | Store — Debounced flush to adapter | `store/` | `docs/persistence-sync.md` (Flush Timing) | pending |
+| E8 | Store — Debounced flush to adapter | `store/` | `docs/persistence-sync.md` (Flush Timing) | done |
 | E9 | Persistence — JSON serialization & type markers | `persistence/` | `docs/persistence-sync.md` (Serialization, Type Markers) | done |
 | E10 | Persistence — FNV-1a hashing | `persistence/` | `docs/persistence-sync.md` (Hashing section) | done |
 | E11 | Persistence — Partition index | `persistence/` | `docs/persistence-sync.md` (Partition Index) | done |
-| E12 | Repository — Repository\<T\> CRUD & query | `repo/` | `docs/schema-repository.md` (Repository Types, QueryOptions) | pending |
+| E12 | Repository — Repository\<T\> CRUD & query | `repo/` | `docs/schema-repository.md` (Repository Types, QueryOptions) | done |
 | E13 | Repository — SingletonRepository\<T\> | `repo/` | `docs/schema-repository.md` (SingletonRepository) | pending |
 | E14 | Reactive — observe, observeQuery, distinctUntilChanged | `reactive/` | `docs/reactive.md` (observe, observeQuery, Change Detection) | pending |
 | E15 | Reactive — Batch writes & dispose | `reactive/` | `docs/reactive.md` (Batch Writes, Cleanup) | pending |
-| E16 | Tenant — Tenant model & TenantManager CRUD | `tenant/` | `docs/tenant.md` (Tenant Model, TenantManager API) | pending |
+| E16 | Tenant — Tenant model & TenantManager CRUD | `tenant/` | `docs/tenant.md` (Tenant Model, TenantManager API) | done |
 | E17 | Tenant — Tenant list storage & sync | `tenant/` | `docs/tenant.md` (Tenant List Storage) | pending |
 | E18 | Tenant — Sharing, setup, marker blob | `tenant/` | `docs/tenant.md` (Sharing Flow, Marker Blob) | pending |
 | E19 | Sync — Partition diff & copy optimization | `sync/` | `docs/persistence-sync.md` (Sync Cycle steps 1-4, Copy optimization) | pending |

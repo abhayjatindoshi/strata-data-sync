@@ -11,3 +11,13 @@ export type EntityStore = {
     loader: () => Promise<Map<string, unknown>>,
   ): Promise<ReadonlyMap<string, unknown>>;
 };
+
+export type FlushSchedulerOptions = {
+  readonly debounceMs?: number;
+};
+
+export type FlushScheduler = {
+  schedule(): void;
+  flush(): Promise<void>;
+  dispose(): Promise<void>;
+};
