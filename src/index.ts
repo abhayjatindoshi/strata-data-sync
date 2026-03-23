@@ -19,5 +19,5 @@ export type { EntityStore, FlushScheduler, FlushSchedulerOptions } from '@strata
 export { createRepository, createSingletonRepository, applyWhere, applyRange, applyOrderBy, applyPagination } from '@strata/repo';
 export type { Repository, QueryOptions, SingletonRepository } from '@strata/repo';
 
-export { loadTenantList, saveTenantList, createTenantManager, mergeTenantLists, pushTenantList, pullTenantList, saveTenantPrefs, loadTenantPrefs } from '@strata/tenant';
-export type { Tenant, CreateTenantOptions, SetupTenantOptions, TenantManagerOptions, Subscribable, TenantManager, TenantPrefs } from '@strata/tenant';
+export { loadTenantList, saveTenantList, createTenantManager, mergeTenantLists, pushTenantList, pullTenantList, saveTenantPrefs, loadTenantPrefs, writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/tenant';
+export type { Tenant, CreateTenantOptions, SetupTenantOptions, TenantManagerOptions, Subscribable, TenantManager, TenantPrefs, MarkerBlob } from '@strata/tenant';

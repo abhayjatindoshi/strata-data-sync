@@ -1,7 +1,5 @@
 import debug from 'debug';
 import type { BlobAdapter } from '@strata/adapter';
-import { STRATA_MARKER_KEY } from '@strata/adapter';
-import { serialize } from '@strata/persistence';
 import type {
   Tenant,
   CreateTenantOptions,
@@ -11,6 +9,8 @@ import type {
   Subscribable,
 } from './types';
 import { loadTenantList, saveTenantList } from './tenant-list';
+import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-blob';
+import { loadTenantPrefs } from './tenant-prefs';
 
 const log = debug('strata:tenant');
 
@@ -100,8 +100,7 @@ export function createTenantManager(
         updatedAt: now,
       };
 
-      const marker = { version: 1, createdAt: now.toISOString(), entityTypes: [] as string[] };
-      await adapter.write(opts.cloudMeta, STRATA_MARKER_KEY, serialize(marker));
+      await writeMarkerBlob(adapter, opts.cloudMeta, options?.entityTypes ?? []);
 
       await persistList([...tenants, tenant]);
       log('created tenant %s', id);
@@ -120,9 +119,12 @@ export function createTenantManager(
     },
 
     async setup(opts: SetupTenantOptions) {
-      const markerData = await adapter.read(opts.cloudMeta, STRATA_MARKER_KEY);
-      if (!markerData) {
+      const marker = await readMarkerBlob(adapter, opts.cloudMeta);
+      if (!marker) {
         throw new Error('No strata workspace found at the specified location');
+      }
+      if (!validateMarkerBlob(marker)) {
+        throw new Error('Incompatible strata workspace version');
       }
 
       let id: string;
@@ -136,10 +138,14 @@ export function createTenantManager(
       const existing = tenants.find(t => t.id === id);
       if (existing) return existing;
 
+      const prefs = await loadTenantPrefs(adapter, opts.cloudMeta);
+
       const now = new Date();
       const tenant: Tenant = {
         id,
-        name: opts.name ?? 'Shared Workspace',
+        name: prefs?.name ?? opts.name ?? 'Shared Workspace',
+        icon: prefs?.icon,
+        color: prefs?.color,
         cloudMeta: opts.cloudMeta,
         createdAt: now,
         updatedAt: now,

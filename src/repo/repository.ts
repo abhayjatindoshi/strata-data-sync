@@ -52,12 +52,20 @@ export function createRepository<T>(
   };
   eventBus.on(listener);
 
+  let disposed = false;
+
+  function assertNotDisposed(): void {
+    if (disposed) {
+      throw new Error('Repository is disposed');
+    }
+  }
+
   function get(id: string): (T & BaseEntity) | undefined {
     const entityKey = parseEntityKey(id);
     return store.get(entityKey, id) as (T & BaseEntity) | undefined;
   }
 
-  function save(partial: T & Partial<BaseEntity>): string {
+  function saveToStore(partial: T & Partial<BaseEntity>): string {
     let id: string;
     let entityKey: string;
 
@@ -89,31 +97,57 @@ export function createRepository<T>(
     };
 
     store.set(entityKey, id, entity);
-    eventBus.emit({ entityName: definition.name });
     log('saved %s', id);
 
+    return id;
+  }
+
+  function save(partial: T & Partial<BaseEntity>): string {
+    assertNotDisposed();
+    const id = saveToStore(partial);
+    eventBus.emit({ entityName: definition.name });
     return id;
   }
 
   function saveMany(
     entities: ReadonlyArray<T & Partial<BaseEntity>>,
   ): ReadonlyArray<string> {
-    return entities.map(entity => save(entity));
+    assertNotDisposed();
+    const ids = entities.map(entity => saveToStore(entity));
+    if (ids.length > 0) {
+      changeSignal.next();
+    }
+    return ids;
   }
 
-  function deleteEntity(id: string): boolean {
+  function deleteFromStore(id: string): boolean {
     const entityKey = parseEntityKey(id);
     const deleted = store.delete(entityKey, id);
     if (deleted) {
-      eventBus.emit({ entityName: definition.name });
       log('deleted %s', id);
     }
     return deleted;
   }
 
+  function deleteEntity(id: string): boolean {
+    assertNotDisposed();
+    const deleted = deleteFromStore(id);
+    if (deleted) {
+      eventBus.emit({ entityName: definition.name });
+    }
+    return deleted;
+  }
+
   function deleteMany(ids: ReadonlyArray<string>): void {
+    assertNotDisposed();
+    let anyDeleted = false;
     for (const id of ids) {
-      deleteEntity(id);
+      if (deleteFromStore(id)) {
+        anyDeleted = true;
+      }
+    }
+    if (anyDeleted) {
+      changeSignal.next();
     }
   }
 
@@ -156,6 +190,7 @@ export function createRepository<T>(
   }
 
   function observe(id: string) {
+    assertNotDisposed();
     return changeSignal.pipe(
       startWith(undefined as void),
       map(() => get(id)),
@@ -164,6 +199,7 @@ export function createRepository<T>(
   }
 
   function observeQuery(opts?: QueryOptions<T>) {
+    assertNotDisposed();
     return changeSignal.pipe(
       startWith(undefined as void),
       map(() => query(opts)),
@@ -171,5 +207,13 @@ export function createRepository<T>(
     );
   }
 
-  return { get, query, save, saveMany, delete: deleteEntity, deleteMany, observe, observeQuery };
+  function dispose(): void {
+    if (disposed) return;
+    disposed = true;
+    changeSignal.complete();
+    eventBus.off(listener);
+    log('disposed %s repository', definition.name);
+  }
+
+  return { get, query, save, saveMany, delete: deleteEntity, deleteMany, observe, observeQuery, dispose };
 }

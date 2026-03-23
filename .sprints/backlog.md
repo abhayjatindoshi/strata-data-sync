@@ -16,10 +16,10 @@
 | E12 | Repository — Repository\<T\> CRUD & query | `repo/` | `docs/schema-repository.md` (Repository Types, QueryOptions) | done |
 | E13 | Repository — SingletonRepository\<T\> | `repo/` | `docs/schema-repository.md` (SingletonRepository) | done |
 | E14 | Reactive — observe, observeQuery, distinctUntilChanged | `reactive/` | `docs/reactive.md` (observe, observeQuery, Change Detection) | done |
-| E15 | Reactive — Batch writes & dispose | `reactive/` | `docs/reactive.md` (Batch Writes, Cleanup) | pending |
+| E15 | Reactive — Batch writes & dispose | `reactive/` | `docs/reactive.md` (Batch Writes, Cleanup) | done |
 | E16 | Tenant — Tenant model & TenantManager CRUD | `tenant/` | `docs/tenant.md` (Tenant Model, TenantManager API) | done |
 | E17 | Tenant — Tenant list storage & sync | `tenant/` | `docs/tenant.md` (Tenant List Storage) | done |
-| E18 | Tenant — Sharing, setup, marker blob | `tenant/` | `docs/tenant.md` (Sharing Flow, Marker Blob) | pending |
+| E18 | Tenant — Sharing, setup, marker blob | `tenant/` | `docs/tenant.md` (Sharing Flow, Marker Blob) | done |
 | E19 | Sync — Partition diff & copy optimization | `sync/` | `docs/persistence-sync.md` (Sync Cycle steps 1-4, Copy optimization) | pending |
 | E20 | Sync — Bidirectional merge & HLC conflict resolution | `sync/` | `docs/persistence-sync.md` (Sync Cycle step 5, Conflict Resolution) | pending |
 | E21 | Sync — Tombstones & retention | `sync/` | `docs/persistence-sync.md` (Tombstones) | pending |

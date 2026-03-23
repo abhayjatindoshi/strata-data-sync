@@ -179,3 +179,32 @@ Epics: E14 (Reactive — observe, observeQuery, distinctUntilChanged), E13 (Sing
 | 14 | Implement `pullTenantList(localAdapter, cloudAdapter)` — reads cloud `__tenants` blob, merges with local list via `mergeTenantLists`, writes merged result back to local adapter | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
 | 15 | Implement `saveTenantPrefs(adapter, cloudMeta, prefs)` — serializes tenant preferences (`name`, `icon?`, `color?`) to a prefs blob at the tenant's `cloudMeta` location for cross-device sharing | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
 | 16 | Implement `loadTenantPrefs(adapter, cloudMeta)` — reads tenant preferences blob from `cloudMeta` location, deserializes, returns `{ name, icon?, color? }` or `undefined` if blob not found | E17 | developer | done | plan | 2026-03-23T22:00:00Z | 2026-03-23T22:25:00Z |
+
+## Sprint 5 — Reactive Batch/Dispose & Tenant Sharing
+Started: 2026-03-23T22:30:00Z
+
+Epics: E15 (Reactive — Batch writes & dispose), E18 (Tenant — Sharing, setup, marker blob)
+
+### E15 — Reactive: Batch writes & dispose (Layer 6)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 1 | Refactor `saveMany()` to batch all Map writes without per-entity signal emission, then emit a single `changeSignal.next()` after all writes complete — 100 saves → 1 signal → 1 observer re-scan | E15 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:35:00Z |
+| 2 | Refactor `deleteMany()` to batch all Map deletes without per-entity signal emission, then emit a single `changeSignal.next()` after all deletes complete | E15 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:35:00Z |
+| 3 | Implement `dispose()` on Repository — calls `changeSignal.complete()` so active observers receive completion signal, removes entity event bus listener via `eventBus.off(listener)`, rejects further save/delete/observe operations after dispose | E15 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:35:00Z |
+| 4 | Implement `dispose()` on SingletonRepository — delegates to internal Repository's `dispose()` method, completing singleton changeSignal and removing event bus listener | E15 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:35:00Z |
+| 5 | Write unit tests for batch writes — verify `saveMany` emits exactly one signal (not N), `deleteMany` emits exactly one signal, observers re-scan once per batch, individual `save`/`delete` still emit immediately | E15 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:42:00Z |
+| 6 | Write unit tests for dispose — `dispose()` completes active Observable subscriptions, disposed Repository rejects further operations, event bus listener is removed after dispose, SingletonRepository dispose delegates correctly | E15 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:42:00Z |
+
+### E18 — Tenant: Sharing, setup, marker blob (Layer 6)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 7 | Define `MarkerBlob` type (`version: number`, `createdAt: Date`, `entityTypes: readonly string[]`) in `src/tenant/` | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:38:00Z |
+| 8 | Implement `writeMarkerBlob(adapter, cloudMeta, entityTypes)` — creates `MarkerBlob` with `version: 1`, current timestamp, and entity type names; serializes via `serialize()` and writes to `__strata` blob key | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:38:00Z |
+| 9 | Implement `readMarkerBlob(adapter, cloudMeta)` — reads `__strata` blob via adapter, deserializes via `deserialize()`, returns `MarkerBlob | undefined` if blob not found | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:38:00Z |
+| 10 | Implement `validateMarkerBlob(blob)` — checks `version` field is supported (currently version 1), returns boolean; used by `setup()` to reject incompatible strata workspaces | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:38:00Z |
+| 11 | Update `TenantManager.create()` to call `writeMarkerBlob` with registered entity type names when creating marker blob at the tenant's `cloudMeta` location | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:38:00Z |
+| 12 | Update `TenantManager.setup()` to call `readMarkerBlob` and `validateMarkerBlob`; read tenant prefs from shared `cloudMeta` location via `loadTenantPrefs`; derive deterministic tenant ID via `deriveTenantId(cloudMeta)` | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:38:00Z |
+| 13 | Write unit tests for marker blob — `writeMarkerBlob`/`readMarkerBlob` round-trip, `readMarkerBlob` returns `undefined` for missing blob, `validateMarkerBlob` accepts version 1 and rejects unsupported versions, entity types array persisted correctly | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:42:00Z |
+| 14 | Write unit tests for sharing flow — `setup()` reads marker blob from shared location and detects existing workspace, derives same tenant ID as creator via `deriveTenantId`, merges tenant prefs into local list, rejects location without valid marker blob | E18 | developer | done | plan | 2026-03-23T22:30:00Z | 2026-03-23T22:42:00Z |

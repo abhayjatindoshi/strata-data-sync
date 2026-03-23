@@ -31,5 +31,8 @@ export function createSingletonRepository<T>(
     observe() {
       return repo.observe(deterministicId);
     },
+    dispose() {
+      repo.dispose();
+    },
   };
 }

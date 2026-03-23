@@ -27,6 +27,7 @@ export type Repository<T> = {
   deleteMany(ids: ReadonlyArray<string>): void;
   observe(id: string): Observable<(T & BaseEntity) | undefined>;
   observeQuery(opts?: QueryOptions<T>): Observable<ReadonlyArray<T & BaseEntity>>;
+  dispose(): void;
 };
 
 export type SingletonRepository<T> = {
@@ -34,4 +35,5 @@ export type SingletonRepository<T> = {
   save(entity: T & Partial<BaseEntity>): void;
   delete(): boolean;
   observe(): Observable<(T & BaseEntity) | undefined>;
+  dispose(): void;
 };

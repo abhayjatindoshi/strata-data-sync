@@ -21,6 +21,7 @@ export type SetupTenantOptions = {
 
 export type TenantManagerOptions = {
   readonly deriveTenantId?: (cloudMeta: Record<string, unknown>) => string;
+  readonly entityTypes?: readonly string[];
 };
 
 export type Subscribable<T> = {

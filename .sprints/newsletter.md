@@ -140,3 +140,46 @@ Append-only log of sprint outcomes. Most recent entry at the bottom.
 - Reactive observe: per-entity-type Subject wiring, observe(id) emits on change, observeQuery live results, distinctUntilChanged entity comparator (id + version), query results comparator (length + element-wise)
 - SingletonRepository: deterministic ID generation, get/save/delete delegation, observe via change signal, singleton key strategy enforcement
 - Tenant sync: mergeTenantLists union by ID with latest-updatedAt wins, pushTenantList local-to-cloud, pullTenantList cloud-to-local merge, saveTenantPrefs/loadTenantPrefs round-trip
+
+---
+
+## Sprint 5 — Reactive Batch/Dispose & Tenant Sharing — 2026-03-23T22:30:00Z
+
+### What's New
+- **Batch writes** (`src/reactive/`): `saveMany()` and `deleteMany()` now batch all Map writes and emit a single change signal per batch instead of per-entity — 100 saves produce 1 signal and 1 observer re-scan
+- **Repository dispose** (`src/reactive/`): `dispose()` on Repository completes the `Subject`, removes the event bus listener via `off()`, and guards against post-dispose save/delete/observe operations; SingletonRepository dispose delegates correctly
+- **MarkerBlob** (`src/tenant/`): `MarkerBlob` type with version, createdAt, and entityTypes; `writeMarkerBlob()` creates and persists marker; `readMarkerBlob()` reads and deserializes; `validateMarkerBlob()` checks version compatibility
+- **Tenant sharing flow** (`src/tenant/`): `TenantManager.create()` now writes a typed marker blob with entity type names; `TenantManager.setup()` reads and validates the marker blob, loads tenant prefs from the shared location, and derives a deterministic tenant ID
+
+### What We Support
+- HLC creation, local/remote tick, and deterministic comparison
+- Pluggable blob storage via `BlobAdapter` interface
+- In-memory blob adapter for testing and offline use
+- Entity definition with flexible key strategies and ID generation
+- Reactive event bus for entity change notifications
+- Transform pipeline for composable blob encoding/decoding
+- JSON serialization with Date type preservation
+- FNV-1a content hashing for partition change detection
+- In-memory entity store with dirty tracking and lazy loading
+- Partition index for tracking partition metadata
+- Debounced flush scheduler with manual flush and graceful dispose
+- Repository CRUD with HLC-stamped writes and query pipeline
+- Multi-tenant management with create/load/setup/delink/delete lifecycle
+- Reactive observe streams for single entities and query results with change detection
+- SingletonRepository for single-instance entities with deterministic IDs
+- Tenant list merge and bidirectional push/pull sync with preference sharing
+- Batch writes with single-signal emission for saveMany/deleteMany
+- Repository and SingletonRepository dispose with observer completion and listener cleanup
+- MarkerBlob creation, reading, and version validation for workspace detection
+- Tenant sharing flow with marker blob validation and deterministic ID derivation
+
+### Quality
+- Unit tests: 207 passing (34 new)
+- Integration tests: 0 (not yet applicable)
+- Known issues: 0
+
+### Coverage Improvements
+- Batch writes: saveMany emits exactly one signal (not N), deleteMany emits exactly one signal, observers re-scan once per batch, individual save/delete still emit immediately
+- Dispose: dispose() completes active Observable subscriptions, disposed Repository rejects further operations, event bus listener removed after dispose, SingletonRepository dispose delegates correctly
+- MarkerBlob: writeMarkerBlob/readMarkerBlob round-trip, readMarkerBlob returns undefined for missing blob, validateMarkerBlob accepts version 1 and rejects unsupported versions, entity types array persisted correctly
+- Sharing flow: setup() reads marker blob and detects existing workspace, derives same tenant ID via deriveTenantId, merges tenant prefs into local list, rejects location without valid marker blob
