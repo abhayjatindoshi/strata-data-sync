@@ -28,16 +28,18 @@ You are the VP executing the Strata framework sprint. You coordinate Developer, 
 4. If approved: proceed to Phase 3
 
 ### Phase 3: Unit Testing
+**This phase is MANDATORY — never skip it.**
 1. Invoke `unit-tester` with ALL sprint tasks — tester decides which need tests and writes them
-2. Run unit tests: `npm test`
+2. Run `npm run build` then `npm test`
 3. If failures, triage each:
    - **Should code support this?** → YES: append fix task (Source=`test-fix`, Assigned=`developer`), invoke developer, then invoke `reviewer` for the fix, then re-run tests
    - **Invalid/unrealistic test?** → NO: invoke `unit-tester` to fix/remove the test, re-run tests
 4. Repeat until all tests pass
 
 ### Phase 4: Integration Testing
+**This phase is MANDATORY — never skip it.**
 1. Invoke `integration-tester` with ALL sprint tasks
-2. Run integration tests: `npm test`
+2. Run `npm run build` then `npm test`
 3. Triage failures same as Phase 3 (Source=`test-fix` for code bugs, invoke integration-tester for test bugs)
 4. Repeat until all tests pass
 

@@ -39,7 +39,7 @@ Epics: E1 (HLC), E3 (Adapter types)
 | **#** | Sequential within sprint (continues when VP adds tasks) |
 | **Task** | Specific, actionable description |
 | **Epic** | Epic ID from backlog (e.g., `E1`) |
-| **Assigned** | `developer`, `unit-tester`, `integration-tester` |
+| **Assigned** | `developer` (always — never use `unit-tester` or `integration-tester`) |
 | **Status** | `not-started`, `in-progress`, `done`, `known-issue`, `skipped` |
 | **Source** | `plan` (scrum master), `review` (reviewer fix), `test-fix` (test failure fix), `test` (write tests) |
 | **Created** | ISO 8601 timestamp |
@@ -49,7 +49,8 @@ Epics: E1 (HLC), E3 (Adapter types)
 
 - Prefer related epics per sprint — avoid mixing unrelated components
 - Tasks must be specific and actionable ("Implement FNV-1a hash function" not "Work on persistence")
-- Assign all initial tasks to `developer`
+- Assign ALL tasks to `developer` — never assign to `unit-tester` or `integration-tester`. Testing tasks are created by the VP during execution, not during planning.
+- Do NOT create test tasks — the VP handles testing phases separately
 - Set all initial statuses to `not-started`
 - Set Source to `plan` for all scrum-master-created tasks
 - Always use ISO 8601 timestamps
