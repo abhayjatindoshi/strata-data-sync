@@ -51,3 +51,53 @@ Epics: E1 (HLC), E3 (Adapter types), E4 (MemoryAdapter), E2 (Schema), E6 (Reacti
 | 15 | Define `EntityEvent` type (with entityName field), `EntityEventListener` callback type, and `EntityEventBus` type (on/off/emit) in `src/reactive/` | E6 | developer | done | plan | 2026-03-23T20:30:00Z | 2026-03-23T20:38:00Z |
 | 16 | Implement `createEventBus()` — maintains listener array, `on()` registers listener, `off()` removes listener, `emit()` calls all listeners synchronously | E6 | developer | done | plan | 2026-03-23T20:30:00Z | 2026-03-23T20:38:00Z |
 | 17 | Write unit tests for event bus — on/emit delivers events, off removes listener, multiple listeners all fire, emit with no listeners is safe, same listener registered twice | E6 | developer | done | plan | 2026-03-23T20:30:00Z | 2026-03-23T20:38:00Z |
+
+## Sprint 2 — Transforms, Persistence & Store
+Started: 2026-03-23T21:00:00Z
+
+Epics: E5 (Transform pipeline), E9 (Serialization), E10 (FNV-1a hashing), E7 (In-memory store), E11 (Partition index)
+
+### E5 — Adapter Transform Pipeline (Layer 2)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 1 | Define `BlobTransform` type with `encode(data: Uint8Array): Promise<Uint8Array>` and `decode(data: Uint8Array): Promise<Uint8Array>` methods in `src/adapter/` | E5 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 2 | Implement `applyTransforms(transforms, data)` — applies transforms in forward order for writes, and `reverseTransforms(transforms, data)` — applies transforms in reverse order for reads | E5 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 3 | Write unit tests for transform pipeline — identity passthrough, chained transforms apply in correct forward order, reverse applies in correct reverse order, empty transform array passthrough | E5 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+
+### E9 — JSON Serialization & Type Markers (Layer 2)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 4 | Implement JSON replacer that wraps `Date` values as `{ __t: 'D', v: isoString }` type marker, and JSON reviver that detects `__t` and reconstructs original types, in `src/persistence/` | E9 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 5 | Implement `serialize(data): Uint8Array` — `JSON.stringify` with replacer → `TextEncoder` to bytes, and `deserialize<T>(bytes: Uint8Array): T` — `TextDecoder` → `JSON.parse` with reviver | E9 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 6 | Write unit tests for serialization — Date round-trip preserves value, nested Date fields, no-Date data passthrough, Uint8Array encoding fidelity, type marker `{ __t: 'D', v }` format correctness | E9 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+
+### E10 — FNV-1a Hashing (Layer 2)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 7 | Implement FNV-1a 32-bit hash — `FNV_OFFSET` (2166136261), `FNV_PRIME` (16777619), `fnv1a(input: string): number` core function, and `fnv1aAppend(hash, input): number` for incremental hashing in `src/persistence/` | E10 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 8 | Implement `partitionHash(entityMap): number` — sorts entity IDs, hashes `id:hlcTimestamp:hlcCounter:hlcNodeId` per entity, includes tombstone HLCs in hash computation | E10 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 9 | Write unit tests for hashing — known FNV-1a test vectors, deterministic output for same input, hash changes when HLC differs, sort-order independence (same entities in any insertion order produce same hash), empty input | E10 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+
+### E7 — In-Memory Store (Layer 3)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 10 | Define `EntityStore` type with nested `Map<string, Map<string, unknown>>` structure and `createStore()` factory in `src/store/` | E7 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 11 | Implement `get(entityKey, id)`, `set(entityKey, id, entity)`, `delete(entityKey, id)` — sync Map operations, `set` auto-creates inner Map if partition missing, `set` and `delete` mark partition dirty | E7 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 12 | Implement `getPartition(entityKey): ReadonlyMap` and `getAllPartitionKeys(entityName): string[]` — partition access and discovery by filtering keys with `entityName.` prefix | E7 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 13 | Implement dirty tracking — `getDirtyKeys(): ReadonlySet<string>`, `clearDirty(entityKey)` to track which partitions have been modified and need flushing | E7 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 14 | Implement lazy loading — `loadPartition(entityKey, loader: () => Promise<Map>)` loads partition data from adapter on first access, subsequent calls return cached partition without re-invoking loader | E7 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 15 | Write unit tests for store — CRUD get/set/delete, auto-creating partitions on set, dirty tracking lifecycle (mark on set/delete, clear resets), getAllPartitionKeys prefix filtering, lazy load executes loader once then caches | E7 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+
+### E11 — Partition Index (Layer 3, depends on E10)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 16 | Define `PartitionIndexEntry` type (`hash: number`, `count: number`, `updatedAt: number`) and `PartitionIndex` type (`Record<string, PartitionIndexEntry>`) in `src/persistence/` | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 17 | Implement `loadPartitionIndex(adapter, cloudMeta, entityName): Promise<PartitionIndex>` — reads `__index.{entityName}` blob via adapter, deserializes with `deserialize`, returns `{}` if blob is null | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 18 | Implement `savePartitionIndex(adapter, cloudMeta, entityName, index): Promise<void>` — serializes index with `serialize` and writes to `__index.{entityName}` blob via adapter | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 19 | Implement `updatePartitionIndexEntry(index, partitionKey, hash, count): PartitionIndex` — creates or updates entry for given partition key with hash, count, and current timestamp | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |
+| 20 | Write unit tests for partition index — load returns empty object for missing blob, save/load round-trip, updateEntry creates new entry and updates existing, key format uses `__index.{entityName}` | E11 | developer | done | plan | 2026-03-23T21:00:00Z | 2026-03-23T21:05:00Z |

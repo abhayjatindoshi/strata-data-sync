@@ -6,3 +6,8 @@ export type BlobAdapter = {
   delete(cloudMeta: CloudMeta, key: string): Promise<boolean>;
   list(cloudMeta: CloudMeta, prefix: string): Promise<string[]>;
 };
+
+export type BlobTransform = {
+  encode(data: Uint8Array): Promise<Uint8Array>;
+  decode(data: Uint8Array): Promise<Uint8Array>;
+};

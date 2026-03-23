@@ -6,13 +6,13 @@
 | E2 | Schema — defineEntity, ID gen, key strategies | `schema/` | `docs/schema-repository.md` (Entity Definition, Entity IDs, Key Strategies) | done |
 | E3 | Adapter — BlobAdapter interface & types | `adapter/` | `docs/adapter.md` (Interface, cloudMeta, keys) | done |
 | E4 | Adapter — MemoryBlobAdapter | `adapter/` | `docs/adapter.md` (MemoryBlobAdapter section) | done |
-| E5 | Adapter — Transform pipeline | `adapter/` | `docs/adapter.md` (Transform Pipeline section) | pending |
+| E5 | Adapter — Transform pipeline | `adapter/` | `docs/adapter.md` (Transform Pipeline section) | done |
 | E6 | Reactive — Event bus & Subject signals | `reactive/` | `docs/reactive.md` (Event Bus, Entity Type Subject) | done |
-| E7 | Store — In-memory Map, lazy loading, dirty tracking | `store/` | `docs/schema-repository.md` (In-Memory Store) | pending |
+| E7 | Store — In-memory Map, lazy loading, dirty tracking | `store/` | `docs/schema-repository.md` (In-Memory Store) | done |
 | E8 | Store — Debounced flush to adapter | `store/` | `docs/persistence-sync.md` (Flush Timing) | pending |
-| E9 | Persistence — JSON serialization & type markers | `persistence/` | `docs/persistence-sync.md` (Serialization, Type Markers) | pending |
-| E10 | Persistence — FNV-1a hashing | `persistence/` | `docs/persistence-sync.md` (Hashing section) | pending |
-| E11 | Persistence — Partition index | `persistence/` | `docs/persistence-sync.md` (Partition Index) | pending |
+| E9 | Persistence — JSON serialization & type markers | `persistence/` | `docs/persistence-sync.md` (Serialization, Type Markers) | done |
+| E10 | Persistence — FNV-1a hashing | `persistence/` | `docs/persistence-sync.md` (Hashing section) | done |
+| E11 | Persistence — Partition index | `persistence/` | `docs/persistence-sync.md` (Partition Index) | done |
 | E12 | Repository — Repository\<T\> CRUD & query | `repo/` | `docs/schema-repository.md` (Repository Types, QueryOptions) | pending |
 | E13 | Repository — SingletonRepository\<T\> | `repo/` | `docs/schema-repository.md` (SingletonRepository) | pending |
 | E14 | Reactive — observe, observeQuery, distinctUntilChanged | `reactive/` | `docs/reactive.md` (observe, observeQuery, Change Detection) | pending |
