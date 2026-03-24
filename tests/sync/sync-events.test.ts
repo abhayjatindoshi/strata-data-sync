@@ -79,6 +79,14 @@ describe('createSyncEventEmitter', () => {
     expect(events2).toHaveLength(1);
   });
 
+  it('off with unregistered listener is a no-op', () => {
+    const emitter = createSyncEventEmitter();
+    const unregistered = () => {};
+    // Should not throw
+    emitter.off(unregistered);
+    emitter.emit({ type: 'sync-started' });
+  });
+
   it('emit with no listeners is safe', () => {
     const emitter = createSyncEventEmitter();
     expect(() => emitter.emit({ type: 'sync-started' })).not.toThrow();

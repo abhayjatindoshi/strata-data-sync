@@ -55,6 +55,14 @@ describe('Serialization', () => {
     expect(result.dates[1]).toBeInstanceOf(Date);
   });
 
+  it('reviver passes through object with unknown __t marker', () => {
+    // An object with __t that is not 'D' should be returned as-is
+    const json = JSON.stringify({ marker: { __t: 'X', v: 'hello' } });
+    const bytes = new TextEncoder().encode(json);
+    const result = deserialize<{ marker: { __t: string; v: string } }>(bytes);
+    expect(result.marker).toEqual({ __t: 'X', v: 'hello' });
+  });
+
   it('handles null values', () => {
     const data = { a: null, b: 'test' };
     const bytes = serialize(data);

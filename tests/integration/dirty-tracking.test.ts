@@ -1,0 +1,87 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import {
+  createStrata,
+  defineEntity,
+  createMemoryBlobAdapter,
+} from '@strata/index';
+import type { Strata } from '@strata/index';
+import type { Repository } from '@strata/repo';
+
+type Task = { title: string; done: boolean };
+
+const TaskDef = defineEntity<Task>('task');
+
+describe('Dirty tracking integration', () => {
+  const instances: Strata[] = [];
+
+  afterEach(async () => {
+    for (const s of instances) {
+      await s.dispose().catch(() => {});
+    }
+    instances.length = 0;
+  });
+
+  function track(s: Strata): Strata {
+    instances.push(s);
+    return s;
+  }
+
+  it('isDirty transitions — false → true after save → false after sync', async () => {
+    const strata = track(createStrata({
+      entities: [TaskDef],
+      localAdapter: createMemoryBlobAdapter(),
+      cloudAdapter: createMemoryBlobAdapter(),
+      deviceId: 'dev-1',
+    }));
+
+    const tenant = await strata.tenants.create({
+      name: 'Test',
+      cloudMeta: { b: 1 },
+    });
+    await strata.tenants.load(tenant.id);
+
+    // Initially not dirty
+    expect(strata.isDirty).toBe(false);
+
+    // Save makes it dirty
+    const repo = strata.repo(TaskDef) as Repository<Task>;
+    repo.save({ title: 'Test', done: false });
+    expect(strata.isDirty).toBe(true);
+
+    // Sync clears dirty
+    await strata.sync();
+    expect(strata.isDirty).toBe(false);
+  });
+
+  it('isDirty$ observable — emits true on save, false on sync', async () => {
+    const strata = track(createStrata({
+      entities: [TaskDef],
+      localAdapter: createMemoryBlobAdapter(),
+      cloudAdapter: createMemoryBlobAdapter(),
+      deviceId: 'dev-1',
+    }));
+
+    const tenant = await strata.tenants.create({
+      name: 'Test',
+      cloudMeta: { b: 1 },
+    });
+    await strata.tenants.load(tenant.id);
+
+    const emissions: boolean[] = [];
+    const sub = strata.isDirty$.subscribe(v => emissions.push(v));
+
+    // Save
+    const repo = strata.repo(TaskDef) as Repository<Task>;
+    repo.save({ title: 'Test', done: false });
+
+    // Sync
+    await strata.sync();
+
+    sub.unsubscribe();
+
+    // Should have emitted: false (initial from BehaviorSubject), true (after save), false (after sync)
+    expect(emissions).toContain(false);
+    expect(emissions).toContain(true);
+    expect(emissions[emissions.length - 1]).toBe(false);
+  });
+});

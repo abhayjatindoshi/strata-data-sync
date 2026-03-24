@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createStore } from '@strata/store';
 import { createMemoryBlobAdapter } from '@strata/adapter';
 import { deserialize } from '@strata/persistence';
-import { flushPartition, flushAll } from '@strata/store';
+import { flushPartition, flushAll, loadPartitionFromAdapter } from '@strata/store';
 import { createFlushScheduler } from '@strata/store';
 
 describe('flushPartition', () => {
@@ -83,6 +83,53 @@ describe('flushAll', () => {
   });
 });
 
+describe('loadPartitionFromAdapter', () => {
+  it('loads entities from blob without deleted section', async () => {
+    const adapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    // Write a blob with entities but no 'deleted' key
+    const blob = { task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } } };
+    const data = new TextEncoder().encode(JSON.stringify(blob));
+    await adapter.write(undefined, 'task._', data);
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+
+    expect(result.size).toBe(1);
+    expect(result.get('task._.a1')).toEqual({ id: 'task._.a1', name: 'Test' });
+    // No tombstones should be set
+    expect(store.getTombstones('task._').size).toBe(0);
+  });
+
+  it('returns empty map when blob does not exist', async () => {
+    const adapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+
+    expect(result.size).toBe(0);
+  });
+
+  it('loads entities and tombstones from blob with deleted section', async () => {
+    const adapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    const blob = {
+      task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } },
+      deleted: {
+        task: { 'task._.d1': { timestamp: 999, counter: 0, nodeId: 'n1' } },
+      },
+    };
+    const data = new TextEncoder().encode(JSON.stringify(blob));
+    await adapter.write(undefined, 'task._', data);
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+
+    expect(result.size).toBe(1);
+    expect(store.getTombstones('task._').get('task._.d1')).toBeDefined();
+  });
+});
+
 describe('createFlushScheduler', () => {
   it('flush() forces immediate write', async () => {
     const adapter = createMemoryBlobAdapter();
@@ -130,6 +177,23 @@ describe('createFlushScheduler', () => {
 
     await vi.advanceTimersByTimeAsync(1000);
     expect(spy).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('dispose() clears pending timer and flushes', async () => {
+    vi.useFakeTimers();
+    const adapter = createMemoryBlobAdapter();
+    const store = createStore();
+    store.set('x._', 'x._.1', { id: 'x._.1' });
+
+    const scheduler = createFlushScheduler(adapter, undefined, store, { debounceMs: 5000 });
+    scheduler.schedule();
+
+    // Dispose without waiting for timer
+    await scheduler.dispose();
+
+    expect(await adapter.read(undefined, 'x._')).not.toBeNull();
+    expect(store.getDirtyKeys().size).toBe(0);
     vi.useRealTimers();
   });
 

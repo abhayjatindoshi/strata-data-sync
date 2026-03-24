@@ -35,6 +35,14 @@ describe('EventBus', () => {
     expect(() => bus.emit({ entityName: 'transaction' })).not.toThrow();
   });
 
+  it('off with unregistered listener is a no-op', () => {
+    const bus = createEventBus();
+    const unregistered = vi.fn();
+    bus.off(unregistered);
+    bus.emit({ entityName: 'transaction' });
+    expect(unregistered).not.toHaveBeenCalled();
+  });
+
   it('same listener registered twice fires twice', () => {
     const bus = createEventBus();
     const listener = vi.fn();

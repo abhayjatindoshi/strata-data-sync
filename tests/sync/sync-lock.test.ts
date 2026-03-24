@@ -71,6 +71,44 @@ describe('createSyncLock', () => {
     expect(results).toEqual([1, 2]);
   });
 
+  it('drain handles running state with empty queue', async () => {
+    const lock = createSyncLock();
+    let resolveOuter!: () => void;
+    const blocker = new Promise<void>(r => { resolveOuter = r; });
+
+    lock.enqueue('memory-to-local', 'memory-to-local', async () => {
+      await blocker;
+    });
+
+    // Start drain while the operation is running
+    const drainPromise = lock.drain();
+    // Let the operation complete
+    resolveOuter();
+    await drainPromise;
+
+    expect(lock.isRunning()).toBe(false);
+  });
+
+  it('dispose rejects queued items', async () => {
+    const lock = createSyncLock();
+    let resolveOuter!: () => void;
+    const blocker = new Promise<void>(r => { resolveOuter = r; });
+
+    const p1 = lock.enqueue('memory-to-local', 'memory-to-local', async () => {
+      await blocker;
+    });
+
+    const p2 = lock.enqueue('local-to-cloud', 'local-to-cloud', async () => {
+      // This should be rejected by dispose
+    });
+
+    lock.dispose();
+    resolveOuter();
+
+    await expect(p2).rejects.toThrow('SyncLock disposed');
+    await p1.catch(() => {});
+  });
+
   it('dispose rejects further enqueue calls', async () => {
     const lock = createSyncLock();
     lock.dispose();

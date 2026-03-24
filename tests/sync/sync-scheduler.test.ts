@@ -72,6 +72,60 @@ describe('createSyncScheduler', () => {
   });
 });
 
+describe('createSyncScheduler — timer callbacks', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('local flush interval enqueues memory-to-local on tick', async () => {
+    vi.useFakeTimers();
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+    const enqueueSpy = vi.spyOn(lock, 'enqueue');
+
+    const scheduler = createSyncScheduler(
+      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+      { localFlushIntervalMs: 50, cloudSyncIntervalMs: 100000 },
+    );
+
+    scheduler.start();
+    vi.advanceTimersByTime(50);
+
+    expect(enqueueSpy).toHaveBeenCalledWith(
+      'memory-to-local', 'memory-to-local', expect.any(Function),
+    );
+
+    scheduler.stop();
+    enqueueSpy.mockRestore();
+  });
+
+  it('cloud sync interval enqueues local-to-cloud on tick', async () => {
+    vi.useFakeTimers();
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+    const enqueueSpy = vi.spyOn(lock, 'enqueue');
+
+    const scheduler = createSyncScheduler(
+      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+      { localFlushIntervalMs: 100000, cloudSyncIntervalMs: 50 },
+    );
+
+    scheduler.start();
+    vi.advanceTimersByTime(50);
+
+    expect(enqueueSpy).toHaveBeenCalledWith(
+      'local-to-cloud', 'local-to-cloud', expect.any(Function),
+    );
+
+    scheduler.stop();
+    enqueueSpy.mockRestore();
+  });
+});
+
 describe('syncNow', () => {
   it('flushes local then syncs with cloud', async () => {
     const lock = createSyncLock();
@@ -88,6 +142,28 @@ describe('syncNow', () => {
 
     // After sync, no errors means both phases completed
     expect(lock.isRunning()).toBe(false);
+  });
+
+  it('loads cloud-only partitions into store during sync', async () => {
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    const cloudEntity = {
+      id: 'task._.c1', name: 'CloudOnly',
+      hlc: { timestamp: 1000, counter: 0, nodeId: 'cloud' },
+    };
+
+    await cloudAdapter.write(undefined, 'task._',
+      makePartitionBlob('task', { 'task._.c1': cloudEntity }));
+    await savePartitionIndex(cloudAdapter, undefined, 'task', {
+      '_': { hash: 333, count: 1, updatedAt: 1000 },
+    });
+
+    await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
+
+    expect(store.get('task._', 'task._.c1')).toBeDefined();
   });
 
   it('processes diverged partitions during cloud sync', async () => {

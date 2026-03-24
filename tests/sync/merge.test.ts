@@ -180,6 +180,34 @@ describe('mergePartition', () => {
     expect(entityB_BA['value']).toBe('B-B');
   });
 
+  it('handles entries present on both sides with null values', () => {
+    // Construct blobs where an ID exists with null value on both sides
+    const local = makeBlob(entityName, {
+      'task._.x': null,
+    });
+    const cloud = makeBlob(entityName, {
+      'task._.x': null,
+    });
+
+    const result = mergePartition(local, cloud, entityName);
+
+    // The null-null case reaches the fallback return {} — no entity or tombstone
+    expect(result.entities['task._.x']).toBeUndefined();
+    expect(result.tombstones['task._.x']).toBeUndefined();
+  });
+
+  it('handles cloud-only tombstones', () => {
+    const local = makeBlob(entityName, {});
+    const cloud = makeBlob(entityName, {}, {
+      'task._.deleted': { timestamp: 1000, counter: 0, nodeId: 'n2' },
+    });
+
+    const result = mergePartition(local, cloud, entityName);
+
+    expect(result.tombstones['task._.deleted']).toBeDefined();
+    expect(Object.keys(result.entities)).toHaveLength(0);
+  });
+
   it('handles local-only tombstones', () => {
     const local = makeBlob(entityName, {}, {
       'task._.deleted': { timestamp: 1000, counter: 0, nodeId: 'n1' },

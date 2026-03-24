@@ -5,6 +5,62 @@
 <!-- Source values: plan, review, test-fix, test -->
 <!-- Assigned values: developer, unit-tester, integration-tester -->
 
+## Integration Test Sprint 2
+Started: 2026-03-24T06:54:00Z
+
+### Sync Advanced Tests (`tests/integration/sync-advanced.test.ts`)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 1 | Cloud unreachable fallback — hydrate falls back to local-only, emits cloud-unreachable event | E22-E23 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 2 | Sync lock dedup — concurrent sync() calls both resolve without error | E22 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 3 | HLC nodeId tiebreaker — deterministic winner when timestamp and counter are equal | E20 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 4 | Sync + reactive end-to-end — A saves → syncs → B hydrates → B observe emits entity from A | E20-E22 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+
+### Repository Advanced Tests (`tests/integration/repo-advanced.test.ts`)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 5 | deriveId upsert — second save with same derived key updates existing entity | E12 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 6 | Range queries — filters entities by numeric field range (gt/lte) | E12 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 7 | Query edge cases — offset > count returns empty, limit=0 returns empty | E12 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 8 | SingletonRepository full lifecycle — get → save → get → observe → delete → get → observe undefined | E13 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 9 | Multiple simultaneous observers — all receive updates, unsubscribing one keeps others | E14 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 10 | Event bus listener cleanup — unsubscribed observer does not fire on save | E14 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+
+### Persistence Advanced Tests (`tests/integration/persistence-advanced.test.ts`)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 11 | Transform pipeline end-to-end — XOR transform applied on flush and reversed on reload | E5 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 12 | Adapter list() discovers partition keys after flush | E4 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+
+### Tenant Advanced Tests (`tests/integration/tenant-advanced.test.ts`)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 13 | Tenant preferences sync — save prefs on A, load on B via shared cloud | E17 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 14 | Tenant list multi-device merge — A creates X, B creates Y, both end up with both | E17 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+
+### Dirty Tracking Tests (`tests/integration/dirty-tracking.test.ts`)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 15 | isDirty transitions — false → true after save → false after sync | E23 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 16 | isDirty$ observable — emits true on save, false on sync | E23 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+
+### Lifecycle Advanced Tests (`tests/integration/lifecycle-advanced.test.ts`)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 17 | Invalid entity definitions — empty entities array throws | E24 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 18 | Invalid entity definitions — duplicate entity names throws | E24 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 19 | Flush debounce coalescing — rapid saves trigger single flush (2 writes) | E8 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+| 20 | Tenant load triggers hydrate from cloud automatically | E24 | integration-tester | done | test | 2026-03-24T06:54:00Z | 2026-03-24T06:58:00Z |
+<!-- Status values: not-started, in-progress, done, known-issue, skipped -->
+<!-- Source values: plan, review, test-fix, test -->
+<!-- Assigned values: developer, unit-tester, integration-tester -->
+
 ## Sprint 1 — Foundation Layer (HLC, Adapter, Schema, Reactive)
 Started: 2026-03-23T20:30:00Z
 

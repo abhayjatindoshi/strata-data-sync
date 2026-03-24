@@ -65,6 +65,24 @@ describe('hydrateFromCloud', () => {
     expect(tombstones.get('task._.deleted1')).toEqual(tombstoneHlc);
   });
 
+  it('handles cloud partition where blob read returns null', async () => {
+    const cloudAdapter = createMemoryBlobAdapter();
+    const localAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    // Set up cloud index pointing to a partition, but don't write the blob
+    await savePartitionIndex(cloudAdapter, { bucket: 'b' }, 'task', {
+      '_': { hash: 111, count: 1, updatedAt: 1000 },
+    });
+
+    const result = await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], { bucket: 'b' });
+
+    expect(result).toEqual(['task']);
+    // No blob was available so nothing was written to local
+    const localBlob = await localAdapter.read(undefined, 'task._');
+    expect(localBlob).toBeNull();
+  });
+
   it('returns empty when no cloud partitions exist', async () => {
     const cloudAdapter = createMemoryBlobAdapter();
     const localAdapter = createMemoryBlobAdapter();

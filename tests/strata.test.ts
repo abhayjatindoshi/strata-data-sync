@@ -38,6 +38,13 @@ describe('validateEntityDefinitions', () => {
     );
   });
 
+  it('rejects entity definition with empty name', () => {
+    const noName = defineEntity<Task>('' as string);
+    expect(() => validateEntityDefinitions([noName])).toThrow(
+      'Entity definition must have a name',
+    );
+  });
+
   it('rejects duplicate entity names', () => {
     const a = defineEntity<Task>('task');
     const b = defineEntity<Task>('task');
@@ -192,6 +199,32 @@ describe('createStrata', () => {
       });
       await strata.tenants.load(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()?.id).toBe(tenant.id);
+    });
+
+    it('stops previous sync scheduler when loading a new tenant', async () => {
+      const cloudAdapter = makeAdapter();
+      const taskDef = defineEntity<Task>('task');
+      strata = createStrata({
+        entities: [taskDef],
+        localAdapter: makeAdapter(),
+        cloudAdapter,
+        deviceId: 'dev',
+      });
+
+      const t1 = await strata.tenants.create({
+        name: 'Tenant 1',
+        cloudMeta: { bucket: 't1' },
+      });
+      const t2 = await strata.tenants.create({
+        name: 'Tenant 2',
+        cloudMeta: { bucket: 't2' },
+      });
+
+      await strata.tenants.load(t1.id);
+      // Load a second tenant — should stop the first scheduler
+      await strata.tenants.load(t2.id);
+
+      expect(strata.tenants.activeTenant$.getValue()?.id).toBe(t2.id);
     });
 
     it('hydrates from local on tenant load without cloud adapter', async () => {
