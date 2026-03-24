@@ -1,27 +1,28 @@
 import { BehaviorSubject } from 'rxjs';
 import { distinctUntilChanged } from 'rxjs/operators';
-import type { DirtyTracker } from './types';
+import type { DirtyTracker as DirtyTrackerType } from './types';
 
-export function createDirtyTracker(): DirtyTracker {
-  const subject = new BehaviorSubject<boolean>(false);
+export class DirtyTracker {
+  private readonly subject = new BehaviorSubject<boolean>(false);
+  readonly isDirty$ = this.subject.pipe(distinctUntilChanged());
 
-  return {
-    get isDirty() {
-      return subject.getValue();
-    },
+  get isDirty(): boolean {
+    return this.subject.getValue();
+  }
 
-    isDirty$: subject.pipe(distinctUntilChanged()),
+  markDirty(): void {
+    if (!this.subject.getValue()) {
+      this.subject.next(true);
+    }
+  }
 
-    markDirty() {
-      if (!subject.getValue()) {
-        subject.next(true);
-      }
-    },
+  clearDirty(): void {
+    if (this.subject.getValue()) {
+      this.subject.next(false);
+    }
+  }
+}
 
-    clearDirty() {
-      if (subject.getValue()) {
-        subject.next(false);
-      }
-    },
-  };
+export function createDirtyTracker(): DirtyTrackerType {
+  return new DirtyTracker();
 }

@@ -5,7 +5,7 @@ import type {
   CreateTenantOptions,
   SetupTenantOptions,
   TenantManagerOptions,
-  TenantManager,
+  TenantManager as TenantManagerType,
   Subscribable,
 } from './types';
 import { loadTenantList, saveTenantList } from './tenant-list';
@@ -53,138 +53,148 @@ function createBehaviorSubject<T>(
   };
 }
 
+export class TenantManager {
+  private readonly subject: Subscribable<Tenant | undefined> & { next(value: Tenant | undefined): void };
+  private cachedList: Tenant[] | null = null;
+
+  readonly activeTenant$: Subscribable<Tenant | undefined>;
+
+  constructor(
+    private readonly adapter: BlobAdapter,
+    private readonly options?: TenantManagerOptions,
+  ) {
+    this.subject = createBehaviorSubject<Tenant | undefined>(undefined);
+    this.activeTenant$ = this.subject;
+  }
+
+  private async getList(): Promise<Tenant[]> {
+    if (!this.cachedList) {
+      this.cachedList = await loadTenantList(this.adapter);
+    }
+    return this.cachedList;
+  }
+
+  private async persistList(tenants: Tenant[]): Promise<void> {
+    this.cachedList = tenants;
+    await saveTenantList(this.adapter, tenants);
+  }
+
+  async list(): Promise<ReadonlyArray<Tenant>> {
+    return this.getList();
+  }
+
+  async create(opts: CreateTenantOptions): Promise<Tenant> {
+    const tenants = await this.getList();
+
+    let id: string;
+    if (opts.id) {
+      id = opts.id;
+    } else if (this.options?.deriveTenantId) {
+      id = this.options.deriveTenantId(opts.cloudMeta);
+    } else {
+      id = generateTenantId();
+    }
+
+    const now = new Date();
+    const tenant: Tenant = {
+      id,
+      name: opts.name,
+      cloudMeta: opts.cloudMeta,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await writeMarkerBlob(this.adapter, opts.cloudMeta, this.options?.entityTypes ?? []);
+
+    await this.persistList([...tenants, tenant]);
+    log('created tenant %s', id);
+
+    return tenant;
+  }
+
+  async load(tenantId: string): Promise<void> {
+    const tenants = await this.getList();
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (!tenant) {
+      throw new Error(`Tenant not found: ${tenantId}`);
+    }
+    this.subject.next(tenant);
+    log('loaded tenant %s', tenantId);
+  }
+
+  async setup(opts: SetupTenantOptions): Promise<Tenant> {
+    const marker = await readMarkerBlob(this.adapter, opts.cloudMeta);
+    if (!marker) {
+      throw new Error('No strata workspace found at the specified location');
+    }
+    if (!validateMarkerBlob(marker)) {
+      throw new Error('Incompatible strata workspace version');
+    }
+
+    let id: string;
+    if (this.options?.deriveTenantId) {
+      id = this.options.deriveTenantId(opts.cloudMeta);
+    } else {
+      id = generateTenantId();
+    }
+
+    const tenants = await this.getList();
+    const existing = tenants.find(t => t.id === id);
+    if (existing) return existing;
+
+    const prefs = await loadTenantPrefs(this.adapter, opts.cloudMeta);
+
+    const now = new Date();
+    const tenant: Tenant = {
+      id,
+      name: prefs?.name ?? opts.name ?? 'Shared Workspace',
+      icon: prefs?.icon,
+      color: prefs?.color,
+      cloudMeta: opts.cloudMeta,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.persistList([...tenants, tenant]);
+    log('setup tenant %s', id);
+
+    return tenant;
+  }
+
+  async delink(tenantId: string): Promise<void> {
+    const tenants = await this.getList();
+    const filtered = tenants.filter(t => t.id !== tenantId);
+    await this.persistList(filtered);
+
+    if (this.subject.getValue()?.id === tenantId) {
+      this.subject.next(undefined);
+    }
+    log('delinked tenant %s', tenantId);
+  }
+
+  async delete(tenantId: string): Promise<void> {
+    const tenants = await this.getList();
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (!tenant) return;
+
+    const keys = await this.adapter.list(tenant.cloudMeta, '');
+    for (const key of keys) {
+      await this.adapter.delete(tenant.cloudMeta, key);
+    }
+
+    const filtered = tenants.filter(t => t.id !== tenantId);
+    await this.persistList(filtered);
+
+    if (this.subject.getValue()?.id === tenantId) {
+      this.subject.next(undefined);
+    }
+    log('deleted tenant %s', tenantId);
+  }
+}
+
 export function createTenantManager(
   adapter: BlobAdapter,
   options?: TenantManagerOptions,
-): TenantManager {
-  const subject = createBehaviorSubject<Tenant | undefined>(undefined);
-  let cachedList: Tenant[] | null = null;
-
-  async function getList(): Promise<Tenant[]> {
-    if (!cachedList) {
-      cachedList = await loadTenantList(adapter);
-    }
-    return cachedList;
-  }
-
-  async function persistList(tenants: Tenant[]): Promise<void> {
-    cachedList = tenants;
-    await saveTenantList(adapter, tenants);
-  }
-
-  return {
-    activeTenant$: subject,
-
-    async list() {
-      return getList();
-    },
-
-    async create(opts: CreateTenantOptions) {
-      const tenants = await getList();
-
-      let id: string;
-      if (opts.id) {
-        id = opts.id;
-      } else if (options?.deriveTenantId) {
-        id = options.deriveTenantId(opts.cloudMeta);
-      } else {
-        id = generateTenantId();
-      }
-
-      const now = new Date();
-      const tenant: Tenant = {
-        id,
-        name: opts.name,
-        cloudMeta: opts.cloudMeta,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      await writeMarkerBlob(adapter, opts.cloudMeta, options?.entityTypes ?? []);
-
-      await persistList([...tenants, tenant]);
-      log('created tenant %s', id);
-
-      return tenant;
-    },
-
-    async load(tenantId: string) {
-      const tenants = await getList();
-      const tenant = tenants.find(t => t.id === tenantId);
-      if (!tenant) {
-        throw new Error(`Tenant not found: ${tenantId}`);
-      }
-      subject.next(tenant);
-      log('loaded tenant %s', tenantId);
-    },
-
-    async setup(opts: SetupTenantOptions) {
-      const marker = await readMarkerBlob(adapter, opts.cloudMeta);
-      if (!marker) {
-        throw new Error('No strata workspace found at the specified location');
-      }
-      if (!validateMarkerBlob(marker)) {
-        throw new Error('Incompatible strata workspace version');
-      }
-
-      let id: string;
-      if (options?.deriveTenantId) {
-        id = options.deriveTenantId(opts.cloudMeta);
-      } else {
-        id = generateTenantId();
-      }
-
-      const tenants = await getList();
-      const existing = tenants.find(t => t.id === id);
-      if (existing) return existing;
-
-      const prefs = await loadTenantPrefs(adapter, opts.cloudMeta);
-
-      const now = new Date();
-      const tenant: Tenant = {
-        id,
-        name: prefs?.name ?? opts.name ?? 'Shared Workspace',
-        icon: prefs?.icon,
-        color: prefs?.color,
-        cloudMeta: opts.cloudMeta,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      await persistList([...tenants, tenant]);
-      log('setup tenant %s', id);
-
-      return tenant;
-    },
-
-    async delink(tenantId: string) {
-      const tenants = await getList();
-      const filtered = tenants.filter(t => t.id !== tenantId);
-      await persistList(filtered);
-
-      if (subject.getValue()?.id === tenantId) {
-        subject.next(undefined);
-      }
-      log('delinked tenant %s', tenantId);
-    },
-
-    async delete(tenantId: string) {
-      const tenants = await getList();
-      const tenant = tenants.find(t => t.id === tenantId);
-      if (!tenant) return;
-
-      const keys = await adapter.list(tenant.cloudMeta, '');
-      for (const key of keys) {
-        await adapter.delete(tenant.cloudMeta, key);
-      }
-
-      const filtered = tenants.filter(t => t.id !== tenantId);
-      await persistList(filtered);
-
-      if (subject.getValue()?.id === tenantId) {
-        subject.next(undefined);
-      }
-      log('deleted tenant %s', tenantId);
-    },
-  };
+): TenantManagerType {
+  return new TenantManager(adapter, options);
 }

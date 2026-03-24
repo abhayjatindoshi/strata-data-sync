@@ -6,14 +6,14 @@ export type {
   SyncEntity,
   SyncDirection,
   SyncQueueItem,
-  SyncLock,
+  SyncLock as SyncLockType,
   SyncResult,
   SyncEvent,
   SyncEventListener,
-  SyncEventEmitter,
+  SyncEventEmitter as SyncEventEmitterType,
   SyncSchedulerOptions,
-  SyncScheduler,
-  DirtyTracker,
+  SyncScheduler as SyncSchedulerType,
+  DirtyTracker as DirtyTrackerType,
 } from './types';
 export { loadIndexPair, diffPartitions } from './diff';
 export {
@@ -29,8 +29,8 @@ export {
   applyMergedToStore,
 } from './sync-phase';
 export { purgeStaleTombstones, DEFAULT_TOMBSTONE_RETENTION_MS } from './tombstone';
-export { createSyncLock } from './sync-lock';
+export { SyncLock, createSyncLock } from './sync-lock';
 export { hydrateFromCloud, hydrateFromLocal } from './hydrate';
-export { createSyncScheduler, syncNow } from './sync-scheduler';
-export { createSyncEventEmitter } from './sync-events';
-export { createDirtyTracker } from './dirty-tracker';
+export { SyncScheduler, createSyncScheduler, syncNow } from './sync-scheduler';
+export { SyncEventEmitter, createSyncEventEmitter } from './sync-events';
+export { DirtyTracker, createDirtyTracker } from './dirty-tracker';

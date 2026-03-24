@@ -4,35 +4,51 @@ import type { EntityDefinition, BaseEntity } from '@strata/schema';
 import { formatEntityId } from '@strata/schema';
 import type { EntityEventBus } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
-import type { SingletonRepository } from './types';
-import { createRepository } from './repository';
+import type { SingletonRepository as SingletonRepositoryType } from './types';
+import { Repository } from './repository';
 
 const log = debug('strata:repo');
+
+export class SingletonRepository<T> {
+  private readonly repo: Repository<T>;
+  private readonly deterministicId: string;
+
+  constructor(
+    definition: EntityDefinition<T>,
+    store: EntityStore,
+    hlc: { current: Hlc },
+    eventBus: EntityEventBus,
+  ) {
+    this.repo = new Repository(definition, store, hlc, eventBus);
+    this.deterministicId = formatEntityId(definition.name, '_', definition.name);
+  }
+
+  get(): (T & BaseEntity) | undefined {
+    return this.repo.get(this.deterministicId);
+  }
+
+  save(entity: T & Partial<BaseEntity>): void {
+    this.repo.save({ ...entity, id: this.deterministicId } as T & Partial<BaseEntity>);
+  }
+
+  delete(): boolean {
+    return this.repo.delete(this.deterministicId);
+  }
+
+  observe() {
+    return this.repo.observe(this.deterministicId);
+  }
+
+  dispose(): void {
+    this.repo.dispose();
+  }
+}
 
 export function createSingletonRepository<T>(
   definition: EntityDefinition<T>,
   store: EntityStore,
   hlc: { current: Hlc },
   eventBus: EntityEventBus,
-): SingletonRepository<T> {
-  const repo = createRepository(definition, store, hlc, eventBus);
-  const deterministicId = formatEntityId(definition.name, '_', definition.name);
-
-  return {
-    get() {
-      return repo.get(deterministicId);
-    },
-    save(entity: T & Partial<BaseEntity>) {
-      repo.save({ ...entity, id: deterministicId } as T & Partial<BaseEntity>);
-    },
-    delete() {
-      return repo.delete(deterministicId);
-    },
-    observe() {
-      return repo.observe(deterministicId);
-    },
-    dispose() {
-      repo.dispose();
-    },
-  };
+): SingletonRepositoryType<T> {
+  return new SingletonRepository(definition, store, hlc, eventBus);
 }

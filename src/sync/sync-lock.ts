@@ -1,78 +1,84 @@
 import debug from 'debug';
-import type { SyncDirection, SyncLock, SyncQueueItem } from './types';
+import type { SyncDirection, SyncLock as SyncLockType, SyncQueueItem } from './types';
 
 const log = debug('strata:sync');
 
-export function createSyncLock(): SyncLock {
-  const queue: SyncQueueItem[] = [];
-  let running = false;
-  let disposed = false;
+export class SyncLock {
+  private readonly queue: SyncQueueItem[] = [];
+  private running = false;
+  private disposed = false;
 
-  async function processQueue(): Promise<void> {
-    if (running) return;
-    running = true;
+  private async processQueue(): Promise<void> {
+    if (this.running) return;
+    this.running = true;
 
-    while (queue.length > 0) {
-      const item = queue[0];
+    while (this.queue.length > 0) {
+      const item = this.queue[0];
       try {
         await item.fn();
         item.resolve();
       } catch (err) {
         item.reject(err instanceof Error ? err : new Error(String(err)));
       }
-      queue.shift();
+      this.queue.shift();
     }
 
-    running = false;
+    this.running = false;
   }
 
-  return {
-    enqueue(source, target, fn) {
-      if (disposed) {
-        return Promise.reject(new Error('SyncLock is disposed'));
+  enqueue(
+    source: SyncDirection,
+    target: SyncDirection,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    if (this.disposed) {
+      return Promise.reject(new Error('SyncLock is disposed'));
+    }
+
+    const existing = this.queue.find(
+      item => item.source === source && item.target === target,
+    );
+    if (existing) {
+      log('dedup: %s→%s already queued', source, target);
+      return existing.promise;
+    }
+
+    let resolve!: () => void;
+    let reject!: (err: Error) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    this.queue.push({ source, target, fn, promise, resolve, reject });
+    log('enqueued %s→%s', source, target);
+    this.processQueue();
+
+    return promise;
+  }
+
+  isRunning(): boolean {
+    return this.running;
+  }
+
+  async drain(): Promise<void> {
+    while (this.queue.length > 0 || this.running) {
+      await this.queue[this.queue.length - 1]?.promise.catch(() => {});
+      if (this.running && this.queue.length === 0) {
+        await new Promise<void>(r => setTimeout(r, 0));
       }
+    }
+  }
 
-      const existing = queue.find(
-        item => item.source === source && item.target === target,
-      );
-      if (existing) {
-        log('dedup: %s→%s already queued', source, target);
-        return existing.promise;
-      }
+  dispose(): void {
+    this.disposed = true;
+    for (const item of this.queue) {
+      item.reject(new Error('SyncLock disposed'));
+    }
+    this.queue.length = 0;
+  }
+}
 
-      let resolve!: () => void;
-      let reject!: (err: Error) => void;
-      const promise = new Promise<void>((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
-
-      queue.push({ source, target, fn, promise, resolve, reject });
-      log('enqueued %s→%s', source, target);
-      processQueue();
-
-      return promise;
-    },
-
-    isRunning() {
-      return running;
-    },
-
-    async drain() {
-      while (queue.length > 0 || running) {
-        await queue[queue.length - 1]?.promise.catch(() => {});
-        if (running && queue.length === 0) {
-          await new Promise<void>(r => setTimeout(r, 0));
-        }
-      }
-    },
-
-    dispose() {
-      disposed = true;
-      for (const item of queue) {
-        item.reject(new Error('SyncLock disposed'));
-      }
-      queue.length = 0;
-    },
-  };
+export function createSyncLock(): SyncLockType {
+  return new SyncLock();
 }

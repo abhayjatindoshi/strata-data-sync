@@ -1,4 +1,4 @@
-export type { EntityStore, FlushScheduler, FlushSchedulerOptions } from './types';
-export { createStore } from './store';
+export type { EntityStore, FlushScheduler as FlushSchedulerType, FlushSchedulerOptions } from './types';
+export { Store, createStore } from './store';
 export { flushPartition, flushAll, loadPartitionFromAdapter } from './flush';
-export { createFlushScheduler } from './flush-scheduler';
+export { FlushScheduler, createFlushScheduler } from './flush-scheduler';

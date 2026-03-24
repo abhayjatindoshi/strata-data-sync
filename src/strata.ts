@@ -7,15 +7,15 @@ import type { EntityDefinition } from '@strata/schema';
 import { createEventBus } from '@strata/reactive';
 import { createStore, createFlushScheduler } from '@strata/store';
 import { createRepository, createSingletonRepository } from '@strata/repo';
-import type { Repository, SingletonRepository } from '@strata/repo';
+import type { RepositoryType, SingletonRepositoryType } from '@strata/repo';
 import { createTenantManager } from '@strata/tenant';
-import type { TenantManager } from '@strata/tenant';
+import type { TenantManagerType } from '@strata/tenant';
 import {
   createSyncLock, createSyncEventEmitter, createDirtyTracker,
   createSyncScheduler, syncNow, hydrateFromCloud, hydrateFromLocal,
 } from '@strata/sync';
 import type {
-  SyncResult, SyncEventListener, SyncScheduler,
+  SyncResult, SyncEventListener, SyncSchedulerType,
 } from '@strata/sync';
 
 const log = debug('strata:core');
@@ -36,17 +36,6 @@ export type StrataConfig = {
   readonly cloudAdapter?: BlobAdapter;
   readonly deviceId: string;
   readonly options?: StrataOptions;
-};
-
-export type Strata = {
-  readonly tenants: TenantManager;
-  repo<T>(def: EntityDefinition<T>): Repository<T> | SingletonRepository<T>;
-  sync(): Promise<SyncResult>;
-  dispose(): Promise<void>;
-  readonly isDirty: boolean;
-  readonly isDirty$: Observable<boolean>;
-  onSyncEvent(listener: SyncEventListener): void;
-  offSyncEvent(listener: SyncEventListener): void;
 };
 
 // ─── Validation ──────────────────────────────────────────
@@ -70,147 +59,179 @@ export function validateEntityDefinitions(
   }
 }
 
-// ─── Factory ─────────────────────────────────────────────
+// ─── Class ───────────────────────────────────────────────
 
-export function createStrata(config: StrataConfig): Strata {
-  validateEntityDefinitions(config.entities);
+export class Strata {
+  readonly tenants: TenantManagerType;
+  readonly isDirty$: Observable<boolean>;
 
-  const hlcRef: { current: Hlc } = { current: createHlc(config.deviceId) };
-  const eventBus = createEventBus();
-  const store = createStore();
-  const flushScheduler = createFlushScheduler(
-    config.localAdapter, undefined, store,
-    { debounceMs: config.options?.flushDebounceMs },
-  );
-  const syncLock = createSyncLock();
-  const syncEvents = createSyncEventEmitter();
-  const dirtyTracker = createDirtyTracker();
-  const entityNames = config.entities.map(d => d.name);
-
+  private readonly hlcRef: { current: Hlc };
+  private readonly eventBus: ReturnType<typeof createEventBus>;
+  private readonly store: ReturnType<typeof createStore>;
+  private readonly flushScheduler: ReturnType<typeof createFlushScheduler>;
+  private readonly syncLock: ReturnType<typeof createSyncLock>;
+  private readonly syncEvents: ReturnType<typeof createSyncEventEmitter>;
+  private readonly dirtyTracker: ReturnType<typeof createDirtyTracker>;
+  private readonly entityNames: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const repoMap = new Map<string, Repository<any> | SingletonRepository<any>>();
-  for (const def of config.entities) {
-    if (def.keyStrategy.kind === 'singleton') {
-      repoMap.set(def.name, createSingletonRepository(def, store, hlcRef, eventBus));
-    } else {
-      repoMap.set(def.name, createRepository(def, store, hlcRef, eventBus));
+  private readonly repoMap = new Map<string, RepositoryType<unknown> | SingletonRepositoryType<unknown>>();
+  private readonly baseTenants: TenantManagerType;
+  private readonly config: StrataConfig;
+  private readonly dirtyFlushListener: () => void;
+
+  private syncScheduler: SyncSchedulerType | null = null;
+  private disposed = false;
+  private disposePromise: Promise<void> | null = null;
+
+  constructor(config: StrataConfig) {
+    validateEntityDefinitions(config.entities);
+    this.config = config;
+
+    this.hlcRef = { current: createHlc(config.deviceId) };
+    this.eventBus = createEventBus();
+    this.store = createStore();
+    this.flushScheduler = createFlushScheduler(
+      config.localAdapter, undefined, this.store,
+      { debounceMs: config.options?.flushDebounceMs },
+    );
+    this.syncLock = createSyncLock();
+    this.syncEvents = createSyncEventEmitter();
+    this.dirtyTracker = createDirtyTracker();
+    this.entityNames = config.entities.map(d => d.name);
+    this.isDirty$ = this.dirtyTracker.isDirty$;
+
+    for (const def of config.entities) {
+      if (def.keyStrategy.kind === 'singleton') {
+        this.repoMap.set(def.name, createSingletonRepository(def, this.store, this.hlcRef, this.eventBus));
+      } else {
+        this.repoMap.set(def.name, createRepository(def, this.store, this.hlcRef, this.eventBus));
+      }
+    }
+
+    this.baseTenants = createTenantManager(config.localAdapter, {
+      entityTypes: this.entityNames,
+    });
+
+    const dirtyFlushListener = () => {
+      this.dirtyTracker.markDirty();
+      this.flushScheduler.schedule();
+    };
+    this.dirtyFlushListener = dirtyFlushListener;
+    this.eventBus.on(dirtyFlushListener);
+
+    this.tenants = this.createTenantsWrapper();
+  }
+
+  private createTenantsWrapper(): TenantManagerType {
+    const self = this;
+    return {
+      list: () => self.baseTenants.list(),
+      create: (opts) => self.baseTenants.create(opts),
+      setup: (opts) => self.baseTenants.setup(opts),
+      delink: (id) => self.baseTenants.delink(id),
+      delete: (id) => self.baseTenants.delete(id),
+      activeTenant$: self.baseTenants.activeTenant$,
+      async load(tenantId) {
+        self.assertNotDisposed();
+        await self.baseTenants.load(tenantId);
+        const tenant = self.baseTenants.activeTenant$.getValue();
+        if (!tenant) return;
+
+        if (self.syncScheduler) {
+          self.syncScheduler.stop();
+          self.syncScheduler = null;
+        }
+
+        if (self.config.cloudAdapter) {
+          try {
+            await hydrateFromCloud(
+              self.config.cloudAdapter, self.config.localAdapter,
+              self.store, self.entityNames, tenant.cloudMeta,
+            );
+          } catch {
+            self.syncEvents.emit({ type: 'cloud-unreachable' });
+            await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames);
+          }
+        } else {
+          await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames);
+        }
+
+        if (self.config.cloudAdapter) {
+          self.syncScheduler = createSyncScheduler(
+            self.syncLock, self.config.localAdapter, self.config.cloudAdapter,
+            self.store, self.entityNames, tenant.cloudMeta, {
+              localFlushIntervalMs: self.config.options?.localFlushIntervalMs,
+              cloudSyncIntervalMs: self.config.options?.cloudSyncIntervalMs,
+            },
+          );
+          self.syncScheduler.start();
+        }
+
+        log('tenant %s loaded and hydrated', tenantId);
+      },
+    };
+  }
+
+  private assertNotDisposed(): void {
+    if (this.disposed) throw new Error('Strata instance is disposed');
+  }
+
+  repo<T>(def: EntityDefinition<T>): RepositoryType<T> | SingletonRepositoryType<T> {
+    this.assertNotDisposed();
+    const r = this.repoMap.get(def.name);
+    if (!r) throw new Error(`Unknown entity definition: ${def.name}`);
+    return r as RepositoryType<T> | SingletonRepositoryType<T>;
+  }
+
+  async sync(): Promise<SyncResult> {
+    this.assertNotDisposed();
+    const tenant = this.baseTenants.activeTenant$.getValue();
+    if (!tenant) throw new Error('No tenant loaded');
+    if (!this.config.cloudAdapter) throw new Error('No cloud adapter configured');
+
+    this.syncEvents.emit({ type: 'sync-started' });
+    try {
+      await syncNow(
+        this.syncLock, this.config.localAdapter, this.config.cloudAdapter,
+        this.store, this.entityNames, tenant.cloudMeta,
+      );
+      this.dirtyTracker.clearDirty();
+      const result: SyncResult = {
+        entitiesUpdated: 0, conflictsResolved: 0, partitionsSynced: 0,
+      };
+      this.syncEvents.emit({ type: 'sync-completed', result });
+      return result;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.syncEvents.emit({ type: 'sync-failed', error });
+      throw error;
     }
   }
 
-  const baseTenants = createTenantManager(config.localAdapter, {
-    entityTypes: entityNames,
-  });
+  get isDirty(): boolean { return this.dirtyTracker.isDirty; }
 
-  let syncScheduler: SyncScheduler | null = null;
-  let disposed = false;
-  let disposePromise: Promise<void> | null = null;
+  onSyncEvent(listener: SyncEventListener): void { this.syncEvents.on(listener); }
 
-  const dirtyFlushListener = () => {
-    dirtyTracker.markDirty();
-    flushScheduler.schedule();
-  };
-  eventBus.on(dirtyFlushListener);
+  offSyncEvent(listener: SyncEventListener): void { this.syncEvents.off(listener); }
 
-  function assertNotDisposed(): void {
-    if (disposed) throw new Error('Strata instance is disposed');
+  dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise;
+    this.disposed = true;
+    this.disposePromise = (async () => {
+      this.syncScheduler?.stop();
+      await this.syncLock.drain();
+      await this.flushScheduler.flush();
+      for (const r of this.repoMap.values()) r.dispose();
+      this.eventBus.off(this.dirtyFlushListener);
+      this.syncLock.dispose();
+      log('strata disposed');
+    })();
+    return this.disposePromise;
   }
+}
 
-  const tenants: TenantManager = {
-    list: () => baseTenants.list(),
-    create: (opts) => baseTenants.create(opts),
-    setup: (opts) => baseTenants.setup(opts),
-    delink: (id) => baseTenants.delink(id),
-    delete: (id) => baseTenants.delete(id),
-    activeTenant$: baseTenants.activeTenant$,
-    async load(tenantId) {
-      assertNotDisposed();
-      await baseTenants.load(tenantId);
-      const tenant = baseTenants.activeTenant$.getValue();
-      if (!tenant) return;
+// ─── Factory ─────────────────────────────────────────────
 
-      if (syncScheduler) {
-        syncScheduler.stop();
-        syncScheduler = null;
-      }
-
-      if (config.cloudAdapter) {
-        try {
-          await hydrateFromCloud(
-            config.cloudAdapter, config.localAdapter,
-            store, entityNames, tenant.cloudMeta,
-          );
-        } catch {
-          syncEvents.emit({ type: 'cloud-unreachable' });
-          await hydrateFromLocal(config.localAdapter, store, entityNames);
-        }
-      } else {
-        await hydrateFromLocal(config.localAdapter, store, entityNames);
-      }
-
-      if (config.cloudAdapter) {
-        syncScheduler = createSyncScheduler(
-          syncLock, config.localAdapter, config.cloudAdapter,
-          store, entityNames, tenant.cloudMeta, {
-            localFlushIntervalMs: config.options?.localFlushIntervalMs,
-            cloudSyncIntervalMs: config.options?.cloudSyncIntervalMs,
-          },
-        );
-        syncScheduler.start();
-      }
-
-      log('tenant %s loaded and hydrated', tenantId);
-    },
-  };
-
-  return {
-    tenants,
-    repo<T>(def: EntityDefinition<T>): Repository<T> | SingletonRepository<T> {
-      assertNotDisposed();
-      const r = repoMap.get(def.name);
-      if (!r) throw new Error(`Unknown entity definition: ${def.name}`);
-      return r as Repository<T> | SingletonRepository<T>;
-    },
-    async sync() {
-      assertNotDisposed();
-      const tenant = baseTenants.activeTenant$.getValue();
-      if (!tenant) throw new Error('No tenant loaded');
-      if (!config.cloudAdapter) throw new Error('No cloud adapter configured');
-
-      syncEvents.emit({ type: 'sync-started' });
-      try {
-        await syncNow(
-          syncLock, config.localAdapter, config.cloudAdapter,
-          store, entityNames, tenant.cloudMeta,
-        );
-        dirtyTracker.clearDirty();
-        const result: SyncResult = {
-          entitiesUpdated: 0, conflictsResolved: 0, partitionsSynced: 0,
-        };
-        syncEvents.emit({ type: 'sync-completed', result });
-        return result;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        syncEvents.emit({ type: 'sync-failed', error });
-        throw error;
-      }
-    },
-    get isDirty() { return dirtyTracker.isDirty; },
-    isDirty$: dirtyTracker.isDirty$,
-    onSyncEvent(listener) { syncEvents.on(listener); },
-    offSyncEvent(listener) { syncEvents.off(listener); },
-    dispose() {
-      if (disposePromise) return disposePromise;
-      disposed = true;
-      disposePromise = (async () => {
-        syncScheduler?.stop();
-        await syncLock.drain();
-        await flushScheduler.flush();
-        for (const r of repoMap.values()) r.dispose();
-        eventBus.off(dirtyFlushListener);
-        syncLock.dispose();
-        log('strata disposed');
-      })();
-      return disposePromise;
-    },
-  };
+export function createStrata(config: StrataConfig): Strata {
+  return new Strata(config);
 }

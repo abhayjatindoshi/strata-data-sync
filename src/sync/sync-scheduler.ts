@@ -4,12 +4,71 @@ import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import type { EntityStore } from '@strata/store';
 import { flushAll, loadPartitionFromAdapter } from '@strata/store';
-import type { SyncLock, SyncScheduler, SyncSchedulerOptions } from './types';
+import type { SyncLock, SyncScheduler as SyncSchedulerType, SyncSchedulerOptions } from './types';
 import { loadIndexPair, diffPartitions } from './diff';
 import { syncCopyPhase } from './copy';
 import { syncMergePhase, updateIndexesAfterSync } from './sync-phase';
 
 const log = debug('strata:sync');
+
+export class SyncScheduler {
+  private localTimer: ReturnType<typeof setInterval> | null = null;
+  private cloudTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly localFlushIntervalMs: number;
+  private readonly cloudSyncIntervalMs: number;
+
+  constructor(
+    private readonly syncLock: SyncLock,
+    private readonly localAdapter: BlobAdapter,
+    private readonly cloudAdapter: BlobAdapter,
+    private readonly store: EntityStore,
+    private readonly entityNames: ReadonlyArray<string>,
+    private readonly cloudMeta: CloudMeta,
+    options?: SyncSchedulerOptions,
+  ) {
+    this.localFlushIntervalMs = options?.localFlushIntervalMs ?? 2000;
+    this.cloudSyncIntervalMs = options?.cloudSyncIntervalMs ?? 300000;
+  }
+
+  start(): void {
+    this.localTimer = setInterval(() => {
+      this.syncLock.enqueue('memory-to-local', 'memory-to-local', () =>
+        flushAll(this.localAdapter, undefined, this.store),
+      ).catch((err: unknown) => {
+        log.extend('error')('local flush failed: %O', err);
+      });
+    }, this.localFlushIntervalMs);
+
+    this.cloudTimer = setInterval(() => {
+      this.syncLock.enqueue('local-to-cloud', 'local-to-cloud', () =>
+        syncCloudCycle(this.localAdapter, this.cloudAdapter, this.store, this.entityNames, this.cloudMeta),
+      ).catch((err: unknown) => {
+        log.extend('error')('cloud sync failed: %O', err);
+      });
+    }, this.cloudSyncIntervalMs);
+
+    log('scheduler started (local=%dms, cloud=%dms)', this.localFlushIntervalMs, this.cloudSyncIntervalMs);
+  }
+
+  stop(): void {
+    if (this.localTimer !== null) {
+      clearInterval(this.localTimer);
+      this.localTimer = null;
+    }
+    if (this.cloudTimer !== null) {
+      clearInterval(this.cloudTimer);
+      this.cloudTimer = null;
+    }
+    log('scheduler stopped');
+  }
+
+  async dispose(): Promise<void> {
+    this.stop();
+    await this.syncLock.drain();
+    this.syncLock.dispose();
+    log('scheduler disposed');
+  }
+}
 
 export function createSyncScheduler(
   syncLock: SyncLock,
@@ -19,53 +78,8 @@ export function createSyncScheduler(
   entityNames: ReadonlyArray<string>,
   cloudMeta: CloudMeta,
   options?: SyncSchedulerOptions,
-): SyncScheduler {
-  const localFlushIntervalMs = options?.localFlushIntervalMs ?? 2000;
-  const cloudSyncIntervalMs = options?.cloudSyncIntervalMs ?? 300000;
-
-  let localTimer: ReturnType<typeof setInterval> | null = null;
-  let cloudTimer: ReturnType<typeof setInterval> | null = null;
-
-  return {
-    start() {
-      localTimer = setInterval(() => {
-        syncLock.enqueue('memory-to-local', 'memory-to-local', () =>
-          flushAll(localAdapter, undefined, store),
-        ).catch((err: unknown) => {
-          log.extend('error')('local flush failed: %O', err);
-        });
-      }, localFlushIntervalMs);
-
-      cloudTimer = setInterval(() => {
-        syncLock.enqueue('local-to-cloud', 'local-to-cloud', () =>
-          syncCloudCycle(localAdapter, cloudAdapter, store, entityNames, cloudMeta),
-        ).catch((err: unknown) => {
-          log.extend('error')('cloud sync failed: %O', err);
-        });
-      }, cloudSyncIntervalMs);
-
-      log('scheduler started (local=%dms, cloud=%dms)', localFlushIntervalMs, cloudSyncIntervalMs);
-    },
-
-    stop() {
-      if (localTimer !== null) {
-        clearInterval(localTimer);
-        localTimer = null;
-      }
-      if (cloudTimer !== null) {
-        clearInterval(cloudTimer);
-        cloudTimer = null;
-      }
-      log('scheduler stopped');
-    },
-
-    async dispose() {
-      this.stop();
-      await syncLock.drain();
-      syncLock.dispose();
-      log('scheduler disposed');
-    },
-  };
+): SyncSchedulerType {
+  return new SyncScheduler(syncLock, localAdapter, cloudAdapter, store, entityNames, cloudMeta, options);
 }
 
 async function syncCloudCycle(

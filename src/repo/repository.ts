@@ -7,7 +7,7 @@ import type { EntityDefinition, BaseEntity } from '@strata/schema';
 import { generateId, formatEntityId } from '@strata/schema';
 import type { EntityEventBus, EntityEventListener } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
-import type { Repository, QueryOptions } from './types';
+import type { Repository as RepositoryType, QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
 
 const log = debug('strata:repo');
@@ -37,35 +37,37 @@ function resultsChanged<T extends BaseEntity>(
   return false;
 }
 
-export function createRepository<T>(
-  definition: EntityDefinition<T>,
-  store: EntityStore,
-  hlc: { current: Hlc },
-  eventBus: EntityEventBus,
-): Repository<T> {
-  const changeSignal = new Subject<void>();
+export class Repository<T> {
+  private readonly changeSignal = new Subject<void>();
+  private readonly listener: EntityEventListener;
+  private disposed = false;
 
-  const listener: EntityEventListener = (event) => {
-    if (event.entityName === definition.name) {
-      changeSignal.next();
-    }
-  };
-  eventBus.on(listener);
+  constructor(
+    private readonly definition: EntityDefinition<T>,
+    private readonly store: EntityStore,
+    private readonly hlc: { current: Hlc },
+    private readonly eventBus: EntityEventBus,
+  ) {
+    this.listener = (event) => {
+      if (event.entityName === definition.name) {
+        this.changeSignal.next();
+      }
+    };
+    eventBus.on(this.listener);
+  }
 
-  let disposed = false;
-
-  function assertNotDisposed(): void {
-    if (disposed) {
+  private assertNotDisposed(): void {
+    if (this.disposed) {
       throw new Error('Repository is disposed');
     }
   }
 
-  function get(id: string): (T & BaseEntity) | undefined {
+  get(id: string): (T & BaseEntity) | undefined {
     const entityKey = parseEntityKey(id);
-    return store.get(entityKey, id) as (T & BaseEntity) | undefined;
+    return this.store.get(entityKey, id) as (T & BaseEntity) | undefined;
   }
 
-  function saveToStore(partial: T & Partial<BaseEntity>): string {
+  private saveToStore(partial: T & Partial<BaseEntity>): string {
     let id: string;
     let entityKey: string;
 
@@ -73,17 +75,17 @@ export function createRepository<T>(
       id = partial.id;
       entityKey = parseEntityKey(id);
     } else {
-      const uniqueId = definition.deriveId
-        ? definition.deriveId(partial)
+      const uniqueId = this.definition.deriveId
+        ? this.definition.deriveId(partial)
         : generateId();
-      const partitionKey = definition.keyStrategy.partitionFn(partial);
-      id = formatEntityId(definition.name, partitionKey, uniqueId);
-      entityKey = `${definition.name}.${partitionKey}`;
+      const partitionKey = this.definition.keyStrategy.partitionFn(partial);
+      id = formatEntityId(this.definition.name, partitionKey, uniqueId);
+      entityKey = `${this.definition.name}.${partitionKey}`;
     }
 
-    const existing = store.get(entityKey, id) as (T & BaseEntity) | undefined;
+    const existing = this.store.get(entityKey, id) as (T & BaseEntity) | undefined;
 
-    hlc.current = tickLocal(hlc.current);
+    this.hlc.current = tickLocal(this.hlc.current);
     const now = new Date();
 
     const entity = {
@@ -92,81 +94,80 @@ export function createRepository<T>(
       createdAt: existing?.createdAt ?? partial.createdAt ?? now,
       updatedAt: now,
       version: (existing?.version ?? 0) + 1,
-      device: hlc.current.nodeId,
-      hlc: hlc.current,
+      device: this.hlc.current.nodeId,
+      hlc: this.hlc.current,
     };
 
-    store.set(entityKey, id, entity);
+    this.store.set(entityKey, id, entity);
     log('saved %s', id);
 
     return id;
   }
 
-  function save(partial: T & Partial<BaseEntity>): string {
-    assertNotDisposed();
-    const id = saveToStore(partial);
-    eventBus.emit({ entityName: definition.name });
+  save(partial: T & Partial<BaseEntity>): string {
+    this.assertNotDisposed();
+    const id = this.saveToStore(partial);
+    this.eventBus.emit({ entityName: this.definition.name });
     return id;
   }
 
-  function saveMany(
+  saveMany(
     entities: ReadonlyArray<T & Partial<BaseEntity>>,
   ): ReadonlyArray<string> {
-    assertNotDisposed();
-    const ids = entities.map(entity => saveToStore(entity));
+    this.assertNotDisposed();
+    const ids = entities.map(entity => this.saveToStore(entity));
     if (ids.length > 0) {
-      changeSignal.next();
+      this.changeSignal.next();
     }
     return ids;
   }
 
-  function deleteFromStore(id: string): boolean {
+  private deleteFromStore(id: string): boolean {
     const entityKey = parseEntityKey(id);
-    const entity = store.get(entityKey, id) as (T & BaseEntity) | undefined;
+    const entity = this.store.get(entityKey, id) as (T & BaseEntity) | undefined;
     if (entity) {
-      store.setTombstone(entityKey, id, entity.hlc);
+      this.store.setTombstone(entityKey, id, entity.hlc);
     }
-    const deleted = store.delete(entityKey, id);
+    const deleted = this.store.delete(entityKey, id);
     if (deleted) {
       log('deleted %s', id);
     }
     return deleted;
   }
 
-  function deleteEntity(id: string): boolean {
-    assertNotDisposed();
-    const deleted = deleteFromStore(id);
+  delete(id: string): boolean {
+    this.assertNotDisposed();
+    const deleted = this.deleteFromStore(id);
     if (deleted) {
-      eventBus.emit({ entityName: definition.name });
+      this.eventBus.emit({ entityName: this.definition.name });
     }
     return deleted;
   }
 
-  function deleteMany(ids: ReadonlyArray<string>): void {
-    assertNotDisposed();
+  deleteMany(ids: ReadonlyArray<string>): void {
+    this.assertNotDisposed();
     let anyDeleted = false;
     for (const id of ids) {
-      if (deleteFromStore(id)) {
+      if (this.deleteFromStore(id)) {
         anyDeleted = true;
       }
     }
     if (anyDeleted) {
-      changeSignal.next();
+      this.changeSignal.next();
     }
   }
 
-  function query(opts?: QueryOptions<T>): ReadonlyArray<T & BaseEntity> {
-    const partitionKeys = store.getAllPartitionKeys(definition.name);
-    let entities: ReadonlyArray<T & BaseEntity> = [];
+  query(opts?: QueryOptions<T>): ReadonlyArray<T & BaseEntity> {
+    const partitionKeys = this.store.getAllPartitionKeys(this.definition.name);
 
     const collected: (T & BaseEntity)[] = [];
     for (const key of partitionKeys) {
-      const partition = store.getPartition(key);
+      const partition = this.store.getPartition(key);
       for (const entity of partition.values()) {
         collected.push(entity as T & BaseEntity);
       }
     }
-    entities = collected;
+    let entities: ReadonlyArray<T & BaseEntity> = collected;
 
     if (!opts) return entities;
 
@@ -193,31 +194,38 @@ export function createRepository<T>(
     return entities;
   }
 
-  function observe(id: string) {
-    assertNotDisposed();
-    return changeSignal.pipe(
+  observe(id: string) {
+    this.assertNotDisposed();
+    return this.changeSignal.pipe(
       startWith(undefined as void),
-      map(() => get(id)),
+      map(() => this.get(id)),
       distinctUntilChanged(entityComparator),
     );
   }
 
-  function observeQuery(opts?: QueryOptions<T>) {
-    assertNotDisposed();
-    return changeSignal.pipe(
+  observeQuery(opts?: QueryOptions<T>) {
+    this.assertNotDisposed();
+    return this.changeSignal.pipe(
       startWith(undefined as void),
-      map(() => query(opts)),
+      map(() => this.query(opts)),
       distinctUntilChanged((prev, next) => !resultsChanged(prev, next)),
     );
   }
 
-  function dispose(): void {
-    if (disposed) return;
-    disposed = true;
-    changeSignal.complete();
-    eventBus.off(listener);
-    log('disposed %s repository', definition.name);
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.changeSignal.complete();
+    this.eventBus.off(this.listener);
+    log('disposed %s repository', this.definition.name);
   }
+}
 
-  return { get, query, save, saveMany, delete: deleteEntity, deleteMany, observe, observeQuery, dispose };
+export function createRepository<T>(
+  definition: EntityDefinition<T>,
+  store: EntityStore,
+  hlc: { current: Hlc },
+  eventBus: EntityEventBus,
+): RepositoryType<T> {
+  return new Repository(definition, store, hlc, eventBus);
 }
