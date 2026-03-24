@@ -77,6 +77,12 @@ export class Store implements EntityStore {
   getTombstones(entityKey: string): ReadonlyMap<string, Hlc> {
     return this.tombstones.get(entityKey) ?? new Map<string, Hlc>();
   }
+
+  clear(): void {
+    this.partitions.clear();
+    this.tombstones.clear();
+    this.dirtyKeys.clear();
+  }
 }
 
 export function createStore(): EntityStore {

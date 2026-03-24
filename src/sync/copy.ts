@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import type { BlobAdapter, Meta } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { PartitionDiffResult } from './types';
 
@@ -8,35 +8,35 @@ const log = debug('strata:sync');
 export async function copyPartitionToCloud(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   entityName: string,
   partitionKey: string,
 ): Promise<void> {
   const key = partitionBlobKey(entityName, partitionKey);
-  const data = await localAdapter.read(undefined, key);
+  const data = await localAdapter.read(meta, key);
   if (!data) return;
-  await cloudAdapter.write(cloudMeta, key, data);
+  await cloudAdapter.write(meta, key, data);
   log('copied %s to cloud', key);
 }
 
 export async function copyPartitionToLocal(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   entityName: string,
   partitionKey: string,
 ): Promise<void> {
   const key = partitionBlobKey(entityName, partitionKey);
-  const data = await cloudAdapter.read(cloudMeta, key);
+  const data = await cloudAdapter.read(meta, key);
   if (!data) return;
-  await localAdapter.write(undefined, key, data);
+  await localAdapter.write(meta, key, data);
   log('copied %s to local', key);
 }
 
 export async function syncCopyPhase(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   entityName: string,
   diff: PartitionDiffResult,
 ): Promise<ReadonlyArray<string>> {
@@ -44,14 +44,14 @@ export async function syncCopyPhase(
 
   for (const key of diff.localOnly) {
     await copyPartitionToCloud(
-      localAdapter, cloudAdapter, cloudMeta, entityName, key,
+      localAdapter, cloudAdapter, meta, entityName, key,
     );
     copiedKeys.push(key);
   }
 
   for (const key of diff.cloudOnly) {
     await copyPartitionToLocal(
-      localAdapter, cloudAdapter, cloudMeta, entityName, key,
+      localAdapter, cloudAdapter, meta, entityName, key,
     );
     copiedKeys.push(key);
   }

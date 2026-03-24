@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import type { BlobAdapter, Meta } from '@strata/adapter';
 import type { EntityStore, FlushScheduler as FlushSchedulerType, FlushSchedulerOptions } from './types';
 import { flushAll } from './flush';
 
@@ -12,7 +12,7 @@ export class FlushScheduler {
 
   constructor(
     private readonly adapter: BlobAdapter,
-    private readonly cloudMeta: CloudMeta,
+    private meta: Meta,
     private readonly store: EntityStore,
     options?: FlushSchedulerOptions,
   ) {
@@ -26,7 +26,7 @@ export class FlushScheduler {
     }
     this.timer = setTimeout(() => {
       this.timer = null;
-      flushAll(this.adapter, this.cloudMeta, this.store).catch((err: unknown) => {
+      flushAll(this.adapter, this.meta, this.store).catch((err: unknown) => {
         log.extend('error')('flush failed: %O', err);
       });
     }, this.debounceMs);
@@ -37,7 +37,7 @@ export class FlushScheduler {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    await flushAll(this.adapter, this.cloudMeta, this.store);
+    await flushAll(this.adapter, this.meta, this.store);
   }
 
   async dispose(): Promise<void> {
@@ -46,15 +46,19 @@ export class FlushScheduler {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    await flushAll(this.adapter, this.cloudMeta, this.store);
+    await flushAll(this.adapter, this.meta, this.store);
+  }
+
+  setMeta(meta: Meta): void {
+    this.meta = meta;
   }
 }
 
 export function createFlushScheduler(
   adapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   store: EntityStore,
   options?: FlushSchedulerOptions,
 ): FlushSchedulerType {
-  return new FlushScheduler(adapter, cloudMeta, store, options);
+  return new FlushScheduler(adapter, meta, store, options);
 }

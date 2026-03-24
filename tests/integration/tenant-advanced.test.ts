@@ -32,17 +32,17 @@ describe('Tenant advanced integration', () => {
 
   it('tenant preferences sync — save prefs on A, load on B via shared cloud', async () => {
     const sharedCloud = createMemoryBlobAdapter();
-    const cloudMeta = { folder: 'shared' };
+    const meta = { folder: 'shared' };
 
     // Device A saves prefs to cloud
-    await saveTenantPrefs(sharedCloud, cloudMeta, {
+    await saveTenantPrefs(sharedCloud, meta, {
       name: 'My Workspace',
       icon: '🚀',
       color: '#FF0000',
     });
 
     // Device B loads prefs from cloud
-    const loaded = await loadTenantPrefs(sharedCloud, cloudMeta);
+    const loaded = await loadTenantPrefs(sharedCloud, meta);
 
     expect(loaded).toBeDefined();
     expect(loaded!.name).toBe('My Workspace');
@@ -61,7 +61,7 @@ describe('Tenant advanced integration', () => {
       localAdapter: localA,
       deviceId: 'dev-A',
     }));
-    await strataA.tenants.create({ name: 'Tenant X', cloudMeta: { b: 'x' } });
+    await strataA.tenants.create({ name: 'Tenant X', meta: { b: 'x' } });
 
     // Device B creates tenant Y
     const strataB = track(createStrata({
@@ -69,7 +69,7 @@ describe('Tenant advanced integration', () => {
       localAdapter: localB,
       deviceId: 'dev-B',
     }));
-    await strataB.tenants.create({ name: 'Tenant Y', cloudMeta: { b: 'y' } });
+    await strataB.tenants.create({ name: 'Tenant Y', meta: { b: 'y' } });
 
     // A pushes → cloud = [X]
     await pushTenantList(localA, sharedCloud);

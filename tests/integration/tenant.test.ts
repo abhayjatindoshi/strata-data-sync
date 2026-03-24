@@ -38,7 +38,7 @@ describe('Tenant integration', () => {
 
     const tenant = await strata.tenants.create({
       name: 'My Workspace',
-      cloudMeta: { bucket: 'ws1' },
+      meta: { bucket: 'ws1' },
     });
 
     await strata.tenants.load(tenant.id);
@@ -60,8 +60,8 @@ describe('Tenant integration', () => {
       deviceId: 'dev-1',
     }));
 
-    await strata1.tenants.create({ name: 'WS1', cloudMeta: { bucket: '1' } });
-    await strata1.tenants.create({ name: 'WS2', cloudMeta: { bucket: '2' } });
+    await strata1.tenants.create({ name: 'WS1', meta: { bucket: '1' } });
+    await strata1.tenants.create({ name: 'WS2', meta: { bucket: '2' } });
     await strata1.dispose();
 
     const strata2 = track(createStrata({
@@ -86,7 +86,7 @@ describe('Tenant integration', () => {
       deviceId: 'dev-1',
     }));
 
-    const tenantA = await strataA.tenants.create({ name: 'A', cloudMeta: { bucket: 'a' } });
+    const tenantA = await strataA.tenants.create({ name: 'A', meta: { bucket: 'a' } });
     await strataA.tenants.load(tenantA.id);
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     repoA.save({ title: 'Task for A', done: false });
@@ -99,7 +99,7 @@ describe('Tenant integration', () => {
       localAdapter: localB,
       deviceId: 'dev-1',
     }));
-    const tenantB = await strataB.tenants.create({ name: 'B', cloudMeta: { bucket: 'b' } });
+    const tenantB = await strataB.tenants.create({ name: 'B', meta: { bucket: 'b' } });
     await strataB.tenants.load(tenantB.id);
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     // B should have no entities — isolated local storage
@@ -116,7 +116,7 @@ describe('Tenant integration', () => {
 
     const tenant = await strata.tenants.create({
       name: 'Will Delink',
-      cloudMeta: { bucket: 'delink' },
+      meta: { bucket: 'delink' },
     });
 
     let list = await strata.tenants.list();
@@ -130,10 +130,10 @@ describe('Tenant integration', () => {
 
   it('setup detects existing workspace via marker blob', async () => {
     const localAdapter = createMemoryBlobAdapter();
-    const cloudMeta = { folder: 'shared-folder' };
+    const meta = { folder: 'shared-folder' };
 
-    // Simulate: workspace marker already exists at cloudMeta location
-    await writeMarkerBlob(localAdapter, cloudMeta, ['task']);
+    // Simulate: workspace marker already exists at meta location
+    await writeMarkerBlob(localAdapter, meta, ['task']);
 
     const strata = track(createStrata({
       entities: [TaskDef],
@@ -141,7 +141,7 @@ describe('Tenant integration', () => {
       deviceId: 'dev-1',
     }));
 
-    const tenant = await strata.tenants.setup({ cloudMeta, name: 'Shared Project' });
+    const tenant = await strata.tenants.setup({ meta, name: 'Shared Project' });
     expect(tenant).toBeDefined();
     expect(tenant.name).toBe('Shared Project');
   });
@@ -154,7 +154,7 @@ describe('Tenant integration', () => {
     }));
 
     await expect(
-      strata.tenants.setup({ cloudMeta: { folder: 'empty' } }),
+      strata.tenants.setup({ meta: { folder: 'empty' } }),
     ).rejects.toThrow('No strata workspace found');
   });
 
@@ -162,7 +162,7 @@ describe('Tenant integration', () => {
     const deriveFn = (meta: Record<string, unknown>) =>
       (meta as { folderId: string }).folderId.substring(0, 6);
 
-    const cloudMeta = { folderId: 'abc123xyz' };
+    const meta = { folderId: 'abc123xyz' };
 
     // Device A creates
     const localA = createMemoryBlobAdapter();
@@ -171,17 +171,17 @@ describe('Tenant integration', () => {
       localAdapter: localA,
       deviceId: 'dev-A',
     }));
-    const tenantA = await strataA.tenants.create({ name: 'Shared', cloudMeta });
+    const tenantA = await strataA.tenants.create({ name: 'Shared', meta });
 
     // Device B sets up (needs marker in its adapter)
     const localB = createMemoryBlobAdapter();
-    await writeMarkerBlob(localB, cloudMeta, ['task']);
+    await writeMarkerBlob(localB, meta, ['task']);
     const strataB = track(createStrata({
       entities: [TaskDef],
       localAdapter: localB,
       deviceId: 'dev-B',
     }));
-    const tenantB = await strataB.tenants.setup({ cloudMeta });
+    const tenantB = await strataB.tenants.setup({ meta });
 
     // Both should be able to load their tenants
     await strataA.tenants.load(tenantA.id);
@@ -201,7 +201,7 @@ describe('Tenant integration', () => {
 
     const tenant = await strata.tenants.create({
       name: 'Delete Me',
-      cloudMeta: { bucket: 'del' },
+      meta: { bucket: 'del' },
     });
 
     await strata.tenants.delete(tenant.id);

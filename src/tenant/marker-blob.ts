@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import type { BlobAdapter, Meta } from '@strata/adapter';
 import { STRATA_MARKER_KEY } from '@strata/adapter';
 import { serialize, deserialize } from '@strata/persistence';
 
@@ -13,7 +13,7 @@ export type MarkerBlob = {
 
 export async function writeMarkerBlob(
   adapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   entityTypes: readonly string[],
 ): Promise<void> {
   const marker: MarkerBlob = {
@@ -22,15 +22,15 @@ export async function writeMarkerBlob(
     entityTypes,
   };
   const data = serialize(marker);
-  await adapter.write(cloudMeta, STRATA_MARKER_KEY, data);
+  await adapter.write(meta, STRATA_MARKER_KEY, data);
   log('wrote marker blob');
 }
 
 export async function readMarkerBlob(
   adapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
 ): Promise<MarkerBlob | undefined> {
-  const data = await adapter.read(cloudMeta, STRATA_MARKER_KEY);
+  const data = await adapter.read(meta, STRATA_MARKER_KEY);
   if (!data) return undefined;
   return deserialize<MarkerBlob>(data);
 }

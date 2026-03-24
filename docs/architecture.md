@@ -161,8 +161,8 @@ graph TB
 
     PERSIST -->|"serialize/hash"| SYNC
     SCHEMA -->|"validate · ID gen"| REPO
-    TENANT -->|"cloudMeta"| LOCAL
-    TENANT -->|"cloudMeta"| CLOUD
+    TENANT -->|"meta"| LOCAL
+    TENANT -->|"meta"| CLOUD
 
     classDef app fill:#E3F2FD,stroke:#1565C0,color:#0D47A1
     classDef framework fill:#F3E5F5,stroke:#7B1FA2,color:#4A148C
@@ -183,7 +183,7 @@ graph TB
 | **Sync Engine** | Bidirectional local↔cloud sync | Three-phase model. HLC conflict resolution. Tombstones. See [persistence & sync](v2-persistence-sync.md). |
 | **Persistence** | Serialize/deserialize/hash | JSON with type markers. FNV-1a hash on ID+HLC pairs. Transform pipeline. See [persistence & sync](v2-persistence-sync.md). |
 | **Schema & Identity** | Entity definitions, IDs, partitioning | Three key strategies. `deriveId` for computed keys. See [repository & schema](v2-schema-repository.md). |
-| **Tenant Manager** | Multi-tenancy lifecycle | `cloudMeta`-based. Not a repo. See [tenant](v2-tenant.md). |
+| **Tenant Manager** | Multi-tenancy lifecycle | `meta`-based. Not a repo. See [tenant](v2-tenant.md). |
 | **Adapter** | Blob I/O (local + cloud) | Single `BlobAdapter` interface. 4 methods. See [adapter](v2-adapter.md). |
 
 ## Data Flow Summary

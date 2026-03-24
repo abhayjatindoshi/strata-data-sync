@@ -1,7 +1,8 @@
 import debug from 'debug';
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import type { BlobAdapter, Meta } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
-import { loadPartitionIndex, savePartitionIndex } from '@strata/persistence';
+import type { AllIndexes } from '@strata/persistence';
+import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
 import type { EntityStore } from '@strata/store';
 import { loadPartitionFromAdapter } from '@strata/store';
 
@@ -12,24 +13,27 @@ export async function hydrateFromCloud(
   localAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  cloudMeta: CloudMeta,
+  meta: Meta,
 ): Promise<ReadonlyArray<string>> {
   const hydrated: string[] = [];
+  const cloudIndexes = await loadAllIndexes(cloudAdapter, meta);
+  const localIndexes = await loadAllIndexes(localAdapter, meta);
+  let indexChanged = false;
 
   for (const entityName of entityNames) {
-    const cloudIndex = await loadPartitionIndex(cloudAdapter, cloudMeta, entityName);
+    const cloudIndex = cloudIndexes[entityName] ?? {};
     const partitionKeys = Object.keys(cloudIndex);
 
     for (const partitionKey of partitionKeys) {
       const blobKey = partitionBlobKey(entityName, partitionKey);
-      const cloudData = await cloudAdapter.read(cloudMeta, blobKey);
+      const cloudData = await cloudAdapter.read(meta, blobKey);
       if (cloudData) {
-        await localAdapter.write(undefined, blobKey, cloudData);
+        await localAdapter.write(meta, blobKey, cloudData);
       }
 
       const entityKey = partitionBlobKey(entityName, partitionKey);
       await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(localAdapter, undefined, store, entityName, partitionKey),
+        loadPartitionFromAdapter(localAdapter, meta, store, entityName, partitionKey),
       );
     }
 
@@ -38,8 +42,13 @@ export async function hydrateFromCloud(
 
     // Copy cloud partition index to local so subsequent syncs can diff correctly
     if (partitionKeys.length > 0) {
-      await savePartitionIndex(localAdapter, undefined, entityName, cloudIndex);
+      localIndexes[entityName] = cloudIndex;
+      indexChanged = true;
     }
+  }
+
+  if (indexChanged) {
+    await saveAllIndexes(localAdapter, meta, localIndexes);
   }
 
   return hydrated;
@@ -49,17 +58,19 @@ export async function hydrateFromLocal(
   localAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
+  meta: Meta = undefined,
 ): Promise<ReadonlyArray<string>> {
   const hydrated: string[] = [];
+  const localIndexes = await loadAllIndexes(localAdapter, meta);
 
   for (const entityName of entityNames) {
-    const localIndex = await loadPartitionIndex(localAdapter, undefined, entityName);
+    const localIndex = localIndexes[entityName] ?? {};
     const partitionKeys = Object.keys(localIndex);
 
     for (const partitionKey of partitionKeys) {
       const entityKey = partitionBlobKey(entityName, partitionKey);
       await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(localAdapter, undefined, store, entityName, partitionKey),
+        loadPartitionFromAdapter(localAdapter, meta, store, entityName, partitionKey),
       );
     }
 

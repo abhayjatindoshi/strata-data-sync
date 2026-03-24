@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import type { BlobAdapter, Meta } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import type { PartitionIndex } from '@strata/persistence';
@@ -7,7 +7,6 @@ import {
   serialize,
   deserialize,
   partitionHash,
-  savePartitionIndex,
   updatePartitionIndexEntry,
 } from '@strata/persistence';
 import type { EntityStore } from '@strata/store';
@@ -20,7 +19,7 @@ const log = debug('strata:sync');
 export async function syncMergePhase(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   entityName: string,
   divergedKeys: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<MergedPartitionResult>> {
@@ -29,8 +28,8 @@ export async function syncMergePhase(
   for (const partitionKey of divergedKeys) {
     const blobKey = partitionBlobKey(entityName, partitionKey);
     const [localBlob, cloudBlob] = await Promise.all([
-      localAdapter.read(undefined, blobKey),
-      cloudAdapter.read(cloudMeta, blobKey),
+      localAdapter.read(meta, blobKey),
+      cloudAdapter.read(meta, blobKey),
     ]);
 
     if (!localBlob || !cloudBlob) {
@@ -46,8 +45,8 @@ export async function syncMergePhase(
     const mergedBytes = serialize(mergedBlobData);
 
     await Promise.all([
-      localAdapter.write(undefined, blobKey, mergedBytes),
-      cloudAdapter.write(cloudMeta, blobKey, mergedBytes),
+      localAdapter.write(meta, blobKey, mergedBytes),
+      cloudAdapter.write(meta, blobKey, mergedBytes),
     ]);
 
     results.push({ partitionKey, ...merged });
@@ -74,19 +73,18 @@ function buildHlcMap(
 
 export async function updateIndexesAfterSync(
   localAdapter: BlobAdapter,
-  cloudAdapter: BlobAdapter,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   entityName: string,
   localIndex: PartitionIndex,
   cloudIndex: PartitionIndex,
   syncedPartitions: ReadonlyArray<string>,
-): Promise<void> {
+): Promise<{ updatedLocal: PartitionIndex; updatedCloud: PartitionIndex }> {
   let updatedLocal = { ...localIndex };
   let updatedCloud = { ...cloudIndex };
 
   for (const partitionKey of syncedPartitions) {
     const blobKey = partitionBlobKey(entityName, partitionKey);
-    const blob = await localAdapter.read(undefined, blobKey);
+    const blob = await localAdapter.read(meta, blobKey);
     if (!blob) continue;
 
     const data = deserialize<Record<string, unknown>>(blob);
@@ -108,11 +106,8 @@ export async function updateIndexesAfterSync(
     );
   }
 
-  await Promise.all([
-    savePartitionIndex(localAdapter, undefined, entityName, updatedLocal),
-    savePartitionIndex(cloudAdapter, cloudMeta, entityName, updatedCloud),
-  ]);
   log('updated indexes for %s after sync', entityName);
+  return { updatedLocal, updatedCloud };
 }
 
 export function applyMergedToStore(

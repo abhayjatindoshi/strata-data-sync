@@ -36,7 +36,7 @@ describe('Dirty tracking integration', () => {
 
     const tenant = await strata.tenants.create({
       name: 'Test',
-      cloudMeta: { b: 1 },
+      meta: { b: 1 },
     });
     await strata.tenants.load(tenant.id);
 
@@ -63,7 +63,7 @@ describe('Dirty tracking integration', () => {
 
     const tenant = await strata.tenants.create({
       name: 'Test',
-      cloudMeta: { b: 1 },
+      meta: { b: 1 },
     });
     await strata.tenants.load(tenant.id);
 

@@ -18,9 +18,9 @@
 | R4 | Repository | Global uses `Repository<T>` | Same type and implementation as partitioned; key strategy just returns `'_'` |
 | R5 | Repository | Rename `getAll` → `query`, `observeAll` → `observeQuery` | Clearer intent |
 | A1 | Adapter | Single `BlobAdapter` interface for both local and cloud | 4 methods: `read`, `write`, `delete`, `list`. Local stores blobs (IDB/filesystem), cloud stores blobs (Drive/S3). Framework handles serialize/deserialize. |
-| A5 | Adapter | Adapter receives `cloudMeta` per-call | `cloudMeta: Record<string, unknown> \| undefined`. Opaque to framework. Adapter casts internally. |
-| A6 | Adapter | No generics on adapter interfaces | No `TTenant`. Adapter casts `cloudMeta` internally. Zero generics in app code. |
-| A7 | Adapter | `cloudMeta = undefined` for unscoped operations | Tenant list in app space, pre-tenant-load operations. |
+| A5 | Adapter | Adapter receives `meta` per-call | `meta: Record<string, unknown> \| undefined`. Opaque to framework. Adapter casts internally. |
+| A6 | Adapter | No generics on adapter interfaces | No `TTenant`. Adapter casts `meta` internally. Zero generics in app code. |
+| A7 | Adapter | `meta = undefined` for unscoped operations | Tenant list in app space, pre-tenant-load operations. |
 | A8 | Adapter | Ship `MemoryBlobAdapter` for testing | Simple in-memory Map-backed blob adapter. |
 | WB1 | Write Buffer | In-memory store is source of truth for reads | All queries run against in-memory Map. Sync reads, no adapter I/O for queries. |
 | WB2 | Write Buffer | Writes are sync to Map, async flush to adapter | `save()` → Map.set (sync, 0.01ms) → emit event (sync) → adapter.write (async, non-blocking). |
@@ -36,12 +36,12 @@
 | RX7 | Reactive | `saveMany()` / `deleteMany()` for batch operations | Many Map writes, one `subject.next()` signal. Prevents N emissions for N saves. |
 | RX8 | Reactive | No debounce on signals | Single `save()` emits immediately and synchronously. Behavior is explicit. App uses `saveMany` for batches. |
 | RX9 | Reactive | `dispose()` completes all subjects and removes listeners | One subject per entity type — trivial cleanup. |
-| TN1 | Tenant | `cloudMeta` on tenant — opaque bag for adapter | Framework stores, doesn't interpret. Adapter-specific (Drive folder+space, S3 bucket+prefix, etc.) |
-| TN2 | Tenant | Tenant ID is short, URL-safe, customizable | App can provide, derive from cloudMeta, or let framework generate. |
-| TN3 | Tenant | `deriveTenantId(cloudMeta)` option | Deterministic ID from cloud location. Enables sharing — same folder = same ID across users. |
+| TN1 | Tenant | `meta` on tenant — opaque bag for adapter | Framework stores, doesn't interpret. Adapter-specific (Drive folder+space, S3 bucket+prefix, etc.) |
+| TN2 | Tenant | Tenant ID is short, URL-safe, customizable | App can provide, derive from meta, or let framework generate. |
+| TN3 | Tenant | `deriveTenantId(meta)` option | Deterministic ID from cloud location. Enables sharing — same folder = same ID across users. |
 | TN4 | Tenant | Tenant prefs (name/icon/color) shareable, stored in tenant data | Synced with tenant. User prefs stored separately (deferred). |
 | TN5 | Tenant | App creates tenants, adapter just stores blobs | App coordinates with auth/cloud APIs. Strata manages tenant list and lifecycle. |
-| TN6 | Tenant | `setup()` for opening existing shared tenants | Framework reads marker blob to detect existing strata workspace at cloudMeta location. |
+| TN6 | Tenant | `setup()` for opening existing shared tenants | Framework reads marker blob to detect existing strata workspace at meta location. |
 | TN7 | Tenant | `delink()` vs `delete()` | Delink = remove from list, keep data. Delete = remove from list + destroy data. |
 | TN8 | Tenant | Tenant list: local primary, cloud backup, union-merge sync | TenantManager owns storage directly (not via repo). Write local first, sync to cloud in background. |
 | TN9 | Tenant | TenantManager bypasses repo — direct adapter I/O | No circular dependency. Tenant list is not an entity. TenantManager reads/writes `__tenants` blob directly. |
@@ -205,13 +205,13 @@ These options were discussed and explicitly rejected. Do not reconsider during i
 **Context:** Tenants map to cloud storage locations (Drive folders, S3 buckets). Sharing means two users access the same cloud location but have their own preferences.
 
 **Key decisions:**
-- **`cloudMeta`** — opaque bag on tenant that the adapter needs to locate storage. Framework stores it, passes it to adapter, never inspects it.
-- **Tenant ID** — short, URL-safe. Can be app-provided, derived from cloudMeta (`deriveTenantId`), or framework-generated. Derived enables sharing (same folder = same ID).
+- **`meta`** — opaque bag on tenant that the adapter needs to locate storage. Framework stores it, passes it to adapter, never inspects it.
+- **Tenant ID** — short, URL-safe. Can be app-provided, derived from meta (`deriveTenantId`), or framework-generated. Derived enables sharing (same folder = same ID).
 - **Tenant prefs are shareable** — name/icon/color stored in tenant data, synced. User-specific prefs stored separately (deferred).
-- **App creates tenants** — app coordinates with auth framework/cloud APIs to create the storage location, then calls `strata.tenants.create()` with cloudMeta. Adapter only implements the 4 blob methods.
-- **`setup()` for shared tenants** — framework reads a marker blob at the cloudMeta location to detect existing strata data. Merges tenant prefs.
+- **App creates tenants** — app coordinates with auth framework/cloud APIs to create the storage location, then calls `strata.tenants.create()` with meta. Adapter only implements the 4 blob methods.
+- **`setup()` for shared tenants** — framework reads a marker blob at the meta location to detect existing strata data. Merges tenant prefs.
 - **`delink()` vs `delete()`** — delink removes from list without touching data. Delete removes + destroys all blobs.
-- **Tenant list storage** — TenantManager owns storage directly via adapter I/O, not via repo. Write to local first (instant, offline-capable), sync to cloud (app space, `cloudMeta = undefined`) in background. Multi-device merge is union-by-tenant-ID. No HLC needed — tenant list is append-mostly, conflicts are set unions.
+- **Tenant list storage** — TenantManager owns storage directly via adapter I/O, not via repo. Write to local first (instant, offline-capable), sync to cloud (app space, `meta = undefined`) in background. Multi-device merge is union-by-tenant-ID. No HLC needed — tenant list is append-mostly, conflicts are set unions.
 - **No circular dependency** — TenantManager doesn't use repo (which requires a loaded tenant). It reads/writes `__tenants` blob directly through the adapter.
 - **Cloud adapter helpers** — `BlobAdapter` contract stays at 4 methods. Framework-shipped adapters (Google Drive, S3) may additionally expose `createLocation()` / `listLocations()` utilities alongside the adapter, not as part of the `BlobAdapter` interface. Custom adapters don't need to implement these — the app handles cloud location creation directly.
 
@@ -223,7 +223,7 @@ These options were discussed and explicitly rejected. Do not reconsider during i
 - **Two internal service interfaces** — `CloudFileService` for file-based (Drive, OneDrive, Dropbox) and `CloudObjectService` for object-based (S3, Azure Blob, GCS). Internal to each adapter package, not exposed as core framework contracts.
 - **One common explorer interface** — `ExplorerDataSource` with `getSpaces()`, `getItems()`, `createContainer()` + capabilities flags. Each adapter package ships a factory that wraps its internal service into this common interface.
 - **One shared UI component** — `CloudExplorer` React component works with any `ExplorerDataSource`. Adapts based on capabilities (hides search for non-searchable, hides create button if not supported, etc.). Handles both "create new" and "open existing" flows.
-- **Claimed tenant matching** — Explorer source factory receives `ClaimedTenant[]` (cloudMeta + name from `strata.tenants.list()`). Adapter matches internally against its own cloudMeta shape. Items annotated with `isClaimed` / `claimedTenantName` for UI display.
+- **Claimed tenant matching** — Explorer source factory receives `ClaimedTenant[]` (meta + name from `strata.tenants.list()`). Adapter matches internally against its own meta shape. Items annotated with `isClaimed` / `claimedTenantName` for UI display.
 - **Package structure** — `@strata/cloud-explorer` ships the UI + `ExplorerDataSource` interface. Each adapter package (`@strata/google-drive-adapter`, `@strata/s3-adapter`) ships `BlobAdapter` impl + internal service + explorer source factory. Core framework (`@strata/core`) has no dependency on any of this.
 
 ### Query & Schema → Write Buffer & In-Memory Store (discussed 2026-03-22)

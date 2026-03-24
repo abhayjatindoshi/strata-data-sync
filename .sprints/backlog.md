@@ -4,7 +4,7 @@
 |---|------|-----------|------------|--------|
 | E1 | HLC — types, tick, compare | `hlc/` | `docs/persistence-sync.md` (HLC section) | done |
 | E2 | Schema — defineEntity, ID gen, key strategies | `schema/` | `docs/schema-repository.md` (Entity Definition, Entity IDs, Key Strategies) | done |
-| E3 | Adapter — BlobAdapter interface & types | `adapter/` | `docs/adapter.md` (Interface, cloudMeta, keys) | done |
+| E3 | Adapter — BlobAdapter interface & types | `adapter/` | `docs/adapter.md` (Interface, meta, keys) | done |
 | E4 | Adapter — MemoryBlobAdapter | `adapter/` | `docs/adapter.md` (MemoryBlobAdapter section) | done |
 | E5 | Adapter — Transform pipeline | `adapter/` | `docs/adapter.md` (Transform Pipeline section) | done |
 | E6 | Reactive — Event bus & Subject signals | `reactive/` | `docs/reactive.md` (Event Bus, Entity Type Subject) | done |

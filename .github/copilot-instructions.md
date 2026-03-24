@@ -14,7 +14,7 @@ Strata is an offline-first, reactive data framework for TypeScript/JavaScript. I
 | `reactive/` | `Subject<void>` per entity type, observe, event bus |
 | `persistence/` | JSON serialization, type markers, FNV-1a hashing, partition index |
 | `sync/` | Three-phase sync, HLC conflict resolution, tombstones |
-| `tenant/` | Tenant CRUD, cloudMeta, tenant list, sharing |
+| `tenant/` | Tenant CRUD, meta, tenant list, sharing |
 
 ## Design Documents
 

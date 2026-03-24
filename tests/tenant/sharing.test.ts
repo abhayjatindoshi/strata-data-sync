@@ -14,7 +14,7 @@ describe('Sharing flow', () => {
     await writeMarkerBlob(adapter, { folder: 'shared' }, ['transaction']);
 
     const tm = createTenantManager(adapter);
-    const tenant = await tm.setup({ cloudMeta: { folder: 'shared' }, name: 'Project X' });
+    const tenant = await tm.setup({ meta: { folder: 'shared' }, name: 'Project X' });
     expect(tenant).toBeDefined();
     expect(tenant.name).toBe('Project X');
   });
@@ -26,13 +26,13 @@ describe('Sharing flow', () => {
     // User A creates
     const adapterA = createMemoryBlobAdapter();
     const tmA = createTenantManager(adapterA, { deriveTenantId: deriveFn });
-    const tenantA = await tmA.create({ name: 'Project X', cloudMeta: { folderId: 'abc12345' } });
+    const tenantA = await tmA.create({ name: 'Project X', meta: { folderId: 'abc12345' } });
 
     // User B sets up (separate adapter simulating separate device, marker blob must exist)
     const adapterB = createMemoryBlobAdapter();
     await writeMarkerBlob(adapterB, { folderId: 'abc12345' }, []);
     const tmB = createTenantManager(adapterB, { deriveTenantId: deriveFn });
-    const tenantB = await tmB.setup({ cloudMeta: { folderId: 'abc12345' } });
+    const tenantB = await tmB.setup({ meta: { folderId: 'abc12345' } });
 
     expect(tenantA.id).toBe('abc1');
     expect(tenantB.id).toBe('abc1');
@@ -41,13 +41,13 @@ describe('Sharing flow', () => {
 
   it('merges tenant prefs into local list', async () => {
     const adapter = createMemoryBlobAdapter();
-    const cloudMeta = { folder: 'shared' };
+    const meta = { folder: 'shared' };
 
-    await writeMarkerBlob(adapter, cloudMeta, []);
-    await saveTenantPrefs(adapter, cloudMeta, { name: 'Team Project', icon: '🚀', color: '#ff0000' });
+    await writeMarkerBlob(adapter, meta, []);
+    await saveTenantPrefs(adapter, meta, { name: 'Team Project', icon: '🚀', color: '#ff0000' });
 
     const tm = createTenantManager(adapter);
-    const tenant = await tm.setup({ cloudMeta });
+    const tenant = await tm.setup({ meta });
 
     expect(tenant.name).toBe('Team Project');
     expect(tenant.icon).toBe('🚀');
@@ -56,13 +56,13 @@ describe('Sharing flow', () => {
 
   it('prefs name takes precedence over opts.name', async () => {
     const adapter = createMemoryBlobAdapter();
-    const cloudMeta = { folder: 'shared' };
+    const meta = { folder: 'shared' };
 
-    await writeMarkerBlob(adapter, cloudMeta, []);
-    await saveTenantPrefs(adapter, cloudMeta, { name: 'From Prefs' });
+    await writeMarkerBlob(adapter, meta, []);
+    await saveTenantPrefs(adapter, meta, { name: 'From Prefs' });
 
     const tm = createTenantManager(adapter);
-    const tenant = await tm.setup({ cloudMeta, name: 'From Opts' });
+    const tenant = await tm.setup({ meta, name: 'From Opts' });
 
     expect(tenant.name).toBe('From Prefs');
   });
@@ -71,7 +71,7 @@ describe('Sharing flow', () => {
     const adapter = createMemoryBlobAdapter();
     const tm = createTenantManager(adapter);
 
-    await expect(tm.setup({ cloudMeta: { folder: 'empty' } })).rejects.toThrow(
+    await expect(tm.setup({ meta: { folder: 'empty' } })).rejects.toThrow(
       'No strata workspace found',
     );
   });
@@ -82,7 +82,7 @@ describe('Sharing flow', () => {
     await adapter.write({}, STRATA_MARKER_KEY, serialize(marker));
 
     const tm = createTenantManager(adapter);
-    await expect(tm.setup({ cloudMeta: {} })).rejects.toThrow(
+    await expect(tm.setup({ meta: {} })).rejects.toThrow(
       'Incompatible strata workspace version',
     );
   });
@@ -91,7 +91,7 @@ describe('Sharing flow', () => {
     const adapter = createMemoryBlobAdapter();
     const tm = createTenantManager(adapter, { entityTypes: ['transaction', 'account'] });
 
-    await tm.create({ name: 'My App', cloudMeta: { bucket: 'x' } });
+    await tm.create({ name: 'My App', meta: { bucket: 'x' } });
 
     const { readMarkerBlob } = await import('@strata/tenant');
     const marker = await readMarkerBlob(adapter, { bucket: 'x' });

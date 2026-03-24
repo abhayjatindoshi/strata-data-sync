@@ -15,7 +15,7 @@ export type {
   SyncScheduler as SyncSchedulerType,
   DirtyTracker as DirtyTrackerType,
 } from './types';
-export { loadIndexPair, diffPartitions } from './diff';
+export { loadAllIndexPairs, diffPartitions } from './diff';
 export {
   copyPartitionToCloud,
   copyPartitionToLocal,

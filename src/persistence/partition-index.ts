@@ -1,28 +1,24 @@
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
-import { indexKey } from '@strata/adapter';
-import type { PartitionIndex } from './types';
+import type { BlobAdapter, Meta } from '@strata/adapter';
+import { INDEX_KEY } from '@strata/adapter';
+import type { AllIndexes, PartitionIndex } from './types';
 import { serialize, deserialize } from './serialize';
 
-export async function loadPartitionIndex(
+export async function loadAllIndexes(
   adapter: BlobAdapter,
-  cloudMeta: CloudMeta,
-  entityName: string,
-): Promise<PartitionIndex> {
-  const key = indexKey(entityName);
-  const data = await adapter.read(cloudMeta, key);
+  meta: Meta,
+): Promise<AllIndexes> {
+  const data = await adapter.read(meta, INDEX_KEY);
   if (!data) return {};
-  return deserialize<PartitionIndex>(data);
+  return deserialize<AllIndexes>(data);
 }
 
-export async function savePartitionIndex(
+export async function saveAllIndexes(
   adapter: BlobAdapter,
-  cloudMeta: CloudMeta,
-  entityName: string,
-  index: PartitionIndex,
+  meta: Meta,
+  indexes: AllIndexes,
 ): Promise<void> {
-  const key = indexKey(entityName);
-  const data = serialize(index);
-  await adapter.write(cloudMeta, key, data);
+  const data = serialize(indexes);
+  await adapter.write(meta, INDEX_KEY, data);
 }
 
 export function updatePartitionIndexEntry(

@@ -1,4 +1,5 @@
 import type { Hlc } from '@strata/hlc';
+import type { Meta } from '@strata/adapter';
 
 export type EntityStore = {
   get(entityKey: string, id: string): unknown | undefined;
@@ -14,6 +15,7 @@ export type EntityStore = {
   ): Promise<ReadonlyMap<string, unknown>>;
   setTombstone(entityKey: string, entityId: string, hlc: Hlc): void;
   getTombstones(entityKey: string): ReadonlyMap<string, Hlc>;
+  clear(): void;
 };
 
 export type FlushSchedulerOptions = {
@@ -24,4 +26,5 @@ export type FlushScheduler = {
   schedule(): void;
   flush(): Promise<void>;
   dispose(): Promise<void>;
+  setMeta(meta: Meta): void;
 };

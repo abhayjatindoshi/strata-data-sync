@@ -3,24 +3,24 @@ export type Tenant = {
   readonly name: string;
   readonly icon?: string;
   readonly color?: string;
-  readonly cloudMeta: Readonly<Record<string, unknown>>;
+  readonly meta: Readonly<Record<string, unknown>>;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };
 
 export type CreateTenantOptions = {
   readonly name: string;
-  readonly cloudMeta: Record<string, unknown>;
+  readonly meta: Record<string, unknown>;
   readonly id?: string;
 };
 
 export type SetupTenantOptions = {
-  readonly cloudMeta: Record<string, unknown>;
+  readonly meta: Record<string, unknown>;
   readonly name?: string;
 };
 
 export type TenantManagerOptions = {
-  readonly deriveTenantId?: (cloudMeta: Record<string, unknown>) => string;
+  readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
   readonly entityTypes?: readonly string[];
 };
 

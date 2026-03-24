@@ -52,7 +52,6 @@ describe('syncMergePhase', () => {
 describe('updateIndexesAfterSync', () => {
   it('skips partitions where blob does not exist', async () => {
     const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
 
     const localIndex: PartitionIndex = {
       '_': { hash: 111, count: 1, updatedAt: 1000 },
@@ -62,19 +61,18 @@ describe('updateIndexesAfterSync', () => {
     };
 
     // No blobs written — the partition key '_' has no blob
-    await updateIndexesAfterSync(
-      localAdapter, cloudAdapter, undefined, 'task',
+    const { updatedLocal, updatedCloud } = await updateIndexesAfterSync(
+      localAdapter, undefined, 'task',
       localIndex, cloudIndex, ['_', 'missing-key'],
     );
 
-    // Should not throw; indexes still saved (just without updates for missing blobs)
-    const localData = await localAdapter.read(undefined, '__index.task');
-    expect(localData).not.toBeNull();
+    // Should not throw; original entries preserved for missing blobs
+    expect(updatedLocal['_'].hash).toBe(111);
+    expect(updatedCloud['_'].hash).toBe(222);
   });
 
   it('updates indexes for partitions with existing blobs', async () => {
     const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
 
     const entity = {
       id: 'task._.a1', name: 'Test',
@@ -87,14 +85,13 @@ describe('updateIndexesAfterSync', () => {
     const localIndex: PartitionIndex = {};
     const cloudIndex: PartitionIndex = {};
 
-    await updateIndexesAfterSync(
-      localAdapter, cloudAdapter, undefined, 'task',
+    const { updatedLocal, updatedCloud } = await updateIndexesAfterSync(
+      localAdapter, undefined, 'task',
       localIndex, cloudIndex, ['_'],
     );
 
-    const localData = await localAdapter.read(undefined, '__index.task');
-    expect(localData).not.toBeNull();
-    const cloudData = await cloudAdapter.read(undefined, '__index.task');
-    expect(cloudData).not.toBeNull();
+    expect(updatedLocal['_']).toBeDefined();
+    expect(updatedLocal['_'].hash).toBe(updatedCloud['_'].hash);
+    expect(updatedLocal['_'].count).toBe(1);
   });
 });

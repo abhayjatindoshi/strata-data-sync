@@ -90,7 +90,7 @@ export class TenantManager {
     if (opts.id) {
       id = opts.id;
     } else if (this.options?.deriveTenantId) {
-      id = this.options.deriveTenantId(opts.cloudMeta);
+      id = this.options.deriveTenantId(opts.meta);
     } else {
       id = generateTenantId();
     }
@@ -99,12 +99,12 @@ export class TenantManager {
     const tenant: Tenant = {
       id,
       name: opts.name,
-      cloudMeta: opts.cloudMeta,
+      meta: opts.meta,
       createdAt: now,
       updatedAt: now,
     };
 
-    await writeMarkerBlob(this.adapter, opts.cloudMeta, this.options?.entityTypes ?? []);
+    await writeMarkerBlob(this.adapter, opts.meta, this.options?.entityTypes ?? []);
 
     await this.persistList([...tenants, tenant]);
     log('created tenant %s', id);
@@ -123,7 +123,7 @@ export class TenantManager {
   }
 
   async setup(opts: SetupTenantOptions): Promise<Tenant> {
-    const marker = await readMarkerBlob(this.adapter, opts.cloudMeta);
+    const marker = await readMarkerBlob(this.adapter, opts.meta);
     if (!marker) {
       throw new Error('No strata workspace found at the specified location');
     }
@@ -133,7 +133,7 @@ export class TenantManager {
 
     let id: string;
     if (this.options?.deriveTenantId) {
-      id = this.options.deriveTenantId(opts.cloudMeta);
+      id = this.options.deriveTenantId(opts.meta);
     } else {
       id = generateTenantId();
     }
@@ -142,7 +142,7 @@ export class TenantManager {
     const existing = tenants.find(t => t.id === id);
     if (existing) return existing;
 
-    const prefs = await loadTenantPrefs(this.adapter, opts.cloudMeta);
+    const prefs = await loadTenantPrefs(this.adapter, opts.meta);
 
     const now = new Date();
     const tenant: Tenant = {
@@ -150,7 +150,7 @@ export class TenantManager {
       name: prefs?.name ?? opts.name ?? 'Shared Workspace',
       icon: prefs?.icon,
       color: prefs?.color,
-      cloudMeta: opts.cloudMeta,
+      meta: opts.meta,
       createdAt: now,
       updatedAt: now,
     };
@@ -177,9 +177,9 @@ export class TenantManager {
     const tenant = tenants.find(t => t.id === tenantId);
     if (!tenant) return;
 
-    const keys = await this.adapter.list(tenant.cloudMeta, '');
+    const keys = await this.adapter.list(tenant.meta, '');
     for (const key of keys) {
-      await this.adapter.delete(tenant.cloudMeta, key);
+      await this.adapter.delete(tenant.meta, key);
     }
 
     const filtered = tenants.filter(t => t.id !== tenantId);

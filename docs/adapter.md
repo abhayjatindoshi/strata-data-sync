@@ -6,18 +6,18 @@ One interface for both local and cloud adapters:
 
 ```typescript
 type BlobAdapter = {
-  read(cloudMeta: Readonly<Record<string, unknown>> | undefined, key: string): Promise<Uint8Array | null>;
-  write(cloudMeta: Readonly<Record<string, unknown>> | undefined, key: string, data: Uint8Array): Promise<void>;
-  delete(cloudMeta: Readonly<Record<string, unknown>> | undefined, key: string): Promise<boolean>;
-  list(cloudMeta: Readonly<Record<string, unknown>> | undefined, prefix: string): Promise<string[]>;
+  read(meta: Readonly<Record<string, unknown>> | undefined, key: string): Promise<Uint8Array | null>;
+  write(meta: Readonly<Record<string, unknown>> | undefined, key: string, data: Uint8Array): Promise<void>;
+  delete(meta: Readonly<Record<string, unknown>> | undefined, key: string): Promise<boolean>;
+  list(meta: Readonly<Record<string, unknown>> | undefined, prefix: string): Promise<string[]>;
 };
 ```
 
 4 methods. No generics. No query capabilities. Blob I/O only.
 
-## `cloudMeta` Parameter
+## `meta` Parameter
 
-Every method receives `cloudMeta` as the first parameter:
+Every method receives `meta` as the first parameter:
 
 - **`undefined`** — unscoped operation. Used for tenant list (`__tenants` blob) stored in the app's default space (e.g., Google Drive appDataFolder, S3 default bucket).
 - **`Record<string, unknown>`** — tenant-scoped operation. Opaque to the framework. Adapter casts to its own type internally.
@@ -26,15 +26,15 @@ Examples:
 
 ```typescript
 // Google Drive adapter casts:
-const { folderId, space, driveId } = cloudMeta as GoogleDriveCloudMeta;
+const { folderId, space, driveId } = meta as GoogleDriveMeta;
 
 // S3 adapter casts:
-const { bucket, prefix, region } = cloudMeta as S3CloudMeta;
+const { bucket, prefix, region } = meta as S3Meta;
 ```
 
 ## No Generics
 
-The adapter interface has no generic type parameters. The framework doesn't know or care about the shape of `cloudMeta`. Adapter implementations cast internally. App code has zero angle brackets.
+The adapter interface has no generic type parameters. The framework doesn't know or care about the shape of `meta`. Adapter implementations cast internally. App code has zero angle brackets.
 
 ## Framework Responsibilities
 
@@ -83,7 +83,7 @@ const adapter = createMemoryBlobAdapter();
 
 | Key pattern | Purpose |
 |---|---|
-| `__tenants` | Tenant list blob (unscoped, `cloudMeta = undefined`) |
+| `__tenants` | Tenant list blob (unscoped, `meta = undefined`) |
 | `__strata` | Workspace marker blob (per-tenant, indicates strata data exists at this location) |
 | `__index.{entityName}` | Partition index for an entity type |
 | `{entityName}.{partitionKey}` | Partition blob containing entities |
@@ -95,20 +95,20 @@ Minimal implementation:
 ```typescript
 function createMyAdapter(): BlobAdapter {
   return {
-    async read(cloudMeta, key) {
-      const location = resolveLocation(cloudMeta);
+    async read(meta, key) {
+      const location = resolveLocation(meta);
       return myStorage.get(location, key);
     },
-    async write(cloudMeta, key, data) {
-      const location = resolveLocation(cloudMeta);
+    async write(meta, key, data) {
+      const location = resolveLocation(meta);
       await myStorage.put(location, key, data);
     },
-    async delete(cloudMeta, key) {
-      const location = resolveLocation(cloudMeta);
+    async delete(meta, key) {
+      const location = resolveLocation(meta);
       return myStorage.remove(location, key);
     },
-    async list(cloudMeta, prefix) {
-      const location = resolveLocation(cloudMeta);
+    async list(meta, prefix) {
+      const location = resolveLocation(meta);
       return myStorage.listKeys(location, prefix);
     },
   };

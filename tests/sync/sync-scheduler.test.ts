@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createMemoryBlobAdapter } from '@strata/adapter';
 import { serialize } from '@strata/persistence';
-import { savePartitionIndex } from '@strata/persistence';
+import { saveAllIndexes } from '@strata/persistence';
 import { createStore } from '@strata/store';
 import { createSyncLock, createSyncScheduler, syncNow } from '@strata/sync';
 
@@ -197,8 +197,8 @@ describe('syncNow', () => {
 
     await cloudAdapter.write(undefined, 'task._',
       makePartitionBlob('task', { 'task._.c1': cloudEntity }));
-    await savePartitionIndex(cloudAdapter, undefined, 'task', {
-      '_': { hash: 333, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(cloudAdapter, undefined, {
+      task: { '_': { hash: 333, count: 1, updatedAt: 1000 } },
     });
 
     await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
@@ -223,14 +223,14 @@ describe('syncNow', () => {
 
     await localAdapter.write(undefined, 'task._',
       makePartitionBlob('task', { 'task._.a1': localEntity }));
-    await savePartitionIndex(localAdapter, undefined, 'task', {
-      '_': { hash: 111, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(localAdapter, undefined, {
+      task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
     });
 
     await cloudAdapter.write(undefined, 'task._',
       makePartitionBlob('task', { 'task._.a1': cloudEntity }));
-    await savePartitionIndex(cloudAdapter, undefined, 'task', {
-      '_': { hash: 222, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(cloudAdapter, undefined, {
+      task: { '_': { hash: 222, count: 1, updatedAt: 1000 } },
     });
 
     await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);

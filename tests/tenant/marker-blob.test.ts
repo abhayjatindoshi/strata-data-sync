@@ -6,10 +6,10 @@ import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/ten
 describe('writeMarkerBlob / readMarkerBlob', () => {
   it('round-trips marker blob', async () => {
     const adapter = createMemoryBlobAdapter();
-    const cloudMeta = { folder: 'test' };
-    await writeMarkerBlob(adapter, cloudMeta, ['transaction', 'account']);
+    const meta = { folder: 'test' };
+    await writeMarkerBlob(adapter, meta, ['transaction', 'account']);
 
-    const marker = await readMarkerBlob(adapter, cloudMeta);
+    const marker = await readMarkerBlob(adapter, meta);
     expect(marker).toBeDefined();
     expect(marker!.version).toBe(1);
     expect(marker!.createdAt).toBeInstanceOf(Date);

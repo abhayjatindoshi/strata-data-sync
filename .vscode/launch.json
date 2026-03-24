@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run app-fs",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/example/node_modules/.bin/tsx",
+      "args": ["${workspaceFolder}/example/app-fs.ts"],
+      "cwd": "${workspaceFolder}/example",
+      "console": "integratedTerminal"
+    }
+  ]
+}

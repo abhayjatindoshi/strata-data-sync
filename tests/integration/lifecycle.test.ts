@@ -35,7 +35,7 @@ describe('Full lifecycle integration', () => {
 
   it('save → dispose → reload from same local adapter → data persisted', async () => {
     const localAdapter = createMemoryBlobAdapter();
-    const cloudMeta = { bucket: 'test' };
+    const meta = { bucket: 'test' };
 
     // Phase 1: Create, save data, dispose
     const strata1 = track(createStrata({
@@ -43,7 +43,7 @@ describe('Full lifecycle integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata1.tenants.create({ name: 'Workspace', cloudMeta });
+    const tenant = await strata1.tenants.create({ name: 'Workspace', meta });
     await strata1.tenants.load(tenant.id);
 
     const repo1 = strata1.repo(TaskDef) as Repository<Task>;
@@ -75,7 +75,7 @@ describe('Full lifecycle integration', () => {
 
   it('dispose flushes all dirty data before shutting down', async () => {
     const localAdapter = createMemoryBlobAdapter();
-    const cloudMeta = { bucket: 'test' };
+    const meta = { bucket: 'test' };
 
     const strata = track(createStrata({
       entities: [TaskDef],
@@ -83,7 +83,7 @@ describe('Full lifecycle integration', () => {
       deviceId: 'dev-1',
       options: { flushDebounceMs: 60000 }, // Long debounce to ensure data isn't flushed before dispose
     }));
-    const tenant = await strata.tenants.create({ name: 'W', cloudMeta });
+    const tenant = await strata.tenants.create({ name: 'W', meta });
     await strata.tenants.load(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
@@ -124,7 +124,7 @@ describe('Full lifecycle integration', () => {
       cloudAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata.tenants.create({ name: 'T', cloudMeta: { b: 1 } });
+    const tenant = await strata.tenants.create({ name: 'T', meta: { b: 1 } });
     await strata.tenants.load(tenant.id);
     await strata.dispose();
 
@@ -137,7 +137,7 @@ describe('Full lifecycle integration', () => {
       localAdapter: createMemoryBlobAdapter(),
       deviceId: 'dev-1',
     }));
-    const tenant = await strata.tenants.create({ name: 'T', cloudMeta: { b: 1 } });
+    const tenant = await strata.tenants.create({ name: 'T', meta: { b: 1 } });
     await strata.dispose();
 
     await expect(strata.tenants.load(tenant.id)).rejects.toThrow('disposed');
@@ -157,14 +157,14 @@ describe('Full lifecycle integration', () => {
 
   it('multiple entity types survive dispose → reload', async () => {
     const localAdapter = createMemoryBlobAdapter();
-    const cloudMeta = { bucket: 'test' };
+    const meta = { bucket: 'test' };
 
     const strata1 = track(createStrata({
       entities: [TaskDef, SettingsDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata1.tenants.create({ name: 'W', cloudMeta });
+    const tenant = await strata1.tenants.create({ name: 'W', meta });
     await strata1.tenants.load(tenant.id);
 
     const taskRepo = strata1.repo(TaskDef) as Repository<Task>;
@@ -192,14 +192,14 @@ describe('Full lifecycle integration', () => {
 
   it('partitioned entities survive dispose → reload', async () => {
     const localAdapter = createMemoryBlobAdapter();
-    const cloudMeta = { bucket: 'test' };
+    const meta = { bucket: 'test' };
 
     const strata1 = track(createStrata({
       entities: [EventDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata1.tenants.create({ name: 'W', cloudMeta });
+    const tenant = await strata1.tenants.create({ name: 'W', meta });
     await strata1.tenants.load(tenant.id);
 
     const repo1 = strata1.repo(EventDef) as Repository<Event>;

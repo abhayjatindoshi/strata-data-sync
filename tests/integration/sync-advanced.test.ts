@@ -54,7 +54,7 @@ describe('Sync advanced integration', () => {
 
     const tenant = await strata.tenants.create({
       name: 'Test',
-      cloudMeta: { bucket: 'test' },
+      meta: { bucket: 'test' },
     });
 
     // Load tenant — cloud hydrate will fail, should fall back to local
@@ -82,7 +82,7 @@ describe('Sync advanced integration', () => {
 
     const tenant = await strata.tenants.create({
       name: 'Test',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
     });
     await strata.tenants.load(tenant.id);
 
@@ -162,7 +162,7 @@ describe('Sync advanced integration', () => {
     }));
     const tenant = await strataA.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
     });
     await strataA.tenants.load(tenant.id);
 
@@ -180,7 +180,7 @@ describe('Sync advanced integration', () => {
     }));
     await strataB.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
       id: tenant.id,
     });
     await strataB.tenants.load(tenant.id);

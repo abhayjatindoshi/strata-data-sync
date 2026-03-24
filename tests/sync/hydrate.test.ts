@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMemoryBlobAdapter } from '@strata/adapter';
 import { serialize } from '@strata/persistence';
-import { savePartitionIndex } from '@strata/persistence';
+import { saveAllIndexes } from '@strata/persistence';
 import { createStore } from '@strata/store';
 import { hydrateFromCloud, hydrateFromLocal } from '@strata/sync';
 
@@ -20,8 +20,8 @@ describe('hydrateFromCloud', () => {
 
     const entity = { id: 'task._.abc', name: 'Test', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     await cloudAdapter.write({ bucket: 'b' }, 'task._', makePartitionBlob('task', { 'task._.abc': entity }));
-    await savePartitionIndex(cloudAdapter, { bucket: 'b' }, 'task', {
-      '_': { hash: 111, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(cloudAdapter, { bucket: 'b' }, {
+      task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
     });
 
     const result = await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], { bucket: 'b' });
@@ -37,8 +37,8 @@ describe('hydrateFromCloud', () => {
 
     const blob = makePartitionBlob('task', { 'task._.abc': { id: 'task._.abc' } });
     await cloudAdapter.write({ bucket: 'b' }, 'task._', blob);
-    await savePartitionIndex(cloudAdapter, { bucket: 'b' }, 'task', {
-      '_': { hash: 111, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(cloudAdapter, { bucket: 'b' }, {
+      task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
     });
 
     await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], { bucket: 'b' });
@@ -55,8 +55,8 @@ describe('hydrateFromCloud', () => {
     const tombstoneHlc = { timestamp: 999, counter: 0, nodeId: 'n1' };
     const blob = makePartitionBlob('task', {}, { 'task._.deleted1': tombstoneHlc });
     await cloudAdapter.write({ bucket: 'b' }, 'task._', blob);
-    await savePartitionIndex(cloudAdapter, { bucket: 'b' }, 'task', {
-      '_': { hash: 222, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(cloudAdapter, { bucket: 'b' }, {
+      task: { '_': { hash: 222, count: 1, updatedAt: 1000 } },
     });
 
     await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], { bucket: 'b' });
@@ -71,8 +71,8 @@ describe('hydrateFromCloud', () => {
     const store = createStore();
 
     // Set up cloud index pointing to a partition, but don't write the blob
-    await savePartitionIndex(cloudAdapter, { bucket: 'b' }, 'task', {
-      '_': { hash: 111, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(cloudAdapter, { bucket: 'b' }, {
+      task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
     });
 
     const result = await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], { bucket: 'b' });
@@ -100,8 +100,8 @@ describe('hydrateFromLocal', () => {
 
     const entity = { id: 'task._.abc', name: 'Test', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     await localAdapter.write(undefined, 'task._', makePartitionBlob('task', { 'task._.abc': entity }));
-    await savePartitionIndex(localAdapter, undefined, 'task', {
-      '_': { hash: 111, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(localAdapter, undefined, {
+      task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
     });
 
     const result = await hydrateFromLocal(localAdapter, store, ['task']);
@@ -117,8 +117,8 @@ describe('hydrateFromLocal', () => {
     const tombstoneHlc = { timestamp: 999, counter: 0, nodeId: 'n1' };
     const blob = makePartitionBlob('task', {}, { 'task._.deleted1': tombstoneHlc });
     await localAdapter.write(undefined, 'task._', blob);
-    await savePartitionIndex(localAdapter, undefined, 'task', {
-      '_': { hash: 222, count: 1, updatedAt: 1000 },
+    await saveAllIndexes(localAdapter, undefined, {
+      task: { '_': { hash: 222, count: 1, updatedAt: 1000 } },
     });
 
     await hydrateFromLocal(localAdapter, store, ['task']);

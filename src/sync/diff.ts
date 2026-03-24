@@ -1,23 +1,22 @@
 import debug from 'debug';
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
-import type { PartitionIndex } from '@strata/persistence';
-import { loadPartitionIndex } from '@strata/persistence';
+import type { BlobAdapter, Meta } from '@strata/adapter';
+import type { AllIndexes, PartitionIndex } from '@strata/persistence';
+import { loadAllIndexes } from '@strata/persistence';
 import type { PartitionDiffResult } from './types';
 
 const log = debug('strata:sync');
 
-export async function loadIndexPair(
+export async function loadAllIndexPairs(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
-  cloudMeta: CloudMeta,
-  entityName: string,
-): Promise<{ localIndex: PartitionIndex; cloudIndex: PartitionIndex }> {
-  const [localIndex, cloudIndex] = await Promise.all([
-    loadPartitionIndex(localAdapter, undefined, entityName),
-    loadPartitionIndex(cloudAdapter, cloudMeta, entityName),
+  meta: Meta,
+): Promise<{ localIndexes: AllIndexes; cloudIndexes: AllIndexes }> {
+  const [localIndexes, cloudIndexes] = await Promise.all([
+    loadAllIndexes(localAdapter, meta),
+    loadAllIndexes(cloudAdapter, meta),
   ]);
-  log('loaded index pair for %s', entityName);
-  return { localIndex, cloudIndex };
+  log('loaded all index pairs');
+  return { localIndexes, cloudIndexes };
 }
 
 export function diffPartitions(

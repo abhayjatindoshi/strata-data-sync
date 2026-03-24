@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createMemoryBlobAdapter } from '@strata/adapter';
 import type { PartitionIndex } from '@strata/persistence';
-import { savePartitionIndex } from '@strata/persistence';
-import { diffPartitions, loadIndexPair } from '@strata/sync';
+import { saveAllIndexes } from '@strata/persistence';
+import { diffPartitions, loadAllIndexPairs } from '@strata/sync';
 
 describe('diffPartitions', () => {
   it('returns all unchanged when hashes match', () => {
@@ -100,11 +100,11 @@ describe('diffPartitions', () => {
   });
 });
 
-describe('loadIndexPair', () => {
+describe('loadAllIndexPairs', () => {
   it('loads indexes from both local and cloud adapters', async () => {
     const local = createMemoryBlobAdapter();
     const cloud = createMemoryBlobAdapter();
-    const cloudMeta = { container: 'test' };
+    const meta = { container: 'test' };
 
     const localIndex: PartitionIndex = {
       '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
@@ -113,22 +113,22 @@ describe('loadIndexPair', () => {
       '2026-02': { hash: 222, count: 20, updatedAt: 2000 },
     };
 
-    await savePartitionIndex(local, undefined, 'task', localIndex);
-    await savePartitionIndex(cloud, cloudMeta, 'task', cloudIndex);
+    await saveAllIndexes(local, undefined, { task: localIndex });
+    await saveAllIndexes(cloud, meta, { task: cloudIndex });
 
-    const result = await loadIndexPair(local, cloud, cloudMeta, 'task');
+    const result = await loadAllIndexPairs(local, cloud, meta);
 
-    expect(result.localIndex['2026-01'].hash).toBe(111);
-    expect(result.cloudIndex['2026-02'].hash).toBe(222);
+    expect(result.localIndexes['task']?.['2026-01']?.hash).toBe(111);
+    expect(result.cloudIndexes['task']?.['2026-02']?.hash).toBe(222);
   });
 
   it('returns empty indexes when no blobs exist', async () => {
     const local = createMemoryBlobAdapter();
     const cloud = createMemoryBlobAdapter();
 
-    const result = await loadIndexPair(local, cloud, undefined, 'task');
+    const result = await loadAllIndexPairs(local, cloud, undefined);
 
-    expect(result.localIndex).toEqual({});
-    expect(result.cloudIndex).toEqual({});
+    expect(result.localIndexes).toEqual({});
+    expect(result.cloudIndexes).toEqual({});
   });
 });

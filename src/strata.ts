@@ -142,24 +142,27 @@ export class Strata {
           self.syncScheduler = null;
         }
 
+        self.store.clear();
+        self.flushScheduler.setMeta(tenant.meta);
+
         if (self.config.cloudAdapter) {
           try {
             await hydrateFromCloud(
               self.config.cloudAdapter, self.config.localAdapter,
-              self.store, self.entityNames, tenant.cloudMeta,
+              self.store, self.entityNames, tenant.meta,
             );
           } catch {
             self.syncEvents.emit({ type: 'cloud-unreachable' });
-            await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames);
+            await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames, tenant.meta);
           }
         } else {
-          await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames);
+          await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames, tenant.meta);
         }
 
         if (self.config.cloudAdapter) {
           self.syncScheduler = createSyncScheduler(
             self.syncLock, self.config.localAdapter, self.config.cloudAdapter,
-            self.store, self.entityNames, tenant.cloudMeta, {
+            self.store, self.entityNames, tenant.meta, {
               localFlushIntervalMs: self.config.options?.localFlushIntervalMs,
               cloudSyncIntervalMs: self.config.options?.cloudSyncIntervalMs,
             },
@@ -193,7 +196,7 @@ export class Strata {
     try {
       await syncNow(
         this.syncLock, this.config.localAdapter, this.config.cloudAdapter,
-        this.store, this.entityNames, tenant.cloudMeta,
+        this.store, this.entityNames, tenant.meta,
       );
       this.dirtyTracker.clearDirty();
       const result: SyncResult = {

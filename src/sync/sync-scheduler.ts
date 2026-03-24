@@ -1,11 +1,12 @@
 import debug from 'debug';
-import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import type { BlobAdapter, Meta } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import type { EntityStore } from '@strata/store';
 import { flushAll, loadPartitionFromAdapter } from '@strata/store';
+import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
 import type { SyncLock, SyncScheduler as SyncSchedulerType, SyncSchedulerOptions } from './types';
-import { loadIndexPair, diffPartitions } from './diff';
+import { diffPartitions } from './diff';
 import { syncCopyPhase } from './copy';
 import { syncMergePhase, updateIndexesAfterSync } from './sync-phase';
 
@@ -23,7 +24,7 @@ export class SyncScheduler {
     private readonly cloudAdapter: BlobAdapter,
     private readonly store: EntityStore,
     private readonly entityNames: ReadonlyArray<string>,
-    private readonly cloudMeta: CloudMeta,
+    private readonly meta: Meta,
     options?: SyncSchedulerOptions,
   ) {
     this.localFlushIntervalMs = options?.localFlushIntervalMs ?? 2000;
@@ -33,7 +34,7 @@ export class SyncScheduler {
   start(): void {
     this.localTimer = setInterval(() => {
       this.syncLock.enqueue('memory-to-local', 'memory-to-local', () =>
-        flushAll(this.localAdapter, undefined, this.store),
+        flushAll(this.localAdapter, this.meta, this.store),
       ).catch((err: unknown) => {
         log.extend('error')('local flush failed: %O', err);
       });
@@ -41,7 +42,7 @@ export class SyncScheduler {
 
     this.cloudTimer = setInterval(() => {
       this.syncLock.enqueue('local-to-cloud', 'local-to-cloud', () =>
-        syncCloudCycle(this.localAdapter, this.cloudAdapter, this.store, this.entityNames, this.cloudMeta),
+        syncCloudCycle(this.localAdapter, this.cloudAdapter, this.store, this.entityNames, this.meta),
       ).catch((err: unknown) => {
         log.extend('error')('cloud sync failed: %O', err);
       });
@@ -76,10 +77,10 @@ export function createSyncScheduler(
   cloudAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  cloudMeta: CloudMeta,
+  meta: Meta,
   options?: SyncSchedulerOptions,
 ): SyncSchedulerType {
-  return new SyncScheduler(syncLock, localAdapter, cloudAdapter, store, entityNames, cloudMeta, options);
+  return new SyncScheduler(syncLock, localAdapter, cloudAdapter, store, entityNames, meta, options);
 }
 
 async function syncCloudCycle(
@@ -87,20 +88,25 @@ async function syncCloudCycle(
   cloudAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  cloudMeta: CloudMeta,
+  meta: Meta,
 ): Promise<void> {
+  const [localIndexes, cloudIndexes] = await Promise.all([
+    loadAllIndexes(localAdapter, meta),
+    loadAllIndexes(cloudAdapter, meta),
+  ]);
+  let indexChanged = false;
+
   for (const entityName of entityNames) {
-    const { localIndex, cloudIndex } = await loadIndexPair(
-      localAdapter, cloudAdapter, cloudMeta, entityName,
-    );
+    const localIndex = localIndexes[entityName] ?? {};
+    const cloudIndex = cloudIndexes[entityName] ?? {};
     const diff = diffPartitions(localIndex, cloudIndex);
 
     const copiedKeys = await syncCopyPhase(
-      localAdapter, cloudAdapter, cloudMeta, entityName, diff,
+      localAdapter, cloudAdapter, meta, entityName, diff,
     );
 
     const mergedResults = await syncMergePhase(
-      localAdapter, cloudAdapter, cloudMeta, entityName, diff.diverged,
+      localAdapter, cloudAdapter, meta, entityName, diff.diverged,
     );
 
     // Apply merged entities/tombstones to in-memory store
@@ -120,7 +126,7 @@ async function syncCloudCycle(
     for (const partitionKey of diff.cloudOnly) {
       const entityKey = partitionBlobKey(entityName, partitionKey);
       await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(localAdapter, undefined, store, entityName, partitionKey),
+        loadPartitionFromAdapter(localAdapter, meta, store, entityName, partitionKey),
       );
     }
 
@@ -130,11 +136,21 @@ async function syncCloudCycle(
     ];
 
     if (allSynced.length > 0) {
-      await updateIndexesAfterSync(
-        localAdapter, cloudAdapter, cloudMeta, entityName,
+      const { updatedLocal, updatedCloud } = await updateIndexesAfterSync(
+        localAdapter, meta, entityName,
         localIndex, cloudIndex, allSynced,
       );
+      localIndexes[entityName] = updatedLocal;
+      cloudIndexes[entityName] = updatedCloud;
+      indexChanged = true;
     }
+  }
+
+  if (indexChanged) {
+    await Promise.all([
+      saveAllIndexes(localAdapter, meta, localIndexes),
+      saveAllIndexes(cloudAdapter, meta, cloudIndexes),
+    ]);
   }
 }
 
@@ -144,13 +160,13 @@ export async function syncNow(
   cloudAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  cloudMeta: CloudMeta,
+  meta: Meta,
 ): Promise<void> {
   await syncLock.enqueue('memory-to-local', 'memory-to-local', () =>
-    flushAll(localAdapter, undefined, store),
+    flushAll(localAdapter, meta, store),
   );
 
   await syncLock.enqueue('local-to-cloud', 'local-to-cloud', () =>
-    syncCloudCycle(localAdapter, cloudAdapter, store, entityNames, cloudMeta),
+    syncCloudCycle(localAdapter, cloudAdapter, store, entityNames, meta),
   );
 }

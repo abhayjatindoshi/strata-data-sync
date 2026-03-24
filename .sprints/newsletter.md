@@ -8,7 +8,7 @@ Append-only log of sprint outcomes. Most recent entry at the bottom.
 
 ### What's New
 - **HLC module** (`src/hlc/`): `Hlc` type, `createHlc()`, `tickLocal()`, `tickRemote()`, `compareHlc()` — full Hybrid Logical Clock implementation with total ordering
-- **Adapter module** (`src/adapter/`): `BlobAdapter` interface with `read`/`write`/`delete`/`list` async methods, `cloudMeta` parameter support, blob key constants/helpers, and `createMemoryBlobAdapter()` with defensive-copy semantics
+- **Adapter module** (`src/adapter/`): `BlobAdapter` interface with `read`/`write`/`delete`/`list` async methods, `meta` parameter support, blob key constants/helpers, and `createMemoryBlobAdapter()` with defensive-copy semantics
 - **Schema module** (`src/schema/`): `BaseEntity` type, `EntityDefinition<T>`, `generateId()` (8-char alphanumeric), `formatEntityId()`, key strategies (`partitioned`, `global`, `singleton`), `defineEntity<T>()` with `deriveId` validation
 - **Reactive module** (`src/reactive/`): `EntityEvent` type, `EntityEventListener` callback, `EntityEventBus` (on/off/emit), `createEventBus()` with synchronous listener dispatch
 

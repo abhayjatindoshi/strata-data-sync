@@ -47,7 +47,7 @@ describe('Two-device sync integration', () => {
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
     });
     await strataA.tenants.load(tenant.id);
 
@@ -55,11 +55,11 @@ describe('Two-device sync integration', () => {
     const id = repoA.save({ title: 'From A', done: false, priority: 1 });
     await strataA.sync();
 
-    // Device B: create tenant with same cloudMeta, load → hydrate from cloud
+    // Device B: create tenant with same meta, load → hydrate from cloud
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
     await strataB.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
       id: tenant.id,
     });
     await strataB.tenants.load(tenant.id);
@@ -80,7 +80,7 @@ describe('Two-device sync integration', () => {
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
     });
     await strataA.tenants.load(tenant.id);
 
@@ -92,7 +92,7 @@ describe('Two-device sync integration', () => {
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
     await strataB.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
       id: tenant.id,
     });
     await strataB.tenants.load(tenant.id);
@@ -127,7 +127,7 @@ describe('Two-device sync integration', () => {
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
     });
     await strataA.tenants.load(tenant.id);
 
@@ -139,7 +139,7 @@ describe('Two-device sync integration', () => {
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
     await strataB.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
       id: tenant.id,
     });
     await strataB.tenants.load(tenant.id);
@@ -165,7 +165,7 @@ describe('Two-device sync integration', () => {
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
     });
     await strataA.tenants.load(tenant.id);
 
@@ -177,7 +177,7 @@ describe('Two-device sync integration', () => {
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
     await strataB.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
       id: tenant.id,
     });
     await strataB.tenants.load(tenant.id);
@@ -204,14 +204,14 @@ describe('Two-device sync integration', () => {
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
     });
     await strataA.tenants.load(tenant.id);
 
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
     await strataB.tenants.create({
       name: 'Shared',
-      cloudMeta: { folder: 'shared' },
+      meta: { folder: 'shared' },
       id: tenant.id,
     });
     await strataB.tenants.load(tenant.id);

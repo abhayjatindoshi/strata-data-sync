@@ -1,31 +1,35 @@
 import { describe, it, expect, vi } from 'vitest';
-import { loadPartitionIndex, savePartitionIndex, updatePartitionIndexEntry } from '@strata/persistence';
+import { loadAllIndexes, saveAllIndexes, updatePartitionIndexEntry } from '@strata/persistence';
 import { createMemoryBlobAdapter } from '@strata/adapter';
 
 describe('Partition Index', () => {
-  it('loadPartitionIndex returns empty object for missing blob', async () => {
+  it('loadAllIndexes returns empty object for missing blob', async () => {
     const adapter = createMemoryBlobAdapter();
-    const index = await loadPartitionIndex(adapter, undefined, 'transaction');
-    expect(index).toEqual({});
+    const indexes = await loadAllIndexes(adapter, undefined);
+    expect(indexes).toEqual({});
   });
 
   it('save and load round-trip', async () => {
     const adapter = createMemoryBlobAdapter();
-    const index = {
-      '2026-01': { hash: 12345, count: 10, updatedAt: 1711100000 },
-      '2026-02': { hash: 67890, count: 20, updatedAt: 1711200000 },
+    const indexes = {
+      transaction: {
+        '2026-01': { hash: 12345, count: 10, updatedAt: 1711100000 },
+        '2026-02': { hash: 67890, count: 20, updatedAt: 1711200000 },
+      },
     };
-    await savePartitionIndex(adapter, undefined, 'transaction', index);
-    const loaded = await loadPartitionIndex(adapter, undefined, 'transaction');
-    expect(loaded).toEqual(index);
+    await saveAllIndexes(adapter, undefined, indexes);
+    const loaded = await loadAllIndexes(adapter, undefined);
+    expect(loaded).toEqual(indexes);
   });
 
-  it('uses __index.{entityName} key format', async () => {
+  it('uses __index key', async () => {
     const adapter = createMemoryBlobAdapter();
-    const index = { '2026-01': { hash: 1, count: 1, updatedAt: 1 } };
-    await savePartitionIndex(adapter, undefined, 'transaction', index);
-    const keys = await adapter.list(undefined, '__index.');
-    expect(keys).toContain('__index.transaction');
+    const indexes = {
+      transaction: { '2026-01': { hash: 1, count: 1, updatedAt: 1 } },
+    };
+    await saveAllIndexes(adapter, undefined, indexes);
+    const keys = await adapter.list(undefined, '__index');
+    expect(keys).toContain('__index');
   });
 
   describe('updatePartitionIndexEntry', () => {

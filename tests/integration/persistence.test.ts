@@ -44,7 +44,7 @@ describe('Persistence round-trip integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata1.tenants.create({ name: 'W', cloudMeta: { b: 1 } });
+    const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
     await strata1.tenants.load(tenant.id);
 
     const repo1 = strata1.repo(TransactionDef) as Repository<Transaction>;
@@ -82,7 +82,7 @@ describe('Persistence round-trip integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata.tenants.create({ name: 'W', cloudMeta: { b: 1 } });
+    const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
     await strata.tenants.load(tenant.id);
 
     const repo = strata.repo(TransactionDef) as Repository<Transaction>;
@@ -165,7 +165,7 @@ describe('Persistence round-trip integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata1.tenants.create({ name: 'W', cloudMeta: { b: 1 } });
+    const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
     await strata1.tenants.load(tenant.id);
 
     const repo1 = strata1.repo(ItemDef) as Repository<Item>;
@@ -201,7 +201,7 @@ describe('Persistence round-trip integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    const tenant = await strata.tenants.create({ name: 'W', cloudMeta: { b: 1 } });
+    const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
     await strata.tenants.load(tenant.id);
 
     const repo = strata.repo(ItemDef) as Repository<Item>;

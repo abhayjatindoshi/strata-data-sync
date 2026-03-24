@@ -8,7 +8,7 @@ import type { Tenant } from '@strata/tenant';
 function makeTenant(overrides: Partial<Tenant> & { id: string; name: string }): Tenant {
   const now = new Date('2026-03-23T12:00:00Z');
   return {
-    cloudMeta: {},
+    meta: {},
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -121,10 +121,10 @@ describe('pullTenantList', () => {
 describe('saveTenantPrefs', () => {
   it('saves and loads prefs round-trip', async () => {
     const adapter = createMemoryBlobAdapter();
-    const cloudMeta = { folder: 'test-folder' };
+    const meta = { folder: 'test-folder' };
 
-    await saveTenantPrefs(adapter, cloudMeta, { name: 'My Tenant', icon: 'star', color: '#ff0000' });
-    const prefs = await loadTenantPrefs(adapter, cloudMeta);
+    await saveTenantPrefs(adapter, meta, { name: 'My Tenant', icon: 'star', color: '#ff0000' });
+    const prefs = await loadTenantPrefs(adapter, meta);
 
     expect(prefs).toBeDefined();
     expect(prefs!.name).toBe('My Tenant');
@@ -142,9 +142,9 @@ describe('loadTenantPrefs', () => {
 
   it('loads prefs without optional fields', async () => {
     const adapter = createMemoryBlobAdapter();
-    const cloudMeta = { folder: 'test' };
-    await saveTenantPrefs(adapter, cloudMeta, { name: 'Plain' });
-    const prefs = await loadTenantPrefs(adapter, cloudMeta);
+    const meta = { folder: 'test' };
+    await saveTenantPrefs(adapter, meta, { name: 'Plain' });
+    const prefs = await loadTenantPrefs(adapter, meta);
     expect(prefs).toBeDefined();
     expect(prefs!.name).toBe('Plain');
     expect(prefs!.icon).toBeUndefined();

@@ -195,7 +195,7 @@ describe('createStrata', () => {
       ({ strata } = makeStrata());
       const tenant = await strata.tenants.create({
         name: 'Test Workspace',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()?.id).toBe(tenant.id);
@@ -213,11 +213,11 @@ describe('createStrata', () => {
 
       const t1 = await strata.tenants.create({
         name: 'Tenant 1',
-        cloudMeta: { bucket: 't1' },
+        meta: { bucket: 't1' },
       });
       const t2 = await strata.tenants.create({
         name: 'Tenant 2',
-        cloudMeta: { bucket: 't2' },
+        meta: { bucket: 't2' },
       });
 
       await strata.tenants.load(t1.id);
@@ -237,7 +237,7 @@ describe('createStrata', () => {
       });
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()?.name).toBe('Test');
@@ -264,7 +264,7 @@ describe('createStrata', () => {
 
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
 
@@ -283,7 +283,7 @@ describe('createStrata', () => {
       ({ strata } = makeStrata());
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
       await expect(strata.sync()).rejects.toThrow('No cloud adapter configured');
@@ -300,7 +300,7 @@ describe('createStrata', () => {
       });
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
 
@@ -323,7 +323,7 @@ describe('createStrata', () => {
 
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
       await strata.sync();
@@ -347,7 +347,7 @@ describe('createStrata', () => {
 
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
 
@@ -376,7 +376,7 @@ describe('createStrata', () => {
       });
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
 
@@ -397,7 +397,7 @@ describe('createStrata', () => {
 
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
 
@@ -433,7 +433,7 @@ describe('createStrata', () => {
       strata.onSyncEvent(listener);
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
       await strata.sync();
@@ -484,7 +484,7 @@ describe('createStrata', () => {
       ({ strata } = makeStrata());
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.dispose();
       await expect(strata.tenants.load(tenant.id)).rejects.toThrow(
@@ -502,7 +502,7 @@ describe('createStrata', () => {
       });
       const tenant = await strata.tenants.create({
         name: 'Test',
-        cloudMeta: { bucket: 'test' },
+        meta: { bucket: 'test' },
       });
       await strata.tenants.load(tenant.id);
 

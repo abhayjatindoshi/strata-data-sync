@@ -31,20 +31,20 @@ sequenceDiagram
     Tenant-->>App: tenants[]
 
     App->>Tenant: strata.tenants.load(tenantId)
-    Tenant->>Tenant: set active tenant, resolve cloudMeta
+    Tenant->>Tenant: set active tenant, resolve meta
 
     Note over App,Sync: ═══ PHASE 3: HYDRATE (cloud → local → memory) ═══
 
-    Sync->>Cloud: read(cloudMeta, '__index.transaction')
+    Sync->>Cloud: read(meta, '__index.transaction')
     Cloud-->>Sync: cloud partition index (or null if unreachable)
 
     alt Cloud reachable
         Sync->>Sync: compare cloud index vs local index
         loop For each changed/new partition
-            Sync->>Cloud: read(cloudMeta, partition blob)
+            Sync->>Cloud: read(meta, partition blob)
             Cloud-->>Sync: blob
             Sync->>Sync: deserialize + merge with local
-            Sync->>Local: write(cloudMeta, merged blob)
+            Sync->>Local: write(meta, merged blob)
             Sync->>Store: upsert merged entities into Map
             Store->>Signal: subject.next()
         end

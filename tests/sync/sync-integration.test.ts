@@ -3,7 +3,7 @@ import { createMemoryBlobAdapter } from '@strata/adapter';
 import {
   serialize,
   deserialize,
-  savePartitionIndex,
+  saveAllIndexes,
 } from '@strata/persistence';
 import type { PartitionIndex } from '@strata/persistence';
 import type { Hlc } from '@strata/hlc';
@@ -13,10 +13,10 @@ import {
   syncMergePhase,
   updateIndexesAfterSync,
   applyMergedToStore,
-  loadIndexPair,
+  loadAllIndexPairs,
 } from '@strata/sync';
 
-const cloudMeta = { container: 'test' };
+const meta = { container: 'test' };
 const entityName = 'task';
 
 function makeBlob(
@@ -48,10 +48,10 @@ describe('syncMergePhase', () => {
     });
 
     await local.write(undefined, 'task.2026-01', localBlob);
-    await cloud.write(cloudMeta, 'task.2026-01', cloudBlob);
+    await cloud.write(meta, 'task.2026-01', cloudBlob);
 
     const results = await syncMergePhase(
-      local, cloud, cloudMeta, entityName, ['2026-01'],
+      local, cloud, meta, entityName, ['2026-01'],
     );
 
     expect(results).toHaveLength(1);
@@ -60,7 +60,7 @@ describe('syncMergePhase', () => {
     expect(results[0].entities['task.2026-01.b']).toBeDefined();
 
     const localResult = await local.read(undefined, 'task.2026-01');
-    const cloudResult = await cloud.read(cloudMeta, 'task.2026-01');
+    const cloudResult = await cloud.read(meta, 'task.2026-01');
     expect(localResult).toEqual(cloudResult);
   });
 
@@ -77,7 +77,7 @@ describe('syncMergePhase', () => {
     await local.write(undefined, 'task.2026-01', localBlob);
 
     const results = await syncMergePhase(
-      local, cloud, cloudMeta, entityName, ['2026-01'],
+      local, cloud, meta, entityName, ['2026-01'],
     );
 
     expect(results).toHaveLength(0);
@@ -92,7 +92,7 @@ describe('syncMergePhase', () => {
         id: 'a', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' },
       },
     }));
-    await cloud.write(cloudMeta, 'task.2026-01', makeBlob({
+    await cloud.write(meta, 'task.2026-01', makeBlob({
       'task.2026-01.b': {
         id: 'b', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' },
       },
@@ -103,14 +103,14 @@ describe('syncMergePhase', () => {
         id: 'c', hlc: { timestamp: 3000, counter: 0, nodeId: 'n1' },
       },
     }));
-    await cloud.write(cloudMeta, 'task.2026-02', makeBlob({
+    await cloud.write(meta, 'task.2026-02', makeBlob({
       'task.2026-02.d': {
         id: 'd', hlc: { timestamp: 4000, counter: 0, nodeId: 'n2' },
       },
     }));
 
     const results = await syncMergePhase(
-      local, cloud, cloudMeta, entityName, ['2026-01', '2026-02'],
+      local, cloud, meta, entityName, ['2026-01', '2026-02'],
     );
 
     expect(results).toHaveLength(2);
@@ -139,12 +139,9 @@ describe('updateIndexesAfterSync', () => {
       '2026-01': { hash: 222, count: 1, updatedAt: 2000 },
     };
 
-    await updateIndexesAfterSync(
-      local, cloud, cloudMeta, entityName, localIndex, cloudIndex, ['2026-01'],
+    const { updatedLocal, updatedCloud } = await updateIndexesAfterSync(
+      local, meta, entityName, localIndex, cloudIndex, ['2026-01'],
     );
-
-    const { localIndex: updatedLocal, cloudIndex: updatedCloud } =
-      await loadIndexPair(local, cloud, cloudMeta, entityName);
 
     expect(updatedLocal['2026-01'].hash).toBe(updatedCloud['2026-01'].hash);
     expect(updatedLocal['2026-01'].count).toBe(1);
@@ -170,12 +167,9 @@ describe('updateIndexesAfterSync', () => {
       '2026-02': { hash: 333, count: 1, updatedAt: 3000 },
     };
 
-    await updateIndexesAfterSync(
-      local, cloud, cloudMeta, entityName, localIndex, cloudIndex, ['2026-02'],
+    const { updatedLocal } = await updateIndexesAfterSync(
+      local, meta, entityName, localIndex, cloudIndex, ['2026-02'],
     );
-
-    const { localIndex: updatedLocal } =
-      await loadIndexPair(local, cloud, cloudMeta, entityName);
 
     expect(updatedLocal['2026-01'].hash).toBe(111);
     expect(updatedLocal['2026-02'].hash).not.toBe(222);
