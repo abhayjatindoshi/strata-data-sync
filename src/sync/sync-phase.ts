@@ -97,12 +97,13 @@ export async function updateIndexesAfterSync(
     const hlcMap = buildHlcMap(entities, tombstones);
     const hash = partitionHash(hlcMap);
     const count = hlcMap.size;
+    const deletedCount = Object.keys(tombstones).length;
 
     updatedLocal = updatePartitionIndexEntry(
-      updatedLocal, partitionKey, hash, count,
+      updatedLocal, partitionKey, hash, count, deletedCount,
     );
     updatedCloud = updatePartitionIndexEntry(
-      updatedCloud, partitionKey, hash, count,
+      updatedCloud, partitionKey, hash, count, deletedCount,
     );
   }
 

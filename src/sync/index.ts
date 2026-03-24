@@ -34,3 +34,5 @@ export { hydrateFromCloud, hydrateFromLocal } from './hydrate';
 export { SyncScheduler, createSyncScheduler, syncNow } from './sync-scheduler';
 export { SyncEventEmitter, createSyncEventEmitter } from './sync-events';
 export { DirtyTracker, createDirtyTracker } from './dirty-tracker';
+export type { SyncBetweenResult } from './unified';
+export { syncBetween } from './unified';

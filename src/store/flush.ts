@@ -98,7 +98,8 @@ async function flushPartitionIndexes(
 
       const hash = partitionHash(hlcMap);
       const count = hlcMap.size;
-      entityIndex = updatePartitionIndexEntry(entityIndex, partitionKey, hash, count);
+      const deletedCount = tombstones.size;
+      entityIndex = updatePartitionIndexEntry(entityIndex, partitionKey, hash, count, deletedCount);
     }
 
     indexes[entityName] = entityIndex;

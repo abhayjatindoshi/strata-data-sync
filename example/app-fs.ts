@@ -32,7 +32,9 @@ function createFsBlobAdapter(rootDir: string): BlobAdapter {
     async write(meta, key, data) {
       const filePath = resolvePath(meta, key);
       await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, data);
+      const decoded = new TextDecoder().decode(data);
+      const dataToWrite = JSON.stringify(JSON.parse(decoded), null, 2);
+      await fs.writeFile(filePath, dataToWrite);
     },
     async delete(meta, key) {
       try {
@@ -107,9 +109,9 @@ async function main(): Promise<void> {
 
   console.log('\n=== Global strategy (task) ===');
   const taskRepo = strata.repo(taskDef) as Repository<Task>;
-  taskRepo.save({ title: 'Ship v2', done: false, category: 'dev' });
+  const shipId = taskRepo.save({ title: 'Ship v2', done: false, category: 'dev' });
   taskRepo.save({ title: 'Write tests', done: true, category: 'dev' });
-  taskRepo.save({ title: 'Buy coffee', done: false, category: 'personal' });
+  const coffeeId = taskRepo.save({ title: 'Buy coffee', done: false, category: 'personal' });
 
   const tasks = taskRepo.query();
   console.log(`All tasks: ${tasks.length}`);
@@ -117,12 +119,17 @@ async function main(): Promise<void> {
     console.log(`  - [${t.category}] ${t.title} (${t.done ? 'done' : 'todo'})`);
   }
 
+  // Delete a task
+  taskRepo.delete(coffeeId);
+  console.log(`Deleted "Buy coffee" (id=${coffeeId})`);
+  console.log(`Tasks after delete: ${taskRepo.query().length}`);
+
   // ── Partitioned strategy: notes by first letter ──────
 
   console.log('\n=== Partitioned strategy (note) ===');
   const noteRepo = strata.repo(noteDef) as Repository<Note>;
   noteRepo.save({ body: 'Alpha release next week' });
-  noteRepo.save({ body: 'Ask about deployment' });
+  const askId = noteRepo.save({ body: 'Ask about deployment' });
   noteRepo.save({ body: 'Book flight to NYC' });
   noteRepo.save({ body: 'Buy new keyboard' });
   noteRepo.save({ body: 'Call the dentist' });
@@ -132,6 +139,11 @@ async function main(): Promise<void> {
   for (const n of notes) {
     console.log(`  - ${n.body}`);
   }
+
+  // Delete a note (from partition "a")
+  noteRepo.delete(askId);
+  console.log(`Deleted "Ask about deployment" (id=${askId})`);
+  console.log(`Notes after delete: ${noteRepo.query().length}`);
 
   // ── Singleton strategy: one settings record ──────────
 
@@ -146,6 +158,10 @@ async function main(): Promise<void> {
   settingsRepo.save({ ...settings!, theme: 'light' });
   const updated = settingsRepo.get();
   console.log(`Updated:  theme=${updated?.theme}, language=${updated?.language}`);
+
+  // Delete singleton
+  settingsRepo.delete();
+  console.log(`Deleted settings, get() = ${settingsRepo.get()}`);
 
   // ── Flush & print files on disk ──────────────────────
 

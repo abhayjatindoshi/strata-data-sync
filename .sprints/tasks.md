@@ -1,4 +1,4 @@
-<!-- Active: sprint-consolidate-index -->
+<!-- Active: sprint-partition-index-unified-sync -->
 
 ## Sprint — Consolidate partition indexes into single `__index` blob
 Started: 2026-03-24T12:00:00Z
@@ -16,6 +16,19 @@ Started: 2026-03-24T12:00:00Z
 | 9 | Update `src/sync/sync-scheduler.ts` to load/save combined indexes | index-consolidation | developer | done | plan | 2026-03-24T12:00:00Z | 2026-03-24T12:58:00Z |
 | 10 | Update `src/sync/index.ts` exports | index-consolidation | developer | done | plan | 2026-03-24T12:00:00Z | 2026-03-24T12:58:00Z |
 | 11 | Update all tests for new API | index-consolidation | developer | done | plan | 2026-03-24T12:00:00Z | 2026-03-24T12:58:00Z |
+
+## Sprint — Merge `__strata` marker blob and `__index` into single `__strata` blob
+Started: 2026-03-24T15:00:00Z
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 1 | Update `MarkerBlob` type and `writeMarkerBlob` to include `indexes` field | merge-strata-blob | developer | done | plan | 2026-03-24T15:00:00Z | 2026-03-24T15:05:00Z |
+| 2 | Update `loadAllIndexes`/`saveAllIndexes` to read/write from `__strata` blob | merge-strata-blob | developer | done | plan | 2026-03-24T15:00:00Z | 2026-03-24T15:05:00Z |
+| 3 | Remove `INDEX_KEY` from `src/adapter/keys.ts` and `src/adapter/index.ts` | merge-strata-blob | developer | done | plan | 2026-03-24T15:00:00Z | 2026-03-24T15:05:00Z |
+| 4 | Update partition-index test for new storage location | merge-strata-blob | developer | done | plan | 2026-03-24T15:00:00Z | 2026-03-24T15:05:00Z |
+| 5 | Review all changes | merge-strata-blob | reviewer | done | plan | 2026-03-24T15:00:00Z | 2026-03-24T15:08:00Z |
+| 6 | Unit tests | merge-strata-blob | unit-tester | done | test | 2026-03-24T15:00:00Z | 2026-03-24T15:10:00Z |
+| 7 | Integration tests | merge-strata-blob | integration-tester | done | test | 2026-03-24T15:00:00Z | 2026-03-24T15:10:00Z |
 
 
 <!-- Status values: not-started, in-progress, done, known-issue, skipped -->
@@ -402,3 +415,22 @@ Epics: E24 (Framework Entry Point — createStrata()), E25 (Framework — Gracef
 | 22 | Fix: `hydrateFromCloud` must copy cloud partition index to local adapter — without this, subsequent syncs couldn't detect diverged partitions because the local index was empty, causing all partitions to be treated as cloud-only copies instead of merge candidates | E20 | developer | done | test-fix | 2026-03-24T06:38:00Z | 2026-03-24T06:40:00Z |
 | 23 | Fix: partition hash must differentiate entities from tombstones — when `deleteFromStore` creates a tombstone with the entity's existing HLC, the hash input (`id:timestamp:counter:nodeId`) was identical for both entity and tombstone, causing `diffPartitions` to report `unchanged` instead of `diverged` and preventing tombstone sync propagation. Fixed by prefixing tombstone keys with `\0` in hash computation | E15 | developer | done | test-fix | 2026-03-24T06:40:00Z | 2026-03-24T06:45:00Z |
 | 24 | Fix: update existing `flush.test.ts` assertion for `flush() cancels pending timer` — test expected 1 adapter write but partition index update adds a second write; updated to expect 2 writes (partition blob + partition index) | E11 | integration-tester | done | test-fix | 2026-03-24T06:45:00Z | 2026-03-24T06:50:00Z |
+
+## Sprint — Partition Index Enhancements & Unified Sync
+Started: 2026-03-24T18:00:00Z
+
+Epics: E11 (Persistence — Partition index), unified-sync (Unified sync logic)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 1 | Add `deletedCount` field to `PartitionIndexEntry` in `src/persistence/types.ts` — new optional `readonly deletedCount: number` tracking tombstone count separately from live entity count | E11 | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 2 | Update `updatePartitionIndexEntry` in `src/persistence/partition-index.ts` to accept and store `deletedCount` parameter | E11 | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 3 | Update `flushPartition` in `src/store/flush.ts` to compute tombstone count from the partition's tombstone map and pass `deletedCount` when updating the partition index entry | E11 | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 4 | Update `updateIndexesAfterSync` in `src/sync/sync-phase.ts` to compute and pass `deletedCount` when rebuilding index entries after merge | E11 | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 5 | Define `SyncBetweenResult` type and `syncBetween(adapterA, adapterB, store, entityNames, meta)` function signature in `src/sync/unified.ts` — result includes hydrated entity names, partitions copied, partitions merged, conflicts resolved | unified-sync | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 6 | Implement `syncBetween` core logic — load indexes from both adapters via `loadAllIndexes`, diff partitions via `diffPartitions`, copy A-only partitions to B and B-only partitions to A via `syncCopyPhase`, merge diverged partitions via `syncMergePhase`, apply merged entities/tombstones to in-memory store, load newly-copied partitions into store, update and save indexes on both adapters | unified-sync | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 7 | Refactor `hydrateFromCloud` in `src/sync/hydrate.ts` to delegate to `syncBetween(cloudAdapter, localAdapter, store, entityNames, meta)` — replace manual index loading, blob copying, and store loading with single `syncBetween` call | unified-sync | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 8 | Refactor `syncCloudCycle` in `src/sync/sync-scheduler.ts` to delegate to `syncBetween(localAdapter, cloudAdapter, store, entityNames, meta)` — replace manual diff/copy/merge/index-update logic with single `syncBetween` call | unified-sync | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 9 | Update `src/sync/index.ts` exports to expose `syncBetween` and `SyncBetweenResult` | unified-sync | developer | done | plan | 2026-03-24T18:00:00Z | 2026-03-24T20:17:00Z |
+| 10 | Unit tests for `deletedCount` in partition index and `syncBetween` | E11, unified-sync | unit-tester | done | test | 2026-03-24T20:18:00Z | 2026-03-24T20:20:00Z |
+| 11 | Integration tests for `syncBetween` with full Strata lifecycle | unified-sync | integration-tester | done | test | 2026-03-24T20:20:00Z | 2026-03-24T20:21:00Z |

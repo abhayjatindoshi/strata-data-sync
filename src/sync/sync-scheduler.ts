@@ -1,14 +1,9 @@
 import debug from 'debug';
 import type { BlobAdapter, Meta } from '@strata/adapter';
-import { partitionBlobKey } from '@strata/adapter';
-import type { Hlc } from '@strata/hlc';
 import type { EntityStore } from '@strata/store';
-import { flushAll, loadPartitionFromAdapter } from '@strata/store';
-import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
+import { flushAll } from '@strata/store';
 import type { SyncLock, SyncScheduler as SyncSchedulerType, SyncSchedulerOptions } from './types';
-import { diffPartitions } from './diff';
-import { syncCopyPhase } from './copy';
-import { syncMergePhase, updateIndexesAfterSync } from './sync-phase';
+import { syncBetween } from './unified';
 
 const log = debug('strata:sync');
 
@@ -90,68 +85,8 @@ async function syncCloudCycle(
   entityNames: ReadonlyArray<string>,
   meta: Meta,
 ): Promise<void> {
-  const [localIndexes, cloudIndexes] = await Promise.all([
-    loadAllIndexes(localAdapter, meta),
-    loadAllIndexes(cloudAdapter, meta),
-  ]);
-  let indexChanged = false;
-
-  for (const entityName of entityNames) {
-    const localIndex = localIndexes[entityName] ?? {};
-    const cloudIndex = cloudIndexes[entityName] ?? {};
-    const diff = diffPartitions(localIndex, cloudIndex);
-
-    const copiedKeys = await syncCopyPhase(
-      localAdapter, cloudAdapter, meta, entityName, diff,
-    );
-
-    const mergedResults = await syncMergePhase(
-      localAdapter, cloudAdapter, meta, entityName, diff.diverged,
-    );
-
-    // Apply merged entities/tombstones to in-memory store
-    for (const { partitionKey, entities, tombstones } of mergedResults) {
-      const entityKey = partitionBlobKey(entityName, partitionKey);
-      for (const [id, entity] of Object.entries(entities)) {
-        store.set(entityKey, id, entity);
-      }
-      for (const [id, hlc] of Object.entries(tombstones)) {
-        store.delete(entityKey, id);
-        store.setTombstone(entityKey, id, hlc as Hlc);
-      }
-      store.clearDirty(entityKey);
-    }
-
-    // Load cloud-only partitions into store
-    for (const partitionKey of diff.cloudOnly) {
-      const entityKey = partitionBlobKey(entityName, partitionKey);
-      await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(localAdapter, meta, store, entityName, partitionKey),
-      );
-    }
-
-    const allSynced = [
-      ...copiedKeys,
-      ...mergedResults.map(r => r.partitionKey),
-    ];
-
-    if (allSynced.length > 0) {
-      const { updatedLocal, updatedCloud } = await updateIndexesAfterSync(
-        localAdapter, meta, entityName,
-        localIndex, cloudIndex, allSynced,
-      );
-      localIndexes[entityName] = updatedLocal;
-      cloudIndexes[entityName] = updatedCloud;
-      indexChanged = true;
-    }
-  }
-
-  if (indexChanged) {
-    await Promise.all([
-      saveAllIndexes(localAdapter, meta, localIndexes),
-      saveAllIndexes(cloudAdapter, meta, cloudIndexes),
-    ]);
-  }
+  const result = await syncBetween(localAdapter, cloudAdapter, store, entityNames, meta);
+  log('cloud sync cycle complete: %d copied, %d merged', result.partitionsCopied, result.partitionsMerged);
 }
 
 export async function syncNow(

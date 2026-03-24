@@ -1,6 +1,7 @@
 export type PartitionIndexEntry = {
   readonly hash: number;
   readonly count: number;
+  readonly deletedCount: number;
   readonly updatedAt: number;
 };
 

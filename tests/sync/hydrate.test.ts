@@ -35,10 +35,11 @@ describe('hydrateFromCloud', () => {
     const localAdapter = createMemoryBlobAdapter();
     const store = createStore();
 
-    const blob = makePartitionBlob('task', { 'task._.abc': { id: 'task._.abc' } });
+    const entity = { id: 'task._.abc', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    const blob = makePartitionBlob('task', { 'task._.abc': entity });
     await cloudAdapter.write({ bucket: 'b' }, 'task._', blob);
     await saveAllIndexes(cloudAdapter, { bucket: 'b' }, {
-      task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
     });
 
     await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], { bucket: 'b' });
