@@ -25,8 +25,8 @@
 | E21 | Sync — Tombstones & retention | `sync/` | `docs/persistence-sync.md` (Tombstones) | done |
 | E22 | Sync — Three-phase model, scheduler & global lock | `sync/` | `docs/persistence-sync.md` (Three-Phase Model, Global Sync Lock) | done |
 | E23 | Sync — Dirty tracking & sync events | `sync/` | `docs/persistence-sync.md` (Dirty Tracking, events) | done |
-| E24 | Framework Entry Point — createStrata() | `src/` root | `docs/lifecycle.md`, `docs/architecture.md` | pending |
-| E25 | Framework — Graceful shutdown & dispose | `src/` root | `docs/persistence-sync.md` (Graceful shutdown), `docs/lifecycle.md` (Phase 9) | pending |
+| E24 | Framework Entry Point — createStrata() | `src/` root | `docs/lifecycle.md`, `docs/architecture.md` | done |
+| E25 | Framework — Graceful shutdown & dispose | `src/` root | `docs/persistence-sync.md` (Graceful shutdown), `docs/lifecycle.md` (Phase 9) | done |
 
 ## Dependency Order
 

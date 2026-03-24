@@ -1,3 +1,6 @@
+export { createStrata, validateEntityDefinitions } from './strata';
+export type { StrataConfig, StrataOptions, Strata } from './strata';
+
 export { createHlc, tickLocal, tickRemote, compareHlc } from '@strata/hlc';
 export type { Hlc } from '@strata/hlc';
 
