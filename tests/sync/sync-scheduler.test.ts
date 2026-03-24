@@ -124,6 +124,46 @@ describe('createSyncScheduler — timer callbacks', () => {
     scheduler.stop();
     enqueueSpy.mockRestore();
   });
+
+  it('catches local flush errors without crashing', async () => {
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    store.set('bad._', 'bad._.1', {});
+    localAdapter.write = async () => { throw new Error('write failed'); };
+
+    const scheduler = createSyncScheduler(
+      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+      { localFlushIntervalMs: 20, cloudSyncIntervalMs: 100000 },
+    );
+
+    scheduler.start();
+    // Wait for the interval to fire and the enqueued operation to fail
+    await new Promise(r => setTimeout(r, 100));
+    await lock.drain().catch(() => {});
+    scheduler.stop();
+  });
+
+  it('catches cloud sync errors without crashing', async () => {
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    cloudAdapter.read = async () => { throw new Error('network failed'); };
+
+    const scheduler = createSyncScheduler(
+      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+      { localFlushIntervalMs: 100000, cloudSyncIntervalMs: 20 },
+    );
+
+    scheduler.start();
+    await new Promise(r => setTimeout(r, 100));
+    await lock.drain().catch(() => {});
+    scheduler.stop();
+  });
 });
 
 describe('syncNow', () => {

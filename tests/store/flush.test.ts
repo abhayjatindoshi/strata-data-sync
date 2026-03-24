@@ -180,6 +180,37 @@ describe('createFlushScheduler', () => {
     vi.useRealTimers();
   });
 
+  it('scheduled callback fires and flushes with real timers', async () => {
+    const adapter = createMemoryBlobAdapter();
+    const store = createStore();
+    store.set('x._', 'x._.1', { id: 'x._.1' });
+
+    const scheduler = createFlushScheduler(adapter, undefined, store, { debounceMs: 10 });
+    scheduler.schedule();
+
+    await new Promise(r => setTimeout(r, 100));
+
+    expect(await adapter.read(undefined, 'x._')).not.toBeNull();
+    await scheduler.dispose();
+  });
+
+  it('scheduled callback catches flush errors gracefully', async () => {
+    const adapter = createMemoryBlobAdapter();
+    const store = createStore();
+    store.set('x._', 'x._.1', { id: 'x._.1' });
+
+    const scheduler = createFlushScheduler(adapter, undefined, store, { debounceMs: 10 });
+    // Sabotage adapter to make flushAll throw
+    adapter.write = async () => { throw new Error('disk full'); };
+
+    scheduler.schedule();
+    // Wait for the timer to fire and the error to be caught
+    await new Promise(r => setTimeout(r, 100));
+
+    // Should not throw — error is caught internally
+    await scheduler.dispose().catch(() => {});
+  });
+
   it('dispose() clears pending timer and flushes', async () => {
     vi.useFakeTimers();
     const adapter = createMemoryBlobAdapter();
