@@ -1,7 +1,9 @@
+import type { Hlc } from '@strata/hlc';
 import type { EntityStore } from './types';
 
 export function createStore(): EntityStore {
   const partitions = new Map<string, Map<string, unknown>>();
+  const tombstones = new Map<string, Map<string, Hlc>>();
   const dirtyKeys = new Set<string>();
 
   return {
@@ -58,6 +60,20 @@ export function createStore(): EntityStore {
         partitions.set(entityKey, data);
       }
       return partitions.get(entityKey)!;
+    },
+
+    setTombstone(entityKey, entityId, hlc) {
+      let partition = tombstones.get(entityKey);
+      if (!partition) {
+        partition = new Map();
+        tombstones.set(entityKey, partition);
+      }
+      partition.set(entityId, hlc);
+      dirtyKeys.add(entityKey);
+    },
+
+    getTombstones(entityKey) {
+      return tombstones.get(entityKey) ?? new Map<string, Hlc>();
     },
   };
 }

@@ -13,7 +13,7 @@ export type { EntityEvent, EntityEventListener, EntityEventBus } from '@strata/r
 export { serialize, deserialize, FNV_OFFSET, FNV_PRIME, fnv1a, fnv1aAppend, partitionHash, loadPartitionIndex, savePartitionIndex, updatePartitionIndexEntry } from '@strata/persistence';
 export type { PartitionIndexEntry, PartitionIndex } from '@strata/persistence';
 
-export { createStore, flushPartition, flushAll, createFlushScheduler } from '@strata/store';
+export { createStore, flushPartition, flushAll, loadPartitionFromAdapter, createFlushScheduler } from '@strata/store';
 export type { EntityStore, FlushScheduler, FlushSchedulerOptions } from '@strata/store';
 
 export { createRepository, createSingletonRepository, applyWhere, applyRange, applyOrderBy, applyPagination } from '@strata/repo';
@@ -22,5 +22,5 @@ export type { Repository, QueryOptions, SingletonRepository } from '@strata/repo
 export { loadTenantList, saveTenantList, createTenantManager, mergeTenantLists, pushTenantList, pullTenantList, saveTenantPrefs, loadTenantPrefs, writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/tenant';
 export type { Tenant, CreateTenantOptions, SetupTenantOptions, TenantManagerOptions, Subscribable, TenantManager, TenantPrefs, MarkerBlob } from '@strata/tenant';
 
-export { loadIndexPair, diffPartitions, copyPartitionToCloud, copyPartitionToLocal, syncCopyPhase, resolveConflict, resolveEntityTombstone, diffEntityMaps, mergePartition, syncMergePhase, updateIndexesAfterSync, applyMergedToStore } from '@strata/sync';
-export type { PartitionDiffResult, EntityDiffResult, MergeResult, MergedPartitionResult, SyncEntity } from '@strata/sync';
+export { loadIndexPair, diffPartitions, copyPartitionToCloud, copyPartitionToLocal, syncCopyPhase, resolveConflict, resolveEntityTombstone, diffEntityMaps, mergePartition, syncMergePhase, updateIndexesAfterSync, applyMergedToStore, purgeStaleTombstones, DEFAULT_TOMBSTONE_RETENTION_MS, createSyncLock, hydrateFromCloud, hydrateFromLocal, createSyncScheduler, syncNow, createSyncEventEmitter, createDirtyTracker } from '@strata/sync';
+export type { PartitionDiffResult, EntityDiffResult, MergeResult, MergedPartitionResult, SyncEntity, SyncDirection, SyncQueueItem, SyncLock, SyncResult, SyncEvent, SyncEventListener, SyncEventEmitter, SyncSchedulerOptions, SyncScheduler, DirtyTracker } from '@strata/sync';

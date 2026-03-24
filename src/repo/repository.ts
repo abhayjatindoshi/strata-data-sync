@@ -122,6 +122,10 @@ export function createRepository<T>(
 
   function deleteFromStore(id: string): boolean {
     const entityKey = parseEntityKey(id);
+    const entity = store.get(entityKey, id) as (T & BaseEntity) | undefined;
+    if (entity) {
+      store.setTombstone(entityKey, id, entity.hlc);
+    }
     const deleted = store.delete(entityKey, id);
     if (deleted) {
       log('deleted %s', id);

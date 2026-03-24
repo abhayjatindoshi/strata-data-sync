@@ -231,3 +231,57 @@ Append-only log of sprint outcomes. Most recent entry at the bottom.
 - Conflict resolution: resolveConflict picks higher timestamp, counter tiebreaker, nodeId string tiebreaker; resolveEntityTombstone both directions
 - Partition merge: mergePartition includes local-only entities, cloud-only entities, HLC-resolved conflicts, tombstone vs entity both directions, symmetric merged results
 - Full sync integration: syncMergePhase processes all diverged keys, updateIndexesAfterSync recomputes hashes and persists both indexes, applyMergedToStore upserts and emits entity events
+
+---
+
+## Sprint 7 — Sync: Tombstones, Scheduler & Dirty Tracking — 2026-03-23T23:30:00Z
+
+### What's New
+- **Tombstones** (`src/sync/`, `src/store/`): `setTombstone()`/`getTombstones()` in store for recording deleted entity HLCs; `purgeStaleTombstones()` with 90-day default retention; flush/load integration to persist and restore tombstones from blob `deleted` section
+- **Three-phase sync** (`src/sync/`): `hydrateFromCloud()` downloads cloud partitions to local and memory; `hydrateFromLocal()` fallback when cloud is unreachable; `createSyncScheduler()` with configurable `localFlushIntervalMs`/`cloudSyncIntervalMs` and periodic sync via sync lock; `syncNow()` for immediate manual sync
+- **Sync lock** (`src/sync/`): `createSyncLock()` — global lock with sequential queue execution, duplicate dedup, `drain()` and `dispose()` lifecycle
+- **Sync events** (`src/sync/`): `createSyncEventEmitter()` with typed `SyncEvent` union (`sync-started`, `sync-completed`, `sync-failed`, `cloud-unreachable`); integrated with sync lock lifecycle
+- **Dirty tracking** (`src/sync/`): `createDirtyTracker()` with `isDirty` getter and `isDirty$` Observable via `distinctUntilChanged`; marks dirty on store writes, clears on successful local→cloud sync
+
+### What We Support
+- HLC creation, local/remote tick, and deterministic comparison
+- Pluggable blob storage via `BlobAdapter` interface
+- In-memory blob adapter for testing and offline use
+- Entity definition with flexible key strategies and ID generation
+- Reactive event bus for entity change notifications
+- Transform pipeline for composable blob encoding/decoding
+- JSON serialization with Date type preservation
+- FNV-1a content hashing for partition change detection
+- In-memory entity store with dirty tracking and lazy loading
+- Partition index for tracking partition metadata
+- Debounced flush scheduler with manual flush and graceful dispose
+- Repository CRUD with HLC-stamped writes and query pipeline
+- Multi-tenant management with create/load/setup/delink/delete lifecycle
+- Reactive observe streams for single entities and query results with change detection
+- SingletonRepository for single-instance entities with deterministic IDs
+- Tenant list merge and bidirectional push/pull sync with preference sharing
+- Batch writes with single-signal emission for saveMany/deleteMany
+- Repository and SingletonRepository dispose with observer completion and listener cleanup
+- MarkerBlob creation, reading, and version validation for workspace detection
+- Tenant sharing flow with marker blob validation and deterministic ID derivation
+- Partition diff and hash-based copy optimization for sync
+- Bidirectional merge with HLC last-writer-wins conflict resolution
+- Entity-vs-tombstone resolution and merged store application with reactive events
+- Tombstone storage, retention purging (90-day default), and flush/load integration
+- Three-phase sync model with cloud/local hydration and periodic scheduling
+- Global sync lock with sequential execution and duplicate dedup
+- Sync event emitter with typed lifecycle events
+- Dirty tracking with reactive Observable for unsaved-to-cloud state
+
+### Quality
+- Unit tests: 308 passing (52 new)
+- Integration tests: 0 (not yet applicable)
+- Known issues: 0
+
+### Coverage Improvements
+- Tombstones: setTombstone/getTombstones round-trip, Repository.delete records tombstone HLC, purgeStaleTombstones removes expired entries and keeps recent, flush includes tombstones in blob, loadPartition restores tombstones from blob
+- Sync lock: createSyncLock sequential execution, duplicate dedup returns same promise, drain waits for in-flight, dispose rejects further enqueue
+- Hydration: hydrateFromCloud downloads all partitions to local and memory, hydrateFromLocal loads from local adapter only, handles missing/empty indexes
+- Scheduler: createSyncScheduler starts/stops periodic timers, configurable intervals, dispose drains queue and stops timers
+- Sync events: createSyncEventEmitter on/off/emit, sync-started/completed/failed/cloud-unreachable fired at correct lifecycle points
+- Dirty tracking: createDirtyTracker marks dirty on write, clears on cloud sync, isDirty$ emits distinct state changes

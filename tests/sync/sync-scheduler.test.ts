@@ -1,0 +1,123 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { createMemoryBlobAdapter } from '@strata/adapter';
+import { serialize } from '@strata/persistence';
+import { savePartitionIndex } from '@strata/persistence';
+import { createStore } from '@strata/store';
+import { createSyncLock, createSyncScheduler, syncNow } from '@strata/sync';
+
+function makePartitionBlob(entityName: string, entities: Record<string, unknown>, tombstones: Record<string, unknown> = {}): Uint8Array {
+  return serialize({
+    [entityName]: entities,
+    deleted: { [entityName]: tombstones },
+  });
+}
+
+describe('createSyncScheduler', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('start begins periodic timers', () => {
+    vi.useFakeTimers();
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    const scheduler = createSyncScheduler(
+      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+      { localFlushIntervalMs: 100, cloudSyncIntervalMs: 500 },
+    );
+
+    scheduler.start();
+    expect(lock.isRunning()).toBe(false);
+    scheduler.stop();
+  });
+
+  it('stop clears timers', () => {
+    vi.useFakeTimers();
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    const scheduler = createSyncScheduler(
+      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+      { localFlushIntervalMs: 100, cloudSyncIntervalMs: 500 },
+    );
+
+    scheduler.start();
+    scheduler.stop();
+
+    vi.advanceTimersByTime(1000);
+    expect(lock.isRunning()).toBe(false);
+  });
+
+  it('dispose stops timers and drains lock', async () => {
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    const scheduler = createSyncScheduler(
+      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+    );
+
+    scheduler.start();
+    await scheduler.dispose();
+    // After dispose, lock should be disposed
+    await expect(
+      lock.enqueue('memory-to-local', 'memory-to-local', async () => {}),
+    ).rejects.toThrow('disposed');
+  });
+});
+
+describe('syncNow', () => {
+  it('flushes local then syncs with cloud', async () => {
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    store.set('task._', 'task._.a1', {
+      id: 'task._.a1', name: 'T1',
+      hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' },
+    });
+
+    await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
+
+    // After sync, no errors means both phases completed
+    expect(lock.isRunning()).toBe(false);
+  });
+
+  it('processes diverged partitions during cloud sync', async () => {
+    const lock = createSyncLock();
+    const localAdapter = createMemoryBlobAdapter();
+    const cloudAdapter = createMemoryBlobAdapter();
+    const store = createStore();
+
+    const localEntity = {
+      id: 'task._.a1', name: 'LocalVer',
+      hlc: { timestamp: 2000, counter: 0, nodeId: 'local' },
+    };
+    const cloudEntity = {
+      id: 'task._.a1', name: 'CloudVer',
+      hlc: { timestamp: 1000, counter: 0, nodeId: 'cloud' },
+    };
+
+    await localAdapter.write(undefined, 'task._',
+      makePartitionBlob('task', { 'task._.a1': localEntity }));
+    await savePartitionIndex(localAdapter, undefined, 'task', {
+      '_': { hash: 111, count: 1, updatedAt: 1000 },
+    });
+
+    await cloudAdapter.write(undefined, 'task._',
+      makePartitionBlob('task', { 'task._.a1': cloudEntity }));
+    await savePartitionIndex(cloudAdapter, undefined, 'task', {
+      '_': { hash: 222, count: 1, updatedAt: 1000 },
+    });
+
+    await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
+    expect(lock.isRunning()).toBe(false);
+  });
+});

@@ -1,3 +1,5 @@
+import type { Hlc } from '@strata/hlc';
+
 export type EntityStore = {
   get(entityKey: string, id: string): unknown | undefined;
   set(entityKey: string, id: string, entity: unknown): void;
@@ -10,6 +12,8 @@ export type EntityStore = {
     entityKey: string,
     loader: () => Promise<Map<string, unknown>>,
   ): Promise<ReadonlyMap<string, unknown>>;
+  setTombstone(entityKey: string, entityId: string, hlc: Hlc): void;
+  getTombstones(entityKey: string): ReadonlyMap<string, Hlc>;
 };
 
 export type FlushSchedulerOptions = {

@@ -241,3 +241,40 @@ Epics: E19 (Sync — Partition diff & copy optimization), E20 (Sync — Bidirect
 | 16 | Write unit tests for conflict resolution — `resolveConflict` picks higher timestamp, counter breaks tie when timestamps equal, nodeId string comparison breaks final tie; `resolveEntityTombstone` picks correct winner in both directions | E20 | developer | done | plan | 2026-03-23T23:00:00Z | 2026-03-23T23:10:00Z |
 | 17 | Write unit tests for partition merge — `mergePartition` includes local-only entities, cloud-only entities, conflicting entities resolved by HLC, tombstone vs entity resolution in both directions, both sides produce identical merged result | E20 | developer | done | plan | 2026-03-23T23:00:00Z | 2026-03-23T23:10:00Z |
 | 18 | Write unit tests for full sync integration — `syncMergePhase` processes all diverged keys, `updateIndexesAfterSync` recomputes correct hashes and persists both indexes, `applyMergedToStore` upserts correctly and emits entity events | E20 | developer | done | plan | 2026-03-23T23:00:00Z | 2026-03-23T23:10:00Z |
+
+## Sprint 7 — Sync: Tombstones, Scheduler & Dirty Tracking
+Started: 2026-03-23T23:30:00Z
+
+Epics: E21 (Tombstones & retention), E22 (Three-phase model, scheduler & global lock), E23 (Dirty tracking & sync events)
+
+### E21 — Sync: Tombstones & retention (Layer 8)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 1 | Add tombstone storage to `EntityStore` — implement `setTombstone(entityKey, entityId, hlc)` to record a deleted entity's HLC in a parallel `Map<string, Map<string, Hlc>>` tombstone structure; implement `getTombstones(entityKey): ReadonlyMap<string, Hlc>` to retrieve tombstones for a partition | E21 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 2 | Update `Repository.delete(id)` to call `store.setTombstone(entityKey, entityId, entity.hlc)` before removing entity from store partition — preserving the entity's HLC as a tombstone; update `deleteMany(ids)` similarly | E21 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 3 | Implement `purgeStaleTombstones(tombstones, retentionMs, now)` in `src/sync/` — iterates tombstone entries, removes those whose `hlc.timestamp` is older than `now - retentionMs`; default retention `90 * 24 * 60 * 60 * 1000` ms (90 days); returns count of purged entries | E21 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 4 | Integrate tombstone purging into `flushPartition` — call `purgeStaleTombstones` on the partition's tombstones using configured retention period before serializing the blob to adapter | E21 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 5 | Update `loadPartition` to restore tombstones from blob's `deleted` section into the store's tombstone map alongside entity data when hydrating from adapter | E21 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+
+### E22 — Sync: Three-phase model, scheduler & global lock (Layer 8)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 6 | Define sync types in `src/sync/` — `SyncDirection` (`'memory-to-local' \| 'local-to-cloud' \| 'cloud-to-local' \| 'cloud-to-memory'`), `SyncQueueItem` (source, target, promise, resolve, reject), `SyncLock` type with `enqueue()`, `isRunning()`, `drain()`, `dispose()` | E22 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 7 | Implement `createSyncLock()` — global lock allowing one sync operation at a time; `enqueue(source, target, fn)` returns existing promise if duplicate already queued or running, otherwise queues and returns new promise; executes queued items sequentially | E22 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 8 | Implement Phase 1 hydrate — `hydrateFromCloud(cloudAdapter, localAdapter, store, entityNames, cloudMeta)` loads cloud partition indexes per entity type, downloads partition blobs, writes to local adapter, loads entities into memory store; returns list of hydrated entity types | E22 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 9 | Implement Phase 1 local-only fallback — `hydrateFromLocal(localAdapter, store, entityNames)` loads all partition indexes from local adapter per entity type, loads partition blobs into memory store; used when cloud is unreachable during initial hydrate | E22 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 10 | Implement Phase 2 periodic scheduler — `createSyncScheduler(options)` with configurable `localFlushIntervalMs` (default 2000) and `cloudSyncIntervalMs` (default 300000); `start()` begins interval timers that enqueue sync operations via sync lock; `stop()` clears all timers | E22 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 11 | Implement Phase 3 manual sync — `syncNow(syncLock, localAdapter, cloudAdapter, store, entityNames, cloudMeta)` enqueues immediate memory→local flush then local↔cloud full sync cycle sequentially through the sync lock; returns promise resolving when both complete | E22 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 12 | Implement scheduler lifecycle — `SyncScheduler.dispose()` stops periodic timers, drains sync lock queue (waits for in-flight operation), rejects further enqueue calls; integrate with `createSyncScheduler` | E22 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+
+### E23 — Sync: Dirty tracking & sync events (Layer 8, depends on E22)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 13 | Define `SyncEvent` type union (`{ type: 'sync-started' }`, `{ type: 'sync-completed', result: SyncResult }`, `{ type: 'sync-failed', error: Error }`, `{ type: 'cloud-unreachable' }`) and `SyncResult` type (`entitiesUpdated: number`, `conflictsResolved: number`, `partitionsSynced: number`) in `src/sync/` | E23 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 14 | Implement `createSyncEventEmitter()` — manages sync event listeners via `on(listener)`, `off(listener)`, `emit(event)` methods; typed to `SyncEvent` union | E23 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 15 | Integrate sync events with sync lock — fire `sync-started` before each sync operation begins, `sync-completed` with `SyncResult` on success, `sync-failed` with error on failure, `cloud-unreachable` when cloud adapter throws connectivity error during hydrate or periodic sync | E23 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 16 | Implement `createDirtyTracker()` — `isDirty: boolean` getter tracks whether any data hasn't reached cloud; `isDirty$: Observable<boolean>` emits reactive dirty-state changes via `distinctUntilChanged`; set dirty on any store write, clear only after successful local→cloud sync | E23 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |
+| 17 | Integrate dirty tracker with store and sync — mark dirty on every `Repository.save`/`saveMany`/`delete`/`deleteMany` operation; clear dirty flag when local→cloud sync completes successfully; expose `isDirty` and `isDirty$` from sync module | E23 | developer | done | plan | 2026-03-23T23:30:00Z | 2026-03-23T23:55:00Z |

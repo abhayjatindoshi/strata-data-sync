@@ -22,9 +22,9 @@
 | E18 | Tenant — Sharing, setup, marker blob | `tenant/` | `docs/tenant.md` (Sharing Flow, Marker Blob) | done |
 | E19 | Sync — Partition diff & copy optimization | `sync/` | `docs/persistence-sync.md` (Sync Cycle steps 1-4, Copy optimization) | done |
 | E20 | Sync — Bidirectional merge & HLC conflict resolution | `sync/` | `docs/persistence-sync.md` (Sync Cycle step 5, Conflict Resolution) | done |
-| E21 | Sync — Tombstones & retention | `sync/` | `docs/persistence-sync.md` (Tombstones) | pending |
-| E22 | Sync — Three-phase model, scheduler & global lock | `sync/` | `docs/persistence-sync.md` (Three-Phase Model, Global Sync Lock) | pending |
-| E23 | Sync — Dirty tracking & sync events | `sync/` | `docs/persistence-sync.md` (Dirty Tracking, events) | pending |
+| E21 | Sync — Tombstones & retention | `sync/` | `docs/persistence-sync.md` (Tombstones) | done |
+| E22 | Sync — Three-phase model, scheduler & global lock | `sync/` | `docs/persistence-sync.md` (Three-Phase Model, Global Sync Lock) | done |
+| E23 | Sync — Dirty tracking & sync events | `sync/` | `docs/persistence-sync.md` (Dirty Tracking, events) | done |
 | E24 | Framework Entry Point — createStrata() | `src/` root | `docs/lifecycle.md`, `docs/architecture.md` | pending |
 | E25 | Framework — Graceful shutdown & dispose | `src/` root | `docs/persistence-sync.md` (Graceful shutdown), `docs/lifecycle.md` (Phase 9) | pending |
 
