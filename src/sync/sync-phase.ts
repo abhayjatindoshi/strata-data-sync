@@ -67,7 +67,7 @@ function buildHlcMap(
     hlcMap.set(id, (entity as SyncEntity).hlc);
   }
   for (const [id, hlc] of Object.entries(tombstones)) {
-    hlcMap.set(id, hlc);
+    hlcMap.set(`\0${id}`, hlc);
   }
   return hlcMap;
 }

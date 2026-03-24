@@ -2,7 +2,10 @@ import debug from 'debug';
 import type { BlobAdapter, CloudMeta } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
-import { serialize, deserialize } from '@strata/persistence';
+import {
+  serialize, deserialize, partitionHash,
+  loadPartitionIndex, savePartitionIndex, updatePartitionIndexEntry,
+} from '@strata/persistence';
 import { purgeStaleTombstones, DEFAULT_TOMBSTONE_RETENTION_MS } from '@strata/sync/tombstone';
 import type { EntityStore } from './types';
 
@@ -50,10 +53,52 @@ export async function flushAll(
   store: EntityStore,
 ): Promise<void> {
   const dirtyKeys = [...store.getDirtyKeys()];
+  const affectedEntityNames = new Set<string>();
+
   for (const entityKey of dirtyKeys) {
     await flushPartition(adapter, cloudMeta, store, entityKey);
     store.clearDirty(entityKey);
+    const dotIndex = entityKey.indexOf('.');
+    affectedEntityNames.add(entityKey.substring(0, dotIndex));
   }
+
+  for (const entityName of affectedEntityNames) {
+    await flushPartitionIndex(adapter, cloudMeta, store, entityName);
+  }
+}
+
+async function flushPartitionIndex(
+  adapter: BlobAdapter,
+  cloudMeta: CloudMeta,
+  store: EntityStore,
+  entityName: string,
+): Promise<void> {
+  let index = await loadPartitionIndex(adapter, cloudMeta, entityName);
+  const partitionKeys = store.getAllPartitionKeys(entityName);
+
+  for (const entityKey of partitionKeys) {
+    const dotIndex = entityKey.indexOf('.');
+    const partitionKey = entityKey.substring(dotIndex + 1);
+
+    const partition = store.getPartition(entityKey);
+    const tombstones = store.getTombstones(entityKey);
+
+    const hlcMap = new Map<string, Hlc>();
+    for (const [id, entity] of partition) {
+      const hlc = (entity as { hlc?: Hlc }).hlc;
+      if (hlc) hlcMap.set(id, hlc);
+    }
+    for (const [id, hlc] of tombstones) {
+      hlcMap.set(`\0${id}`, hlc);
+    }
+
+    const hash = partitionHash(hlcMap);
+    const count = hlcMap.size;
+    index = updatePartitionIndexEntry(index, partitionKey, hash, count);
+  }
+
+  await savePartitionIndex(adapter, cloudMeta, entityName, index);
+  log('updated partition index for %s', entityName);
 }
 
 export async function loadPartitionFromAdapter(

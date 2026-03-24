@@ -1,7 +1,9 @@
 import debug from 'debug';
 import type { BlobAdapter, CloudMeta } from '@strata/adapter';
+import { partitionBlobKey } from '@strata/adapter';
+import type { Hlc } from '@strata/hlc';
 import type { EntityStore } from '@strata/store';
-import { flushAll } from '@strata/store';
+import { flushAll, loadPartitionFromAdapter } from '@strata/store';
 import type { SyncLock, SyncScheduler, SyncSchedulerOptions } from './types';
 import { loadIndexPair, diffPartitions } from './diff';
 import { syncCopyPhase } from './copy';
@@ -86,6 +88,27 @@ async function syncCloudCycle(
     const mergedResults = await syncMergePhase(
       localAdapter, cloudAdapter, cloudMeta, entityName, diff.diverged,
     );
+
+    // Apply merged entities/tombstones to in-memory store
+    for (const { partitionKey, entities, tombstones } of mergedResults) {
+      const entityKey = partitionBlobKey(entityName, partitionKey);
+      for (const [id, entity] of Object.entries(entities)) {
+        store.set(entityKey, id, entity);
+      }
+      for (const [id, hlc] of Object.entries(tombstones)) {
+        store.delete(entityKey, id);
+        store.setTombstone(entityKey, id, hlc as Hlc);
+      }
+      store.clearDirty(entityKey);
+    }
+
+    // Load cloud-only partitions into store
+    for (const partitionKey of diff.cloudOnly) {
+      const entityKey = partitionBlobKey(entityName, partitionKey);
+      await store.loadPartition(entityKey, () =>
+        loadPartitionFromAdapter(localAdapter, undefined, store, entityName, partitionKey),
+      );
+    }
 
     const allSynced = [
       ...copiedKeys,

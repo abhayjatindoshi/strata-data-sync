@@ -126,10 +126,10 @@ describe('createFlushScheduler', () => {
     scheduler.schedule();
     await scheduler.flush();
 
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(2); // partition blob + partition index
 
     await vi.advanceTimersByTimeAsync(1000);
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
 

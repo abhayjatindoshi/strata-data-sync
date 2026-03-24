@@ -1,7 +1,7 @@
 import debug from 'debug';
 import type { BlobAdapter, CloudMeta } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
-import { loadPartitionIndex } from '@strata/persistence';
+import { loadPartitionIndex, savePartitionIndex } from '@strata/persistence';
 import type { EntityStore } from '@strata/store';
 import { loadPartitionFromAdapter } from '@strata/store';
 
@@ -35,6 +35,11 @@ export async function hydrateFromCloud(
 
     hydrated.push(entityName);
     log('hydrated %s from cloud (%d partitions)', entityName, partitionKeys.length);
+
+    // Copy cloud partition index to local so subsequent syncs can diff correctly
+    if (partitionKeys.length > 0) {
+      await savePartitionIndex(localAdapter, undefined, entityName, cloudIndex);
+    }
   }
 
   return hydrated;
