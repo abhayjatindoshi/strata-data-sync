@@ -9,7 +9,7 @@ function makePartitionBlob(
   entities: Record<string, unknown>,
   tombstones: Record<string, unknown> = {},
 ): Uint8Array {
-  return serialize({
+  return ({
     [entityName]: entities,
     deleted: { [entityName]: tombstones },
   });

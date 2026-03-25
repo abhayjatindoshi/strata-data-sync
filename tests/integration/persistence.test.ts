@@ -93,19 +93,19 @@ describe('Persistence round-trip integration', () => {
     await strata.dispose();
 
     // Verify separate partition blobs exist
-    const checkingBlob = await localAdapter.read(undefined, 'transaction.checking');
-    const savingsBlob = await localAdapter.read(undefined, 'transaction.savings');
+    const checkingBlob = await localAdapter.read(tenant, 'transaction.checking');
+    const savingsBlob = await localAdapter.read(tenant, 'transaction.savings');
 
     expect(checkingBlob).not.toBeNull();
     expect(savingsBlob).not.toBeNull();
 
     // Verify checking has 2 entities
-    const checkingData = deserialize<Record<string, unknown>>(checkingBlob!);
+    const checkingData = checkingBlob as Record<string, unknown>;
     const checkingEntities = checkingData['transaction'] as Record<string, unknown>;
     expect(Object.keys(checkingEntities)).toHaveLength(2);
 
     // Verify savings has 1 entity
-    const savingsData = deserialize<Record<string, unknown>>(savingsBlob!);
+    const savingsData = savingsBlob as Record<string, unknown>;
     const savingsEntities = savingsData['transaction'] as Record<string, unknown>;
     expect(Object.keys(savingsEntities)).toHaveLength(1);
   });
@@ -211,10 +211,10 @@ describe('Persistence round-trip integration', () => {
     await strata.dispose();
 
     // Verify the partition blob contains tombstone
-    const blob = await localAdapter.read(undefined, 'item._');
+    const blob = await localAdapter.read(tenant, 'item._');
     expect(blob).not.toBeNull();
 
-    const data = deserialize<Record<string, unknown>>(blob!);
+    const data = blob as Record<string, unknown>;
     const deleted = data['deleted'] as Record<string, unknown>;
     const itemTombstones = deleted?.['item'] as Record<string, unknown>;
     expect(itemTombstones).toBeDefined();

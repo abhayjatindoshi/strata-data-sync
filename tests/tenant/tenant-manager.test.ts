@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createMemoryBlobAdapter } from '@strata/adapter';
 import { TENANTS_KEY, STRATA_MARKER_KEY } from '@strata/adapter';
-import { serialize, deserialize } from '@strata/persistence';
+import type { Tenant } from '@strata/adapter';
 import { loadTenantList, saveTenantList, createTenantManager } from '@strata/tenant';
-import type { Tenant } from '@strata/tenant';
 
 describe('tenant list persistence', () => {
   it('loadTenantList returns empty array when no blob', async () => {
@@ -75,10 +74,10 @@ describe('TenantManager', () => {
     it('writes __strata marker blob', async () => {
       const adapter = createMemoryBlobAdapter();
       const tm = createTenantManager(adapter);
-      await tm.create({ name: 'T', meta: { folder: 'f1' } });
-      const marker = await adapter.read({ folder: 'f1' }, STRATA_MARKER_KEY);
+      const created = await tm.create({ name: 'T', meta: { folder: 'f1' } });
+      const marker = await adapter.read(created, STRATA_MARKER_KEY);
       expect(marker).not.toBeNull();
-      const parsed = deserialize<{ version: number }>(marker!);
+      const parsed = marker as { version: number };
       expect(parsed.version).toBe(1);
     });
 
@@ -124,9 +123,10 @@ describe('TenantManager', () => {
     it('reads marker blob and adds tenant', async () => {
       const adapter = createMemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
-      await adapter.write({ folder: 'shared' }, STRATA_MARKER_KEY, serialize(marker));
+      const tempTenant: Tenant = { id: 'shared-id', name: 'Shared', meta: { folder: 'shared' }, createdAt: new Date(), updatedAt: new Date() };
+      await adapter.write(tempTenant, STRATA_MARKER_KEY, marker);
 
-      const tm = createTenantManager(adapter);
+      const tm = createTenantManager(adapter, { deriveTenantId: () => 'shared-id' });
       const tenant = await tm.setup({ meta: { folder: 'shared' }, name: 'Shared' });
       expect(tenant.name).toBe('Shared');
       const list = await tm.list();
@@ -144,7 +144,8 @@ describe('TenantManager', () => {
     it('returns existing tenant if already in list', async () => {
       const adapter = createMemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
-      await adapter.write({ folder: 'f1' }, STRATA_MARKER_KEY, serialize(marker));
+      const tempTenant: Tenant = { id: 'derived-id', name: '', meta: { folder: 'f1' }, createdAt: new Date(), updatedAt: new Date() };
+      await adapter.write(tempTenant, STRATA_MARKER_KEY, marker);
 
       const tm = createTenantManager(adapter, {
         deriveTenantId: () => 'derived-id',
@@ -159,9 +160,10 @@ describe('TenantManager', () => {
     it('defaults name to Shared Workspace', async () => {
       const adapter = createMemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
-      await adapter.write({}, STRATA_MARKER_KEY, serialize(marker));
+      const tempTenant: Tenant = { id: 'default-id', name: '', meta: {}, createdAt: new Date(), updatedAt: new Date() };
+      await adapter.write(tempTenant, STRATA_MARKER_KEY, marker);
 
-      const tm = createTenantManager(adapter);
+      const tm = createTenantManager(adapter, { deriveTenantId: () => 'default-id' });
       const tenant = await tm.setup({ meta: {} });
       expect(tenant.name).toBe('Shared Workspace');
     });
@@ -190,10 +192,10 @@ describe('TenantManager', () => {
     it('does not delete cloud data', async () => {
       const adapter = createMemoryBlobAdapter();
       const tm = createTenantManager(adapter);
-      await tm.create({ name: 'T', meta: { f: '1' }, id: 't1' });
+      const created = await tm.create({ name: 'T', meta: { f: '1' }, id: 't1' });
       await tm.delink('t1');
       // Marker blob should still exist
-      const marker = await adapter.read({ f: '1' }, STRATA_MARKER_KEY);
+      const marker = await adapter.read(created, STRATA_MARKER_KEY);
       expect(marker).not.toBeNull();
     });
   });

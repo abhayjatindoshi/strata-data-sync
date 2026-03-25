@@ -1,10 +1,10 @@
 import debug from 'debug';
-import type { BlobAdapter, Meta } from '@strata/adapter';
+import type { BlobAdapter, Tenant } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import type { AllIndexes } from '@strata/persistence';
 import {
-  serialize, deserialize, partitionHash,
+  partitionHash,
   loadAllIndexes, saveAllIndexes, updatePartitionIndexEntry,
 } from '@strata/persistence';
 import { purgeStaleTombstones, DEFAULT_TOMBSTONE_RETENTION_MS } from '@strata/sync/tombstone';
@@ -14,7 +14,7 @@ const log = debug('strata:store');
 
 export async function flushPartition(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   store: EntityStore,
   entityKey: string,
   retentionMs: number = DEFAULT_TOMBSTONE_RETENTION_MS,
@@ -42,39 +42,38 @@ export async function flushPartition(
     deleted: { [entityName]: tombstones },
   };
 
-  const data = serialize(blob);
   const key = partitionBlobKey(entityName, partitionKey);
-  await adapter.write(meta, key, data);
+  await adapter.write(tenant, key, blob);
   log('flushed partition %s', entityKey);
 }
 
 export async function flushAll(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   store: EntityStore,
 ): Promise<void> {
   const dirtyKeys = [...store.getDirtyKeys()];
   const affectedEntityNames = new Set<string>();
 
   for (const entityKey of dirtyKeys) {
-    await flushPartition(adapter, meta, store, entityKey);
+    await flushPartition(adapter, tenant, store, entityKey);
     store.clearDirty(entityKey);
     const dotIndex = entityKey.indexOf('.');
     affectedEntityNames.add(entityKey.substring(0, dotIndex));
   }
 
   if (affectedEntityNames.size > 0) {
-    await flushPartitionIndexes(adapter, meta, store, affectedEntityNames);
+    await flushPartitionIndexes(adapter, tenant, store, affectedEntityNames);
   }
 }
 
 async function flushPartitionIndexes(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   store: EntityStore,
   affectedEntityNames: ReadonlySet<string>,
 ): Promise<void> {
-  const indexes = await loadAllIndexes(adapter, meta);
+  const indexes = await loadAllIndexes(adapter, tenant);
 
   for (const entityName of affectedEntityNames) {
     let entityIndex = indexes[entityName] ?? {};
@@ -105,22 +104,22 @@ async function flushPartitionIndexes(
     indexes[entityName] = entityIndex;
   }
 
-  await saveAllIndexes(adapter, meta, indexes);
+  await saveAllIndexes(adapter, tenant, indexes);
   log('updated partition indexes for %s', [...affectedEntityNames].join(', '));
 }
 
 export async function loadPartitionFromAdapter(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   store: EntityStore,
   entityName: string,
   partitionKey: string,
 ): Promise<Map<string, unknown>> {
   const key = partitionBlobKey(entityName, partitionKey);
-  const data = await adapter.read(meta, key);
+  const data = await adapter.read(tenant, key);
   if (!data) return new Map();
 
-  const blob = deserialize<Record<string, unknown>>(data);
+  const blob = data as Record<string, unknown>;
   const entities =
     (blob[entityName] as Record<string, unknown> | undefined) ?? {};
 

@@ -64,7 +64,7 @@ export class Repository<T> {
 
   get(id: string): (T & BaseEntity) | undefined {
     const entityKey = parseEntityKey(id);
-    return this.store.get(entityKey, id) as (T & BaseEntity) | undefined;
+    return this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;
   }
 
   private saveToStore(partial: T & Partial<BaseEntity>): string {
@@ -83,7 +83,7 @@ export class Repository<T> {
       entityKey = `${this.definition.name}.${partitionKey}`;
     }
 
-    const existing = this.store.get(entityKey, id) as (T & BaseEntity) | undefined;
+    const existing = this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;
 
     this.hlc.current = tickLocal(this.hlc.current);
     const now = new Date();
@@ -98,7 +98,7 @@ export class Repository<T> {
       hlc: this.hlc.current,
     };
 
-    this.store.set(entityKey, id, entity);
+    this.store.setEntity(entityKey, id, entity);
     log('saved %s', id);
 
     return id;
@@ -124,11 +124,11 @@ export class Repository<T> {
 
   private deleteFromStore(id: string): boolean {
     const entityKey = parseEntityKey(id);
-    const entity = this.store.get(entityKey, id) as (T & BaseEntity) | undefined;
+    const entity = this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;
     if (entity) {
       this.store.setTombstone(entityKey, id, entity.hlc);
     }
-    const deleted = this.store.delete(entityKey, id);
+    const deleted = this.store.deleteEntity(entityKey, id);
     if (deleted) {
       log('deleted %s', id);
     }

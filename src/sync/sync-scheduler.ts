@@ -1,7 +1,6 @@
 import debug from 'debug';
-import type { BlobAdapter, Meta } from '@strata/adapter';
+import type { BlobAdapter, Tenant } from '@strata/adapter';
 import type { EntityStore } from '@strata/store';
-import { flushAll } from '@strata/store';
 import type { SyncLock, SyncScheduler as SyncSchedulerType, SyncSchedulerOptions } from './types';
 import { syncBetween } from './unified';
 
@@ -19,7 +18,7 @@ export class SyncScheduler {
     private readonly cloudAdapter: BlobAdapter,
     private readonly store: EntityStore,
     private readonly entityNames: ReadonlyArray<string>,
-    private readonly meta: Meta,
+    private readonly tenant: Tenant | undefined,
     options?: SyncSchedulerOptions,
   ) {
     this.localFlushIntervalMs = options?.localFlushIntervalMs ?? 2000;
@@ -29,7 +28,7 @@ export class SyncScheduler {
   start(): void {
     this.localTimer = setInterval(() => {
       this.syncLock.enqueue('memory-to-local', 'memory-to-local', () =>
-        flushAll(this.localAdapter, this.meta, this.store),
+        syncMemoryToLocal(this.store, this.localAdapter, this.entityNames, this.tenant),
       ).catch((err: unknown) => {
         log.extend('error')('local flush failed: %O', err);
       });
@@ -37,7 +36,7 @@ export class SyncScheduler {
 
     this.cloudTimer = setInterval(() => {
       this.syncLock.enqueue('local-to-cloud', 'local-to-cloud', () =>
-        syncCloudCycle(this.localAdapter, this.cloudAdapter, this.store, this.entityNames, this.meta),
+        syncCloudCycle(this.localAdapter, this.cloudAdapter, this.store, this.entityNames, this.tenant),
       ).catch((err: unknown) => {
         log.extend('error')('cloud sync failed: %O', err);
       });
@@ -72,10 +71,20 @@ export function createSyncScheduler(
   cloudAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  meta: Meta,
+  tenant: Tenant | undefined,
   options?: SyncSchedulerOptions,
 ): SyncSchedulerType {
-  return new SyncScheduler(syncLock, localAdapter, cloudAdapter, store, entityNames, meta, options);
+  return new SyncScheduler(syncLock, localAdapter, cloudAdapter, store, entityNames, tenant, options);
+}
+
+async function syncMemoryToLocal(
+  store: EntityStore,
+  localAdapter: BlobAdapter,
+  entityNames: ReadonlyArray<string>,
+  tenant: Tenant | undefined,
+): Promise<void> {
+  const result = await syncBetween(store, localAdapter, store, entityNames, tenant);
+  log('memory→local sync complete: %d copied, %d merged', result.partitionsCopied, result.partitionsMerged);
 }
 
 async function syncCloudCycle(
@@ -83,9 +92,9 @@ async function syncCloudCycle(
   cloudAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  meta: Meta,
+  tenant: Tenant | undefined,
 ): Promise<void> {
-  const result = await syncBetween(localAdapter, cloudAdapter, store, entityNames, meta);
+  const result = await syncBetween(localAdapter, cloudAdapter, store, entityNames, tenant);
   log('cloud sync cycle complete: %d copied, %d merged', result.partitionsCopied, result.partitionsMerged);
 }
 
@@ -95,13 +104,13 @@ export async function syncNow(
   cloudAdapter: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  meta: Meta,
+  tenant: Tenant | undefined,
 ): Promise<void> {
   await syncLock.enqueue('memory-to-local', 'memory-to-local', () =>
-    flushAll(localAdapter, meta, store),
+    syncMemoryToLocal(store, localAdapter, entityNames, tenant),
   );
 
   await syncLock.enqueue('local-to-cloud', 'local-to-cloud', () =>
-    syncCloudCycle(localAdapter, cloudAdapter, store, entityNames, meta),
+    syncCloudCycle(localAdapter, cloudAdapter, store, entityNames, tenant),
   );
 }

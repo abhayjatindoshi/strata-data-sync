@@ -1,16 +1,20 @@
 import type { Hlc } from '@strata/hlc';
+import type { Tenant } from '@strata/adapter';
+import { STRATA_MARKER_KEY } from '@strata/adapter';
+import { partitionHash } from '@strata/persistence';
 import type { EntityStore } from './types';
 
 export class Store implements EntityStore {
   private readonly partitions = new Map<string, Map<string, unknown>>();
   private readonly tombstones = new Map<string, Map<string, Hlc>>();
   private readonly dirtyKeys = new Set<string>();
+  private storedMarkerBlob: unknown = null;
 
-  get(entityKey: string, id: string): unknown | undefined {
+  getEntity(entityKey: string, id: string): unknown | undefined {
     return this.partitions.get(entityKey)?.get(id);
   }
 
-  set(entityKey: string, id: string, entity: unknown): void {
+  setEntity(entityKey: string, id: string, entity: unknown): void {
     let partition = this.partitions.get(entityKey);
     if (!partition) {
       partition = new Map();
@@ -20,7 +24,7 @@ export class Store implements EntityStore {
     this.dirtyKeys.add(entityKey);
   }
 
-  delete(entityKey: string, id: string): boolean {
+  deleteEntity(entityKey: string, id: string): boolean {
     const partition = this.partitions.get(entityKey);
     if (!partition) return false;
     const deleted = partition.delete(id);
@@ -82,6 +86,116 @@ export class Store implements EntityStore {
     this.partitions.clear();
     this.tombstones.clear();
     this.dirtyKeys.clear();
+    this.storedMarkerBlob = null;
+  }
+
+  // ─── BlobAdapter interface ─────────────────────────────
+
+  async read(_tenant: Tenant | undefined, key: string): Promise<unknown> {
+    if (key === STRATA_MARKER_KEY) {
+      return this.buildMarkerBlob();
+    }
+    const dotIndex = key.indexOf('.');
+    if (dotIndex < 0) return null;
+    const entityName = key.substring(0, dotIndex);
+    const partition = this.getPartition(key);
+    if (partition.size === 0 && this.getTombstones(key).size === 0) {
+      return null;
+    }
+    const entities: Record<string, unknown> = {};
+    for (const [id, entity] of partition) {
+      entities[id] = entity;
+    }
+    const tombstoneEntries: Record<string, Hlc> = {};
+    for (const [id, hlc] of this.getTombstones(key)) {
+      tombstoneEntries[id] = hlc;
+    }
+    return {
+      [entityName]: entities,
+      deleted: { [entityName]: tombstoneEntries },
+    };
+  }
+
+  async write(_tenant: Tenant | undefined, key: string, data: unknown): Promise<void> {
+    if (key === STRATA_MARKER_KEY) {
+      this.storedMarkerBlob = data;
+      return;
+    }
+    const dotIndex = key.indexOf('.');
+    if (dotIndex < 0) return;
+    const entityName = key.substring(0, dotIndex);
+    const blob = data as Record<string, unknown>;
+    const entities =
+      (blob[entityName] as Record<string, unknown> | undefined) ?? {};
+    const deletedSection = blob['deleted'] as Record<string, unknown> | undefined;
+    const tombstoneData =
+      (deletedSection?.[entityName] as Record<string, Hlc> | undefined) ?? {};
+
+    const partition = new Map<string, unknown>();
+    for (const [id, entity] of Object.entries(entities)) {
+      partition.set(id, entity);
+    }
+    this.partitions.set(key, partition);
+
+    const tombstoneMap = new Map<string, Hlc>();
+    for (const [id, hlc] of Object.entries(tombstoneData)) {
+      tombstoneMap.set(id, hlc);
+    }
+    this.tombstones.set(key, tombstoneMap);
+  }
+
+  async delete(_tenant: Tenant | undefined, key: string): Promise<boolean> {
+    const had = this.partitions.has(key) || this.tombstones.has(key);
+    this.partitions.delete(key);
+    this.tombstones.delete(key);
+    return had;
+  }
+
+  async list(_tenant: Tenant | undefined, prefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    for (const key of this.partitions.keys()) {
+      if (key.startsWith(prefix)) {
+        keys.push(key);
+      }
+    }
+    return keys;
+  }
+
+  private buildMarkerBlob(): Record<string, unknown> {
+    const indexes: Record<string, Record<string, { hash: number; count: number; deletedCount: number; updatedAt: number }>> = {};
+    for (const entityKey of this.partitions.keys()) {
+      const dotIndex = entityKey.indexOf('.');
+      if (dotIndex < 0) continue;
+      const entityName = entityKey.substring(0, dotIndex);
+      const partitionKey = entityKey.substring(dotIndex + 1);
+
+      if (!indexes[entityName]) indexes[entityName] = {};
+
+      const partition = this.getPartition(entityKey);
+      const tombstoneMap = this.getTombstones(entityKey);
+      const hlcMap = new Map<string, Hlc>();
+      for (const [id, entity] of partition) {
+        const hlc = (entity as { hlc?: Hlc }).hlc;
+        if (hlc) hlcMap.set(id, hlc);
+      }
+      for (const [id, hlc] of tombstoneMap) {
+        hlcMap.set(`\0${id}`, hlc);
+      }
+
+      indexes[entityName][partitionKey] = {
+        hash: partitionHash(hlcMap),
+        count: hlcMap.size,
+        deletedCount: tombstoneMap.size,
+        updatedAt: Date.now(),
+      };
+    }
+
+    return {
+      version: 1,
+      createdAt: new Date(),
+      entityTypes: [],
+      indexes,
+    };
   }
 }
 

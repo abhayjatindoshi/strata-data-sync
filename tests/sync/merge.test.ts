@@ -1,17 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import type { Hlc } from '@strata/hlc';
-import { serialize } from '@strata/persistence';
 import { mergePartition, diffEntityMaps } from '@strata/sync';
 
 function makeBlob(
   entityName: string,
   entities: Record<string, unknown>,
   tombstones: Record<string, Hlc> = {},
-): Uint8Array {
-  return serialize({
+): Record<string, unknown> {
+  return {
     [entityName]: entities,
     deleted: { [entityName]: tombstones },
-  });
+  };
 }
 
 const entityName = 'task';

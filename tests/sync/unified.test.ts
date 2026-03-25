@@ -9,7 +9,7 @@ function makePartitionBlob(
   entities: Record<string, unknown>,
   tombstones: Record<string, unknown> = {},
 ): Uint8Array {
-  return serialize({
+  return ({
     [entityName]: entities,
     deleted: { [entityName]: tombstones },
   });
@@ -51,7 +51,7 @@ describe('syncBetween', () => {
     const result = await syncBetween(adapterA, adapterB, store, ['task'], undefined);
 
     expect(result.partitionsCopied).toBe(1);
-    expect(store.get('task._', 'task._.b1')).toBeDefined();
+    expect(store.getEntity('task._', 'task._.b1')).toBeDefined();
   });
 
   it('merges diverged partitions', async () => {
@@ -75,8 +75,8 @@ describe('syncBetween', () => {
     const result = await syncBetween(adapterA, adapterB, store, ['task'], undefined);
 
     expect(result.partitionsMerged).toBe(1);
-    expect(store.get('task._', 'task._.a1')).toBeDefined();
-    expect(store.get('task._', 'task._.b1')).toBeDefined();
+    expect(store.getEntity('task._', 'task._.a1')).toBeDefined();
+    expect(store.getEntity('task._', 'task._.b1')).toBeDefined();
   });
 
   it('returns empty result when no data on either side', async () => {

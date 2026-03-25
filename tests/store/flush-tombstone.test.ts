@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMemoryBlobAdapter } from '@strata/adapter';
-import { serialize, deserialize } from '@strata/persistence';
-import { createStore, flushPartition, loadPartitionFromAdapter } from '@strata/store';
+import { createStore } from '@strata/store';
+import { flushPartition, loadPartitionFromAdapter } from '@strata/store/flush';
 import type { Hlc } from '@strata/hlc';
 
 describe('flush with tombstones', () => {
@@ -9,7 +9,7 @@ describe('flush with tombstones', () => {
     const adapter = createMemoryBlobAdapter();
     const store = createStore();
 
-    store.set('task._', 'task._.a1', {
+    store.setEntity('task._', 'task._.a1', {
       id: 'task._.a1',
       hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' },
     });
@@ -19,10 +19,9 @@ describe('flush with tombstones', () => {
 
     await flushPartition(adapter, undefined, store, 'task._');
 
-    const data = await adapter.read(undefined, 'task._');
+    const data = await adapter.read(undefined, 'task._') as Record<string, unknown>;
     expect(data).not.toBeNull();
-    const blob = deserialize<Record<string, unknown>>(data!);
-    const deleted = blob['deleted'] as Record<string, Record<string, Hlc>>;
+    const deleted = data['deleted'] as Record<string, Record<string, Hlc>>;
     expect(deleted['task']['task._.deleted1']).toEqual(tombstoneHlc);
   });
 
@@ -36,13 +35,12 @@ describe('flush with tombstones', () => {
 
     store.setTombstone('task._', 'task._.old', staleHlc);
     store.setTombstone('task._', 'task._.new', freshHlc);
-    store.set('task._', 'task._.alive', { id: 'task._.alive' });
+    store.setEntity('task._', 'task._.alive', { id: 'task._.alive' });
 
     await flushPartition(adapter, undefined, store, 'task._');
 
-    const data = await adapter.read(undefined, 'task._');
-    const blob = deserialize<Record<string, unknown>>(data!);
-    const deleted = blob['deleted'] as Record<string, Record<string, Hlc>>;
+    const data = await adapter.read(undefined, 'task._') as Record<string, unknown>;
+    const deleted = data['deleted'] as Record<string, Record<string, Hlc>>;
     expect(deleted['task']['task._.old']).toBeUndefined();
     expect(deleted['task']['task._.new']).toEqual(freshHlc);
   });
@@ -54,10 +52,10 @@ describe('loadPartitionFromAdapter', () => {
     const store = createStore();
 
     const entity = { id: 'task._.a1', name: 'Test' };
-    const blob = serialize({
+    const blob = {
       task: { 'task._.a1': entity },
       deleted: { task: {} },
-    });
+    };
     await adapter.write(undefined, 'task._', blob);
 
     const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
@@ -71,10 +69,10 @@ describe('loadPartitionFromAdapter', () => {
     const store = createStore();
 
     const tombstoneHlc: Hlc = { timestamp: 999, counter: 0, nodeId: 'n1' };
-    const blob = serialize({
+    const blob = {
       task: {},
       deleted: { task: { 'task._.del1': tombstoneHlc } },
-    });
+    };
     await adapter.write(undefined, 'task._', blob);
 
     await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');

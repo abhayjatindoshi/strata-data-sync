@@ -132,11 +132,11 @@ describe('Sync advanced integration', () => {
       hlc: hlcB,
     };
 
-    const localBlob = serialize({
+    const localBlob = ({
       task: { 'task._.abc123': entityA },
       deleted: { task: {} },
     });
-    const cloudBlob = serialize({
+    const cloudBlob = ({
       task: { 'task._.abc123': entityB },
       deleted: { task: {} },
     });

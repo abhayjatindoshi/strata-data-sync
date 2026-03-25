@@ -4,13 +4,12 @@ import {
   createStrata,
   defineEntity,
   createMemoryBlobAdapter,
-  serialize,
   partitionBlobKey,
   saveAllIndexes,
   updatePartitionIndexEntry,
   loadAllIndexes,
 } from '@strata/index';
-import type { Strata, BlobAdapter, SyncEvent } from '@strata/index';
+import type { Strata, BlobAdapter, SyncEvent, Tenant } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Note = { title: string; body: string; priority: number };
@@ -37,7 +36,7 @@ describe('Multi-tenant parallel sync integration', () => {
   /** Write a partition blob externally into an adapter (simulating another device). */
   async function writeExternalPartition(
     adapter: BlobAdapter,
-    meta: Record<string, unknown>,
+    tenant: Tenant | undefined,
     entityName: string,
     partitionKey: string,
     entities: Record<string, unknown>,
@@ -48,24 +47,24 @@ describe('Multi-tenant parallel sync integration', () => {
       deleted: { [entityName]: tombstones },
     };
     const key = partitionBlobKey(entityName, partitionKey);
-    await adapter.write(meta, key, serialize(blob));
+    await adapter.write(tenant, key, blob);
   }
 
   /** Write an external partition + update the __strata index so sync can discover it. */
   async function seedExternal(
     adapter: BlobAdapter,
-    meta: Record<string, unknown>,
+    tenant: Tenant | undefined,
     entityName: string,
     partitionKey: string,
     entities: Record<string, unknown>,
   ): Promise<void> {
-    await writeExternalPartition(adapter, meta, entityName, partitionKey, entities);
+    await writeExternalPartition(adapter, tenant, entityName, partitionKey, entities);
 
-    const indexes = await loadAllIndexes(adapter, meta);
+    const indexes = await loadAllIndexes(adapter, tenant);
     let idx = indexes[entityName] ?? {};
     idx = updatePartitionIndexEntry(idx, partitionKey, Date.now(), Object.keys(entities).length, 0);
     indexes[entityName] = idx;
-    await saveAllIndexes(adapter, meta, indexes);
+    await saveAllIndexes(adapter, tenant, indexes);
   }
 
   it('two tenants — data stays isolated after switching and syncing', async () => {
@@ -174,7 +173,7 @@ describe('Multi-tenant parallel sync integration', () => {
       device: 'phantom-device',
       hlc: { timestamp: Date.now() + 5000, counter: 0, nodeId: 'phantom-device' },
     };
-    await seedExternal(sharedCloud, meta, 'note', '_', {
+    await seedExternal(sharedCloud, tenant, 'note', '_', {
       'note._.ext001': externalNote,
     });
 
@@ -283,7 +282,7 @@ describe('Multi-tenant parallel sync integration', () => {
       device: 'external',
       hlc: { timestamp: Date.now() + 10000, counter: 0, nodeId: 'external' },
     };
-    await seedExternal(sharedCloud, metaA, 'note', '_', {
+    await seedExternal(sharedCloud, tenantA, 'note', '_', {
       'note._.ext-a': externalNote,
     });
 
@@ -336,7 +335,7 @@ describe('Multi-tenant parallel sync integration', () => {
       device: 'auto-device',
       hlc: { timestamp: Date.now() + 20000, counter: 0, nodeId: 'auto-device' },
     };
-    await seedExternal(sharedCloud, meta, 'note', '_', {
+    await seedExternal(sharedCloud, tenant, 'note', '_', {
       'note._.auto-ext': externalNote,
     });
 

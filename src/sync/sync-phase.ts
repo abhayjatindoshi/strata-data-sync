@@ -1,11 +1,9 @@
 import debug from 'debug';
-import type { BlobAdapter, Meta } from '@strata/adapter';
+import type { BlobAdapter, Tenant } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import type { PartitionIndex } from '@strata/persistence';
 import {
-  serialize,
-  deserialize,
   partitionHash,
   updatePartitionIndexEntry,
 } from '@strata/persistence';
@@ -19,7 +17,7 @@ const log = debug('strata:sync');
 export async function syncMergePhase(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   entityName: string,
   divergedKeys: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<MergedPartitionResult>> {
@@ -28,8 +26,8 @@ export async function syncMergePhase(
   for (const partitionKey of divergedKeys) {
     const blobKey = partitionBlobKey(entityName, partitionKey);
     const [localBlob, cloudBlob] = await Promise.all([
-      localAdapter.read(meta, blobKey),
-      cloudAdapter.read(meta, blobKey),
+      localAdapter.read(tenant, blobKey),
+      cloudAdapter.read(tenant, blobKey),
     ]);
 
     if (!localBlob || !cloudBlob) {
@@ -42,11 +40,10 @@ export async function syncMergePhase(
       [entityName]: merged.entities,
       deleted: { [entityName]: merged.tombstones },
     };
-    const mergedBytes = serialize(mergedBlobData);
 
     await Promise.all([
-      localAdapter.write(meta, blobKey, mergedBytes),
-      cloudAdapter.write(meta, blobKey, mergedBytes),
+      localAdapter.write(tenant, blobKey, mergedBlobData),
+      cloudAdapter.write(tenant, blobKey, mergedBlobData),
     ]);
 
     results.push({ partitionKey, ...merged });
@@ -73,7 +70,7 @@ function buildHlcMap(
 
 export async function updateIndexesAfterSync(
   localAdapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   entityName: string,
   localIndex: PartitionIndex,
   cloudIndex: PartitionIndex,
@@ -84,10 +81,10 @@ export async function updateIndexesAfterSync(
 
   for (const partitionKey of syncedPartitions) {
     const blobKey = partitionBlobKey(entityName, partitionKey);
-    const blob = await localAdapter.read(meta, blobKey);
+    const blob = await localAdapter.read(tenant, blobKey);
     if (!blob) continue;
 
-    const data = deserialize<Record<string, unknown>>(blob);
+    const data = blob as Record<string, unknown>;
     const entities =
       (data[entityName] as Record<string, unknown> | undefined) ?? {};
     const deleted = data['deleted'] as Record<string, unknown> | undefined;
@@ -121,11 +118,11 @@ export function applyMergedToStore(
     const entityKey = partitionBlobKey(entityName, partitionKey);
 
     for (const [id, entity] of Object.entries(entities)) {
-      store.set(entityKey, id, entity);
+      store.setEntity(entityKey, id, entity);
     }
 
     for (const id of Object.keys(tombstones)) {
-      store.delete(entityKey, id);
+      store.deleteEntity(entityKey, id);
     }
   }
 

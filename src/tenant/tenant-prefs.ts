@@ -1,6 +1,5 @@
 import debug from 'debug';
-import type { BlobAdapter, Meta } from '@strata/adapter';
-import { serialize, deserialize } from '@strata/persistence';
+import type { BlobAdapter, Tenant } from '@strata/adapter';
 
 const log = debug('strata:tenant');
 
@@ -14,19 +13,18 @@ export type TenantPrefs = {
 
 export async function saveTenantPrefs(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   prefs: TenantPrefs,
 ): Promise<void> {
-  const data = serialize(prefs);
-  await adapter.write(meta, TENANT_PREFS_KEY, data);
+  await adapter.write(tenant, TENANT_PREFS_KEY, prefs);
   log('saved tenant prefs');
 }
 
 export async function loadTenantPrefs(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
 ): Promise<TenantPrefs | undefined> {
-  const data = await adapter.read(meta, TENANT_PREFS_KEY);
+  const data = await adapter.read(tenant, TENANT_PREFS_KEY);
   if (!data) return undefined;
-  return deserialize<TenantPrefs>(data);
+  return data as TenantPrefs;
 }

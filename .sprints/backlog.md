@@ -27,6 +27,7 @@
 | E23 | Sync — Dirty tracking & sync events | `sync/` | `docs/persistence-sync.md` (Dirty Tracking, events) | done |
 | E24 | Framework Entry Point — createStrata() | `src/` root | `docs/lifecycle.md`, `docs/architecture.md` | done |
 | E25 | Framework — Graceful shutdown & dispose | `src/` root | `docs/persistence-sync.md` (Graceful shutdown), `docs/lifecycle.md` (Phase 9) | done |
+| E26 | Unified Sync Refactor — BlobAdapter to JS objects, EntityStore as sync peer, syncBetween everywhere | `adapter/`, `store/`, `sync/`, `tenant/`, `src/` root | `docs/persistence-sync.md`, `docs/adapter.md`, `docs/architecture.md` | in-progress |
 
 ## Dependency Order
 

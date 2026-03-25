@@ -104,7 +104,7 @@ export class TenantManager {
       updatedAt: now,
     };
 
-    await writeMarkerBlob(this.adapter, opts.meta, this.options?.entityTypes ?? []);
+    await writeMarkerBlob(this.adapter, tenant, this.options?.entityTypes ?? []);
 
     await this.persistList([...tenants, tenant]);
     log('created tenant %s', id);
@@ -123,14 +123,6 @@ export class TenantManager {
   }
 
   async setup(opts: SetupTenantOptions): Promise<Tenant> {
-    const marker = await readMarkerBlob(this.adapter, opts.meta);
-    if (!marker) {
-      throw new Error('No strata workspace found at the specified location');
-    }
-    if (!validateMarkerBlob(marker)) {
-      throw new Error('Incompatible strata workspace version');
-    }
-
     let id: string;
     if (this.options?.deriveTenantId) {
       id = this.options.deriveTenantId(opts.meta);
@@ -142,9 +134,25 @@ export class TenantManager {
     const existing = tenants.find(t => t.id === id);
     if (existing) return existing;
 
-    const prefs = await loadTenantPrefs(this.adapter, opts.meta);
-
     const now = new Date();
+    const tempTenant: Tenant = {
+      id,
+      name: opts.name ?? 'Shared Workspace',
+      meta: opts.meta,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const marker = await readMarkerBlob(this.adapter, tempTenant);
+    if (!marker) {
+      throw new Error('No strata workspace found at the specified location');
+    }
+    if (!validateMarkerBlob(marker)) {
+      throw new Error('Incompatible strata workspace version');
+    }
+
+    const prefs = await loadTenantPrefs(this.adapter, tempTenant);
+
     const tenant: Tenant = {
       id,
       name: prefs?.name ?? opts.name ?? 'Shared Workspace',
@@ -177,9 +185,9 @@ export class TenantManager {
     const tenant = tenants.find(t => t.id === tenantId);
     if (!tenant) return;
 
-    const keys = await this.adapter.list(tenant.meta, '');
+    const keys = await this.adapter.list(tenant, '');
     for (const key of keys) {
-      await this.adapter.delete(tenant.meta, key);
+      await this.adapter.delete(tenant, key);
     }
 
     const filtered = tenants.filter(t => t.id !== tenantId);

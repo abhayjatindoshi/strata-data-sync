@@ -58,7 +58,7 @@ describe('syncBetween integration', () => {
 
     await strataA.sync();
 
-    const indexes = await loadAllIndexes(localAdapter, undefined);
+    const indexes = await loadAllIndexes(localAdapter, tenant);
     const taskIndex = indexes['task'];
     expect(taskIndex).toBeDefined();
     const partitionEntry = Object.values(taskIndex)[0];
@@ -119,8 +119,8 @@ describe('syncBetween integration', () => {
     repo.save({ title: 'Task 1', done: false });
     await strata.sync();
 
-    const localIndexes = await loadAllIndexes(localAdapter, undefined);
-    const cloudIndexes = await loadAllIndexes(sharedCloud, { folder: 'test' });
+    const localIndexes = await loadAllIndexes(localAdapter, tenant);
+    const cloudIndexes = await loadAllIndexes(sharedCloud, tenant);
 
     const localEntry = localIndexes['task']?.['_'];
     const cloudEntry = cloudIndexes['task']?.['_'];

@@ -4,7 +4,7 @@ import {
   defineEntity,
   createMemoryBlobAdapter,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
+import type { Strata, Tenant } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import { writeMarkerBlob } from '@strata/tenant';
 
@@ -131,17 +131,14 @@ describe('Tenant integration', () => {
   it('setup detects existing workspace via marker blob', async () => {
     const localAdapter = createMemoryBlobAdapter();
     const meta = { folder: 'shared-folder' };
+    const deriveFn = () => 'setup-id';
+    const tempTenant: Tenant = { id: 'setup-id', name: '', meta, createdAt: new Date(), updatedAt: new Date() };
 
-    // Simulate: workspace marker already exists at meta location
-    await writeMarkerBlob(localAdapter, meta, ['task']);
+    await writeMarkerBlob(localAdapter, tempTenant, ['task']);
 
-    const strata = track(createStrata({
-      entities: [TaskDef],
-      localAdapter,
-      deviceId: 'dev-1',
-    }));
-
-    const tenant = await strata.tenants.setup({ meta, name: 'Shared Project' });
+    const { createTenantManager } = await import('@strata/tenant');
+    const tm = createTenantManager(localAdapter, { deriveTenantId: deriveFn });
+    const tenant = await tm.setup({ meta, name: 'Shared Project' });
     expect(tenant).toBeDefined();
     expect(tenant.name).toBe('Shared Project');
   });
@@ -166,29 +163,27 @@ describe('Tenant integration', () => {
 
     // Device A creates
     const localA = createMemoryBlobAdapter();
-    const strataA = track(createStrata({
-      entities: [TaskDef],
-      localAdapter: localA,
-      deviceId: 'dev-A',
-    }));
-    const tenantA = await strataA.tenants.create({ name: 'Shared', meta });
+    const { createTenantManager } = await import('@strata/tenant');
+    const tmA = createTenantManager(localA, { deriveTenantId: deriveFn, entityTypes: ['task'] });
+    const tenantA = await tmA.create({ name: 'Shared', meta });
 
-    // Device B sets up (needs marker in its adapter)
+    // Device B sets up (needs marker in its adapter with matching tenant ID)
     const localB = createMemoryBlobAdapter();
-    await writeMarkerBlob(localB, meta, ['task']);
-    const strataB = track(createStrata({
-      entities: [TaskDef],
-      localAdapter: localB,
-      deviceId: 'dev-B',
-    }));
-    const tenantB = await strataB.tenants.setup({ meta });
+    const tenantRefB: Tenant = { id: deriveFn(meta), name: '', meta, createdAt: new Date(), updatedAt: new Date() };
+    await writeMarkerBlob(localB, tenantRefB, ['task']);
+    const tmB = createTenantManager(localB, { deriveTenantId: deriveFn });
+    const tenantB = await tmB.setup({ meta });
 
-    // Both should be able to load their tenants
-    await strataA.tenants.load(tenantA.id);
-    await strataB.tenants.load(tenantB.id);
+    // Both should have the same derived ID
+    expect(tenantA.id).toBe('abc123');
+    expect(tenantB.id).toBe('abc123');
 
-    expect(strataA.tenants.activeTenant$.getValue()?.name).toBe('Shared');
-    expect(strataB.tenants.activeTenant$.getValue()).toBeDefined();
+    // Both can load their tenants
+    await tmA.load(tenantA.id);
+    await tmB.load(tenantB.id);
+
+    expect(tmA.activeTenant$.getValue()?.name).toBe('Shared');
+    expect(tmB.activeTenant$.getValue()).toBeDefined();
   });
 
   it('delete removes tenant and all data at cloudMeta location', async () => {

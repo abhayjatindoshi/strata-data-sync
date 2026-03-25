@@ -1,6 +1,5 @@
 import type { Hlc } from '@strata/hlc';
 import { compareHlc } from '@strata/hlc';
-import { deserialize } from '@strata/persistence';
 import type { EntityDiffResult, MergeResult, SyncEntity } from './types';
 import { resolveConflict, resolveEntityTombstone } from './conflict';
 
@@ -66,12 +65,12 @@ function resolveBothEntry(
 }
 
 export function mergePartition(
-  localBlob: Uint8Array,
-  cloudBlob: Uint8Array,
+  localBlob: unknown,
+  cloudBlob: unknown,
   entityName: string,
 ): MergeResult {
-  const localData = deserialize<Record<string, unknown>>(localBlob);
-  const cloudData = deserialize<Record<string, unknown>>(cloudBlob);
+  const localData = localBlob as Record<string, unknown>;
+  const cloudData = cloudBlob as Record<string, unknown>;
 
   const localEntities =
     (localData[entityName] as Record<string, unknown> | undefined) ?? {};

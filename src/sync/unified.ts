@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { BlobAdapter, Meta } from '@strata/adapter';
+import type { BlobAdapter, Tenant } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
@@ -23,11 +23,11 @@ export async function syncBetween(
   adapterB: BlobAdapter,
   store: EntityStore,
   entityNames: ReadonlyArray<string>,
-  meta: Meta,
+  tenant: Tenant | undefined,
 ): Promise<SyncBetweenResult> {
   const [indexesA, indexesB] = await Promise.all([
-    loadAllIndexes(adapterA, meta),
-    loadAllIndexes(adapterB, meta),
+    loadAllIndexes(adapterA, tenant),
+    loadAllIndexes(adapterB, tenant),
   ]);
 
   const hydratedEntityNames: string[] = [];
@@ -42,22 +42,22 @@ export async function syncBetween(
     const diff = diffPartitions(indexA, indexB);
 
     const copiedKeys = await syncCopyPhase(
-      adapterA, adapterB, meta, entityName, diff,
+      adapterA, adapterB, tenant, entityName, diff,
     );
     totalCopied += copiedKeys.length;
 
     const mergedResults = await syncMergePhase(
-      adapterA, adapterB, meta, entityName, diff.diverged,
+      adapterA, adapterB, tenant, entityName, diff.diverged,
     );
     totalMerged += mergedResults.length;
 
     for (const { partitionKey, entities, tombstones } of mergedResults) {
       const entityKey = partitionBlobKey(entityName, partitionKey);
       for (const [id, entity] of Object.entries(entities)) {
-        store.set(entityKey, id, entity);
+        store.setEntity(entityKey, id, entity);
       }
       for (const [id, hlc] of Object.entries(tombstones)) {
-        store.delete(entityKey, id);
+        store.deleteEntity(entityKey, id);
         store.setTombstone(entityKey, id, hlc as Hlc);
       }
       store.clearDirty(entityKey);
@@ -68,7 +68,7 @@ export async function syncBetween(
     for (const partitionKey of diff.cloudOnly) {
       const entityKey = partitionBlobKey(entityName, partitionKey);
       await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(adapterA, meta, store, entityName, partitionKey),
+        loadPartitionFromAdapter(adapterA, tenant, store, entityName, partitionKey),
       );
     }
 
@@ -76,7 +76,7 @@ export async function syncBetween(
     for (const partitionKey of diff.localOnly) {
       const entityKey = partitionBlobKey(entityName, partitionKey);
       await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(adapterA, meta, store, entityName, partitionKey),
+        loadPartitionFromAdapter(adapterA, tenant, store, entityName, partitionKey),
       );
     }
 
@@ -87,7 +87,7 @@ export async function syncBetween(
 
     if (allSynced.length > 0) {
       const { updatedLocal, updatedCloud } = await updateIndexesAfterSync(
-        adapterA, meta, entityName,
+        adapterA, tenant, entityName,
         indexA, indexB, allSynced,
       );
       indexesA[entityName] = updatedLocal;
@@ -101,8 +101,8 @@ export async function syncBetween(
 
   if (indexChanged) {
     await Promise.all([
-      saveAllIndexes(adapterA, meta, indexesA),
-      saveAllIndexes(adapterB, meta, indexesB),
+      saveAllIndexes(adapterA, tenant, indexesA),
+      saveAllIndexes(adapterB, tenant, indexesB),
     ]);
   }
 

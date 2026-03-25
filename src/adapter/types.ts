@@ -1,10 +1,18 @@
-export type Meta = Readonly<Record<string, unknown>> | undefined;
+export type Tenant = {
+  readonly id: string;
+  readonly name: string;
+  readonly icon?: string;
+  readonly color?: string;
+  readonly meta: Readonly<Record<string, unknown>>;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+};
 
 export type BlobAdapter = {
-  read(meta: Meta, key: string): Promise<Uint8Array | null>;
-  write(meta: Meta, key: string, data: Uint8Array): Promise<void>;
-  delete(meta: Meta, key: string): Promise<boolean>;
-  list(meta: Meta, prefix: string): Promise<string[]>;
+  read(tenant: Tenant | undefined, key: string): Promise<unknown>;
+  write(tenant: Tenant | undefined, key: string, data: unknown): Promise<void>;
+  delete(tenant: Tenant | undefined, key: string): Promise<boolean>;
+  list(tenant: Tenant | undefined, prefix: string): Promise<string[]>;
 };
 
 export type BlobTransform = {

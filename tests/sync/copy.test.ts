@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { createMemoryBlobAdapter } from '@strata/adapter';
-import { serialize } from '@strata/persistence';
+import type { Tenant } from '@strata/adapter';
 import {
   copyPartitionToCloud,
   copyPartitionToLocal,
   syncCopyPhase,
 } from '@strata/sync';
 
-const meta = { container: 'test' };
+const tenant: Tenant = { id: 'test', name: 'Test', meta: { container: 'test' }, createdAt: new Date(), updatedAt: new Date() };
 const entityName = 'task';
 
-function makeBlob(data: Record<string, unknown>): Uint8Array {
-  return serialize(data);
+function makeBlob(data: Record<string, unknown>): Record<string, unknown> {
+  return data;
 }
 
 describe('copyPartitionToCloud', () => {
@@ -19,11 +19,11 @@ describe('copyPartitionToCloud', () => {
     const local = createMemoryBlobAdapter();
     const cloud = createMemoryBlobAdapter();
     const blob = makeBlob({ task: { 'task.2026-01.abc': { id: 'abc' } } });
-    await local.write(undefined, 'task.2026-01', blob);
+    await local.write(tenant, 'task.2026-01', blob);
 
-    await copyPartitionToCloud(local, cloud, meta, entityName, '2026-01');
+    await copyPartitionToCloud(local, cloud, tenant, entityName, '2026-01');
 
-    const result = await cloud.read(meta, 'task.2026-01');
+    const result = await cloud.read(tenant, 'task.2026-01');
     expect(result).not.toBeNull();
     expect(result).toEqual(blob);
   });
@@ -32,9 +32,9 @@ describe('copyPartitionToCloud', () => {
     const local = createMemoryBlobAdapter();
     const cloud = createMemoryBlobAdapter();
 
-    await copyPartitionToCloud(local, cloud, meta, entityName, '2026-01');
+    await copyPartitionToCloud(local, cloud, tenant, entityName, '2026-01');
 
-    const result = await cloud.read(meta, 'task.2026-01');
+    const result = await cloud.read(tenant, 'task.2026-01');
     expect(result).toBeNull();
   });
 });
@@ -44,11 +44,11 @@ describe('copyPartitionToLocal', () => {
     const local = createMemoryBlobAdapter();
     const cloud = createMemoryBlobAdapter();
     const blob = makeBlob({ task: { 'task.2026-01.abc': { id: 'abc' } } });
-    await cloud.write(meta, 'task.2026-01', blob);
+    await cloud.write(tenant, 'task.2026-01', blob);
 
-    await copyPartitionToLocal(local, cloud, meta, entityName, '2026-01');
+    await copyPartitionToLocal(local, cloud, tenant, entityName, '2026-01');
 
-    const result = await local.read(undefined, 'task.2026-01');
+    const result = await local.read(tenant, 'task.2026-01');
     expect(result).not.toBeNull();
     expect(result).toEqual(blob);
   });
@@ -57,9 +57,9 @@ describe('copyPartitionToLocal', () => {
     const local = createMemoryBlobAdapter();
     const cloud = createMemoryBlobAdapter();
 
-    await copyPartitionToLocal(local, cloud, meta, entityName, '2026-01');
+    await copyPartitionToLocal(local, cloud, tenant, entityName, '2026-01');
 
-    const result = await local.read(undefined, 'task.2026-01');
+    const result = await local.read(tenant, 'task.2026-01');
     expect(result).toBeNull();
   });
 });
@@ -70,8 +70,8 @@ describe('syncCopyPhase', () => {
     const cloud = createMemoryBlobAdapter();
     const localBlob = makeBlob({ task: { 'task.2026-01.a': { id: 'a' } } });
     const cloudBlob = makeBlob({ task: { 'task.2026-02.b': { id: 'b' } } });
-    await local.write(undefined, 'task.2026-01', localBlob);
-    await cloud.write(meta, 'task.2026-02', cloudBlob);
+    await local.write(tenant, 'task.2026-01', localBlob);
+    await cloud.write(tenant, 'task.2026-02', cloudBlob);
 
     const diff = {
       localOnly: ['2026-01'],
@@ -81,15 +81,15 @@ describe('syncCopyPhase', () => {
     };
 
     const copied = await syncCopyPhase(
-      local, cloud, meta, entityName, diff,
+      local, cloud, tenant, entityName, diff,
     );
 
     expect(copied).toHaveLength(2);
     expect(copied).toContain('2026-01');
     expect(copied).toContain('2026-02');
 
-    expect(await cloud.read(meta, 'task.2026-01')).toEqual(localBlob);
-    expect(await local.read(undefined, 'task.2026-02')).toEqual(cloudBlob);
+    expect(await cloud.read(tenant, 'task.2026-01')).toEqual(localBlob);
+    expect(await local.read(tenant, 'task.2026-02')).toEqual(cloudBlob);
   });
 
   it('returns empty array when no partitions to copy', async () => {
@@ -103,7 +103,7 @@ describe('syncCopyPhase', () => {
     };
 
     const copied = await syncCopyPhase(
-      local, cloud, meta, entityName, diff,
+      local, cloud, tenant, entityName, diff,
     );
 
     expect(copied).toHaveLength(0);

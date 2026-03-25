@@ -5,7 +5,7 @@ import {
   createMemoryBlobAdapter,
   partitioned,
 } from '@strata/index';
-import type { Strata, BlobAdapter, BlobTransform } from '@strata/index';
+import type { Strata, BlobAdapter } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Item = { name: string; category: string };
@@ -31,35 +31,19 @@ describe('Persistence advanced integration', () => {
     return s;
   }
 
-  it('transform pipeline end-to-end — XOR transform applied on flush and reversed on reload', async () => {
-    const xorTransform: BlobTransform = {
-      async encode(data) {
-        const result = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) {
-          result[i] = data[i] ^ 0x42;
-        }
-        return result;
-      },
-      async decode(data) {
-        const result = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) {
-          result[i] = data[i] ^ 0x42;
-        }
-        return result;
-      },
-    };
-
+  it('transform pipeline end-to-end — custom adapter wrapping applied on flush and reversed on reload', async () => {
     const rawAdapter = createMemoryBlobAdapter();
 
+    // Create a wrapping adapter that adds an envelope around stored data
     const transformedAdapter: BlobAdapter = {
       async read(cm, key) {
         const data = await rawAdapter.read(cm, key);
         if (!data) return null;
-        return xorTransform.decode(data);
+        const envelope = data as { __wrapped: unknown };
+        return envelope.__wrapped;
       },
       async write(cm, key, data) {
-        const encoded = await xorTransform.encode(data);
-        await rawAdapter.write(cm, key, encoded);
+        await rawAdapter.write(cm, key, { __wrapped: data });
       },
       async delete(cm, key) { return rawAdapter.delete(cm, key); },
       async list(cm, prefix) { return rawAdapter.list(cm, prefix); },
@@ -78,11 +62,10 @@ describe('Persistence advanced integration', () => {
     const id = repo1.save({ name: 'Secret', category: 'classified' });
     await strata1.dispose();
 
-    // Read raw blob bypassing transform — should be XOR'd (not valid JSON)
-    const rawBlob = await rawAdapter.read(undefined, 'item._');
+    // Read raw blob — should be wrapped in envelope
+    const rawBlob = await rawAdapter.read(tenant, 'item._') as Record<string, unknown>;
     expect(rawBlob).not.toBeNull();
-    const rawText = new TextDecoder().decode(rawBlob!);
-    expect(rawText.includes('Secret')).toBe(false);
+    expect(rawBlob).toHaveProperty('__wrapped');
 
     // Phase 2: Reload through transformed adapter → data should be readable
     const strata2 = track(createStrata({
@@ -117,7 +100,7 @@ describe('Persistence advanced integration', () => {
 
     await strata.dispose();
 
-    const keys = await localAdapter.list(undefined, 'transaction.');
+    const keys = await localAdapter.list(tenant, 'transaction.');
     expect(keys.sort()).toEqual(['transaction.checking', 'transaction.savings']);
   });
 });

@@ -1,4 +1,59 @@
-<!-- Active: sprint-partition-index-unified-sync -->
+<!-- Active: sprint-unified-sync-refactor -->
+
+## Sprint — Unified Sync Refactor
+Started: 2026-03-24T21:00:00Z
+
+Epics: unified-sync-refactor
+
+Major refactor: BlobAdapter switches from Uint8Array to typed JS objects, `meta: Meta` becomes `tenant: Tenant`, EntityStore becomes a BlobAdapter peer, all data movement uses `syncBetween`, serialize/deserialize removed from framework internals, FlushScheduler and hydrateFromLocal eliminated.
+
+### Phase 1 — Types & Interfaces
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 1 | Define `PartitionBlob` type (`{ [entityName]: Record<string, unknown>, deleted: { [entityName]: Record<string, Hlc> } }`) and `TenantListBlob` type (typed wrapper for `Tenant[]`) in `src/persistence/types.ts` | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:10:00Z |
+| 2 | Refactor `BlobAdapter` interface in `src/adapter/types.ts`: change `read`/`write` from `Uint8Array` to JS objects (typed as `unknown`), change all method signatures from `meta: Meta` to `tenant: Tenant \| undefined`, remove `Meta` type export | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:10:00Z |
+| 3 | Update `EntityStore` type in `src/store/types.ts`: rename `get`→`getEntity`, `set`→`setEntity`, `delete`→`deleteEntity`; add BlobAdapter-compatible methods (`read`, `write`, `delete`, `list`) to the type; remove `FlushScheduler` and `FlushSchedulerOptions` types | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:10:00Z |
+
+### Phase 2 — Adapter & Store Implementations
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 4 | Update `MemoryBlobAdapter` in `src/adapter/memory.ts`: store JS objects instead of `Uint8Array` (use structured clone for defensive copy), accept `Tenant \| undefined` instead of `Meta` in all methods | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:15:00Z |
+| 5 | Rename all `EntityStore` call sites: `store.get`→`store.getEntity`, `store.set`→`store.setEntity`, `store.delete`→`store.deleteEntity` across `src/store/store.ts`, `src/repo/`, `src/sync/`, and `src/strata.ts` | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:15:00Z |
+| 6 | Implement BlobAdapter methods on `Store` class in `src/store/store.ts`: `read(tenant, key)` returns partition data as `PartitionBlob`, `write(tenant, key, data)` loads partition data from blob into Maps, `delete(tenant, key)` clears a partition, `list(tenant, prefix)` returns matching entity keys | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:15:00Z |
+
+### Phase 3 — Remove serialize/deserialize from Internals
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 7 | Remove `serialize`/`deserialize` calls from `src/store/flush.ts` (`flushPartition`, `loadPartitionFromAdapter`) — adapters now receive/return JS objects directly | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:20:00Z |
+| 8 | Remove `serialize`/`deserialize` calls from sync internals: `src/sync/sync-phase.ts`, `src/sync/copy.ts`, `src/sync/merge.ts` — partition blobs are now JS objects, no encoding/decoding needed | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:20:00Z |
+| 9 | Remove `serialize`/`deserialize` calls from tenant internals: `src/tenant/tenant-list.ts` (`loadTenantList`, `saveTenantList`), `src/tenant/marker-blob.ts` (`writeMarkerBlob`, `readMarkerBlob`) — adapters now store/return typed objects | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:20:00Z |
+
+### Phase 4 — Sync & Data Flow Refactor
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 10 | Update `syncBetween` in `src/sync/unified.ts` to accept `Tenant \| undefined` instead of `Meta`, operate on JS objects, and support `EntityStore`-as-BlobAdapter as either sync peer | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:25:00Z |
+| 11 | Delete `flushAll`, `flushPartition` from `src/store/flush.ts`, delete `FlushScheduler` class from `src/store/flush-scheduler.ts`, delete `hydrateFromLocal` from `src/sync/hydrate.ts` — all data movement now uses `syncBetween` | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:25:00Z |
+| 12 | Update `SyncScheduler` in `src/sync/sync-scheduler.ts`: replace `flushAll` memory→local hop with `syncBetween(store, localAdapter, ...)`, accept `Tenant \| undefined` instead of `Meta`; update `syncNow` similarly | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:25:00Z |
+
+### Phase 5 — Entry Point & Tenant Updates
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 13 | Update `Strata` class in `src/strata.ts`: remove `FlushScheduler` dependency and `flushScheduler` field, replace `hydrateFromLocal` fallback with `syncBetween(localAdapter, store, ...)`, pass `Tenant` objects instead of `tenant.meta` throughout | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:30:00Z |
+| 14 | Update tenant system to accept `Tenant \| undefined` instead of `Meta`: `loadTenantList`, `saveTenantList`, `writeMarkerBlob`, `readMarkerBlob`, `saveTenantPrefs`, `loadTenantPrefs`, `pushTenantList`, `pullTenantList`, and `TenantManager` internals | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:30:00Z |
+| 15 | Update barrel exports: `src/store/index.ts` (remove `flushAll`, `flushPartition`, `FlushScheduler`, `createFlushScheduler`, `FlushSchedulerOptions`), `src/sync/index.ts` (remove `hydrateFromLocal`), `src/adapter/index.ts` (remove `Meta` export) | unified-sync-refactor | developer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:30:00Z |
+
+### Phase 6 — Review & Tests
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|-----------|
+| 16 | Review all changes for type safety, design alignment, and completeness across adapter, store, sync, tenant, and strata modules | unified-sync-refactor | reviewer | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:55:00Z |
+| 17 | Update unit tests: `BlobAdapter`/`MemoryBlobAdapter` tests for JS objects and Tenant param, `EntityStore` tests for renamed methods and new BlobAdapter methods, sync tests for `syncBetween` with store-as-adapter, tenant tests for Tenant param | unified-sync-refactor | unit-tester | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:55:00Z |
+| 18 | Update integration tests: end-to-end flows with new BlobAdapter interface, `syncBetween` for memory↔local↔cloud, tenant lifecycle with Tenant objects, verify `FlushScheduler` and `hydrateFromLocal` removal has no regressions | unified-sync-refactor | integration-tester | done | plan | 2026-03-24T21:00:00Z | 2026-03-24T21:55:00Z |
 
 ## Sprint — Consolidate partition indexes into single `__index` blob
 Started: 2026-03-24T12:00:00Z

@@ -44,24 +44,13 @@ describe('Lifecycle advanced integration', () => {
     })).toThrow('Duplicate entity name: task');
   });
 
-  it('flush debounce coalescing — rapid saves trigger single flush', async () => {
-    let writeCount = 0;
+  it('data persists to local adapter on dispose', async () => {
     const innerAdapter = createMemoryBlobAdapter();
-    const countingAdapter: BlobAdapter = {
-      async read(cm, key) { return innerAdapter.read(cm, key); },
-      async write(cm, key, data) {
-        writeCount++;
-        return innerAdapter.write(cm, key, data);
-      },
-      async delete(cm, key) { return innerAdapter.delete(cm, key); },
-      async list(cm, prefix) { return innerAdapter.list(cm, prefix); },
-    };
 
     const strata = track(createStrata({
       entities: [TaskDef],
-      localAdapter: countingAdapter,
+      localAdapter: innerAdapter,
       deviceId: 'dev-1',
-      options: { flushDebounceMs: 50 },
     }));
 
     const tenant = await strata.tenants.create({
@@ -70,21 +59,16 @@ describe('Lifecycle advanced integration', () => {
     });
     await strata.tenants.load(tenant.id);
 
-    // Reset counter after tenant setup writes (marker blob + tenant list)
-    writeCount = 0;
-
     const repo = strata.repo(TaskDef) as Repository<Task>;
-
-    // Save 5 entities rapidly
     for (let i = 0; i < 5; i++) {
       repo.save({ title: `Task ${i}`, done: false });
     }
 
-    // Wait for debounce to fire (50ms debounce + margin)
-    await new Promise(r => setTimeout(r, 150));
+    await strata.dispose();
 
-    // Should have flushed once: partition blob + partition index = 2 writes
-    expect(writeCount).toBe(2);
+    // After dispose, data should be flushed to local adapter
+    const keys = await innerAdapter.list(tenant, 'task.');
+    expect(keys.length).toBeGreaterThan(0);
   });
 
   it('tenant load triggers hydrate from cloud automatically', async () => {

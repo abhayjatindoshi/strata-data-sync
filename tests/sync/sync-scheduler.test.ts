@@ -6,7 +6,7 @@ import { createStore } from '@strata/store';
 import { createSyncLock, createSyncScheduler, syncNow } from '@strata/sync';
 
 function makePartitionBlob(entityName: string, entities: Record<string, unknown>, tombstones: Record<string, unknown> = {}): Uint8Array {
-  return serialize({
+  return ({
     [entityName]: entities,
     deleted: { [entityName]: tombstones },
   });
@@ -131,7 +131,7 @@ describe('createSyncScheduler — timer callbacks', () => {
     const cloudAdapter = createMemoryBlobAdapter();
     const store = createStore();
 
-    store.set('bad._', 'bad._.1', {});
+    store.setEntity('bad._', 'bad._.1', {});
     localAdapter.write = async () => { throw new Error('write failed'); };
 
     const scheduler = createSyncScheduler(
@@ -173,7 +173,7 @@ describe('syncNow', () => {
     const cloudAdapter = createMemoryBlobAdapter();
     const store = createStore();
 
-    store.set('task._', 'task._.a1', {
+    store.setEntity('task._', 'task._.a1', {
       id: 'task._.a1', name: 'T1',
       hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' },
     });
@@ -203,7 +203,7 @@ describe('syncNow', () => {
 
     await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
 
-    expect(store.get('task._', 'task._.c1')).toBeDefined();
+    expect(store.getEntity('task._', 'task._.c1')).toBeDefined();
   });
 
   it('processes diverged partitions during cloud sync', async () => {

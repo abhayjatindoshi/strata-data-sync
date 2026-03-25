@@ -5,14 +5,15 @@ import type { Hlc } from '@strata/hlc';
 import type { BlobAdapter } from '@strata/adapter';
 import type { EntityDefinition } from '@strata/schema';
 import { createEventBus } from '@strata/reactive';
-import { createStore, createFlushScheduler } from '@strata/store';
+import { createStore } from '@strata/store';
 import { createRepository, createSingletonRepository } from '@strata/repo';
 import type { RepositoryType, SingletonRepositoryType } from '@strata/repo';
 import { createTenantManager } from '@strata/tenant';
 import type { TenantManagerType } from '@strata/tenant';
 import {
   createSyncLock, createSyncEventEmitter, createDirtyTracker,
-  createSyncScheduler, syncNow, hydrateFromCloud, hydrateFromLocal,
+  createSyncScheduler, syncNow, hydrateFromCloud,
+  syncBetween,
 } from '@strata/sync';
 import type {
   SyncResult, SyncEventListener, SyncSchedulerType,
@@ -68,7 +69,6 @@ export class Strata {
   private readonly hlcRef: { current: Hlc };
   private readonly eventBus: ReturnType<typeof createEventBus>;
   private readonly store: ReturnType<typeof createStore>;
-  private readonly flushScheduler: ReturnType<typeof createFlushScheduler>;
   private readonly syncLock: ReturnType<typeof createSyncLock>;
   private readonly syncEvents: ReturnType<typeof createSyncEventEmitter>;
   private readonly dirtyTracker: ReturnType<typeof createDirtyTracker>;
@@ -90,10 +90,6 @@ export class Strata {
     this.hlcRef = { current: createHlc(config.deviceId) };
     this.eventBus = createEventBus();
     this.store = createStore();
-    this.flushScheduler = createFlushScheduler(
-      config.localAdapter, undefined, this.store,
-      { debounceMs: config.options?.flushDebounceMs },
-    );
     this.syncLock = createSyncLock();
     this.syncEvents = createSyncEventEmitter();
     this.dirtyTracker = createDirtyTracker();
@@ -114,7 +110,6 @@ export class Strata {
 
     const dirtyFlushListener = () => {
       this.dirtyTracker.markDirty();
-      this.flushScheduler.schedule();
     };
     this.dirtyFlushListener = dirtyFlushListener;
     this.eventBus.on(dirtyFlushListener);
@@ -143,26 +138,25 @@ export class Strata {
         }
 
         self.store.clear();
-        self.flushScheduler.setMeta(tenant.meta);
 
         if (self.config.cloudAdapter) {
           try {
             await hydrateFromCloud(
               self.config.cloudAdapter, self.config.localAdapter,
-              self.store, self.entityNames, tenant.meta,
+              self.store, self.entityNames, tenant,
             );
           } catch {
             self.syncEvents.emit({ type: 'cloud-unreachable' });
-            await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames, tenant.meta);
+            await syncBetween(self.config.localAdapter, self.store, self.store, self.entityNames, tenant);
           }
         } else {
-          await hydrateFromLocal(self.config.localAdapter, self.store, self.entityNames, tenant.meta);
+          await syncBetween(self.config.localAdapter, self.store, self.store, self.entityNames, tenant);
         }
 
         if (self.config.cloudAdapter) {
           self.syncScheduler = createSyncScheduler(
             self.syncLock, self.config.localAdapter, self.config.cloudAdapter,
-            self.store, self.entityNames, tenant.meta, {
+            self.store, self.entityNames, tenant, {
               localFlushIntervalMs: self.config.options?.localFlushIntervalMs,
               cloudSyncIntervalMs: self.config.options?.cloudSyncIntervalMs,
             },
@@ -196,7 +190,7 @@ export class Strata {
     try {
       await syncNow(
         this.syncLock, this.config.localAdapter, this.config.cloudAdapter,
-        this.store, this.entityNames, tenant.meta,
+        this.store, this.entityNames, tenant,
       );
       this.dirtyTracker.clearDirty();
       const result: SyncResult = {
@@ -223,7 +217,10 @@ export class Strata {
     this.disposePromise = (async () => {
       this.syncScheduler?.stop();
       await this.syncLock.drain();
-      await this.flushScheduler.flush();
+      const tenant = this.baseTenants.activeTenant$.getValue();
+      if (tenant) {
+        await syncBetween(this.store, this.config.localAdapter, this.store, this.entityNames, tenant);
+      }
       for (const r of this.repoMap.values()) r.dispose();
       this.eventBus.off(this.dirtyFlushListener);
       this.syncLock.dispose();

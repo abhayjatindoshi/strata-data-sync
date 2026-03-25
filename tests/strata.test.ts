@@ -512,7 +512,7 @@ describe('createStrata', () => {
       await strata.dispose();
 
       // After dispose, the data should be flushed to local adapter
-      const keys = await localAdapter.list(undefined, 'task.');
+      const keys = await localAdapter.list(tenant, 'task.');
       expect(keys.length).toBeGreaterThan(0);
     });
 

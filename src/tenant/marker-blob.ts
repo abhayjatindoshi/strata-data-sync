@@ -1,8 +1,7 @@
 import debug from 'debug';
-import type { BlobAdapter, Meta } from '@strata/adapter';
+import type { BlobAdapter, Tenant } from '@strata/adapter';
 import { STRATA_MARKER_KEY } from '@strata/adapter';
 import type { AllIndexes } from '@strata/persistence';
-import { serialize, deserialize } from '@strata/persistence';
 
 const log = debug('strata:tenant');
 
@@ -15,7 +14,7 @@ export type MarkerBlob = {
 
 export async function writeMarkerBlob(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
   entityTypes: readonly string[],
 ): Promise<void> {
   const marker: MarkerBlob = {
@@ -24,18 +23,17 @@ export async function writeMarkerBlob(
     entityTypes,
     indexes: {},
   };
-  const data = serialize(marker);
-  await adapter.write(meta, STRATA_MARKER_KEY, data);
+  await adapter.write(tenant, STRATA_MARKER_KEY, marker);
   log('wrote marker blob');
 }
 
 export async function readMarkerBlob(
   adapter: BlobAdapter,
-  meta: Meta,
+  tenant: Tenant | undefined,
 ): Promise<MarkerBlob | undefined> {
-  const data = await adapter.read(meta, STRATA_MARKER_KEY);
+  const data = await adapter.read(tenant, STRATA_MARKER_KEY);
   if (!data) return undefined;
-  return deserialize<MarkerBlob>(data);
+  return data as MarkerBlob;
 }
 
 export function validateMarkerBlob(blob: MarkerBlob): boolean {
