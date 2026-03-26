@@ -57,7 +57,7 @@ describe('Lifecycle advanced integration', () => {
       name: 'Test',
       meta: { b: 1 },
     });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     for (let i = 0; i < 5; i++) {
@@ -86,7 +86,7 @@ describe('Lifecycle advanced integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.tenants.load(tenant.id);
+    await strataA.loadTenant(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false });
@@ -105,7 +105,7 @@ describe('Lifecycle advanced integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.tenants.load(tenant.id);
+    await strataB.loadTenant(tenant.id);
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     const entity = repoB.get(id);

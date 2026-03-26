@@ -36,6 +36,7 @@ describe('Persistence advanced integration', () => {
 
     // Create a wrapping adapter that adds an envelope around stored data
     const transformedAdapter: BlobAdapter = {
+      kind: 'blob',
       async read(cm, key) {
         const data = await rawAdapter.read(cm, key);
         if (!data) return null;
@@ -56,7 +57,7 @@ describe('Persistence advanced integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata1.tenants.load(tenant.id);
+    await strata1.loadTenant(tenant.id);
 
     const repo1 = strata1.repo(ItemDef) as Repository<Item>;
     const id = repo1.save({ name: 'Secret', category: 'classified' });
@@ -73,7 +74,7 @@ describe('Persistence advanced integration', () => {
       localAdapter: transformedAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.tenants.load(tenant.id);
+    await strata2.loadTenant(tenant.id);
 
     const repo2 = strata2.repo(ItemDef) as Repository<Item>;
     const loaded = repo2.get(id);
@@ -91,7 +92,7 @@ describe('Persistence advanced integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const repo = strata.repo(TransactionDef) as Repository<Transaction>;
     repo.save({ amount: 100, date: new Date(), accountId: 'checking' });

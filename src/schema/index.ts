@@ -2,3 +2,4 @@ export type { BaseEntity, KeyStrategy, EntityDefinition, EntityDefinitionOptions
 export { generateId, formatEntityId } from './id';
 export { partitioned } from './key-strategy';
 export { defineEntity } from './define-entity';
+export { migrateEntity } from './migration';

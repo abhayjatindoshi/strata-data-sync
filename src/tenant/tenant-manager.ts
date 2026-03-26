@@ -1,4 +1,5 @@
 import debug from 'debug';
+import { BehaviorSubject } from 'rxjs';
 import type { BlobAdapter } from '@strata/adapter';
 import type {
   Tenant,
@@ -6,7 +7,6 @@ import type {
   SetupTenantOptions,
   TenantManagerOptions,
   TenantManager as TenantManagerType,
-  Subscribable,
 } from './types';
 import { loadTenantList, saveTenantList } from './tenant-list';
 import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-blob';
@@ -25,45 +25,17 @@ function generateTenantId(): string {
   return id;
 }
 
-function createBehaviorSubject<T>(
-  initial: T,
-): Subscribable<T> & { next(value: T): void } {
-  let current = initial;
-  const callbacks: Array<(value: T) => void> = [];
-
-  return {
-    getValue() {
-      return current;
-    },
-    next(value: T) {
-      current = value;
-      for (const cb of [...callbacks]) {
-        cb(value);
-      }
-    },
-    subscribe(callback: (value: T) => void) {
-      callbacks.push(callback);
-      return {
-        unsubscribe() {
-          const idx = callbacks.indexOf(callback);
-          if (idx !== -1) callbacks.splice(idx, 1);
-        },
-      };
-    },
-  };
-}
-
 export class TenantManager {
-  private readonly subject: Subscribable<Tenant | undefined> & { next(value: Tenant | undefined): void };
+  private readonly subject: BehaviorSubject<Tenant | undefined>;
   private cachedList: Tenant[] | null = null;
 
-  readonly activeTenant$: Subscribable<Tenant | undefined>;
+  readonly activeTenant$: BehaviorSubject<Tenant | undefined>;
 
   constructor(
     private readonly adapter: BlobAdapter,
     private readonly options?: TenantManagerOptions,
   ) {
-    this.subject = createBehaviorSubject<Tenant | undefined>(undefined);
+    this.subject = new BehaviorSubject<Tenant | undefined>(undefined);
     this.activeTenant$ = this.subject;
   }
 

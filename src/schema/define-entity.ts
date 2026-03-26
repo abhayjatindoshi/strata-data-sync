@@ -3,6 +3,14 @@ import { globalStrategy, singletonStrategy } from './key-strategy';
 
 export function defineEntity<T>(
   name: string,
+  options: EntityDefinitionOptions<T> & { readonly keyStrategy: 'singleton' },
+): EntityDefinition<T, 'singleton'>;
+export function defineEntity<T>(
+  name: string,
+  options?: EntityDefinitionOptions<T>,
+): EntityDefinition<T, 'global' | 'partitioned'>;
+export function defineEntity<T>(
+  name: string,
   options?: EntityDefinitionOptions<T>,
 ): EntityDefinition<T> {
   const keyStrategyOption = options?.keyStrategy ?? 'global';
@@ -17,8 +25,10 @@ export function defineEntity<T>(
   }
 
   const deriveId = options?.deriveId ? wrapDeriveId(options.deriveId) : undefined;
+  const version = options?.version ?? 1;
+  const migrations = options?.migrations;
 
-  return { name, keyStrategy, deriveId };
+  return { name, keyStrategy, deriveId, version, migrations };
 }
 
 function wrapDeriveId<T>(fn: (entity: T) => string): (entity: T) => string {

@@ -1,4 +1,135 @@
-<!-- Active: sprint-shared-types-typed-adapter -->
+<!-- Active: sprint-test-cleanup-docs -->
+
+## Sprint — Test Cleanup & Documentation Gaps
+Started: 2026-03-27T09:00:00Z
+
+Epics: E36 (Test Cleanup), E35 (Documentation Gaps)
+
+### Phase 1 — Test Cleanup (E36)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 1 | Remove `flushPartition` and `flushAll` test blocks from `tests/store/flush.test.ts`, fix imports | E36 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:10:00Z |
+| 2 | Remove `flushPartition` tests from `tests/store/flush-tombstone.test.ts`, fix imports | E36 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:10:00Z |
+| 3 | Rewrite `tests/integration/migration.test.ts` to use `adapter.write()` instead of `flushPartition` | E36 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:10:00Z |
+| 4 | Remove `applyMergedToStore` describe block from `tests/sync/sync-integration.test.ts`, fix imports | E36 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:10:00Z |
+
+### Phase 2 — Documentation Gaps (E35)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 5 | DM-17: Update `docs/tenant.md` tenant list merge to say `updatedAt` comparison | E35 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:15:00Z |
+| 6 | MD-5,6,7: Add encryption method docs to `docs/lifecycle.md` | E35 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:15:00Z |
+| 7 | MD-13: Add `__tenant_prefs` section to `docs/tenant.md` | E35 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:15:00Z |
+| 8 | MD-16: Document `createStrataAsync` in `docs/lifecycle.md` | E35 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:15:00Z |
+| 9 | Strike through DM-17, MD-5, MD-6, MD-7, MD-13, MD-16 in `docs/doc-vs-implementation.md` | E35 | developer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:15:00Z |
+
+### Phase 3 — Review & Verification
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 10 | Review all test cleanup changes | E36 | reviewer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:18:00Z |
+| 11 | Review all documentation changes | E35 | reviewer | done | plan | 2026-03-27T09:00:00Z | 2026-03-27T09:18:00Z |
+
+### Phase 4 — Unit Tests
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 12 | Build and run all tests to verify cleanup | E36 | unit-tester | done | test | 2026-03-27T09:00:00Z | 2026-03-27T09:20:00Z |
+
+---
+
+<!-- Previous: sprint-encryption-migration -->
+
+## Sprint — Encryption & Migration
+Started: 2026-03-26T10:00:00Z
+
+Epics: E28 (StorageAdapter & AdapterBridge), E29 (Encryption primitives), E30 (Encryption integration), E31 (Schema migration)
+
+Dependency order: E28 → E29 → E30, E29 → E31. Phase 1 (E28) must complete before Phase 2 (E29). Phase 2 must complete before Phase 3 (E30) and Phase 4 (E31). Phase 3 and Phase 4 are independent of each other.
+
+### Phase 1 — StorageAdapter Interface & AdapterBridge (E28)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 1 | Define `StorageAdapter` interface in `src/adapter/types.ts` — `read(tenant, key): Promise<Uint8Array \| null>`, `write(tenant, key, data: Uint8Array): Promise<void>`, `delete(tenant, key): Promise<void>`, `list(tenant, prefix): Promise<string[]>` with `tenant: Tenant \| undefined` param | E28 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:15:00Z |
+| 2 | Add `appId: string` required field to `StrataConfig` — used to namespace blob keys in `AdapterBridge` and in KEK derivation for encryption | E28 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:15:00Z |
+| 3 | Implement core `AdapterBridge` class in `src/adapter/bridge.ts` — wraps `StorageAdapter` to implement `BlobAdapter` interface, JSON-serializes `PartitionBlob` to `Uint8Array` on write, deserializes on read | E28 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:15:00Z |
+| 4 | Add `appId`-based key namespacing in `AdapterBridge` — prefix all blob keys with `{appId}/` before delegating to underlying `StorageAdapter` | E28 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:15:00Z |
+| 5 | Wire optional `encrypt`/`decrypt` hooks in `AdapterBridge` — accept optional `(data: Uint8Array) => Promise<Uint8Array>` callbacks, apply encrypt after serialize on write and decrypt before deserialize on read | E28 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:15:00Z |
+| 6 | Implement `MemoryStorageAdapter` in `src/adapter/memory-storage.ts` — in-memory `Map<string, Uint8Array>` implementation of `StorageAdapter` for testing | E28 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:15:00Z |
+| 7 | Update barrel exports in `src/adapter/index.ts` — export `StorageAdapter`, `AdapterBridge`, `MemoryStorageAdapter` | E28 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:15:00Z |
+
+### Phase 2 — Encryption Primitives (E29)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 8 | Define encryption types in `src/adapter/crypto/types.ts` — `EncryptionHeader` (version byte + IV), `WrappedDEK` (encrypted DEK + salt), `EncryptionConfig` (password field) | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+| 9 | Implement PBKDF2 KEK derivation in `src/adapter/crypto/kek.ts` — `deriveKEK(password, salt, appId)` using Web Crypto API with PBKDF2, 600k iterations, SHA-256, produces AES-256 `CryptoKey` | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+| 10 | Implement DEK generation in `src/adapter/crypto/dek.ts` — `generateDEK()` returns random AES-256-GCM `CryptoKey` via `crypto.subtle.generateKey` | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+| 11 | Implement DEK wrap/unwrap in `src/adapter/crypto/dek.ts` — `wrapDEK(dek, kek)` exports and encrypts DEK with AES-KW, `unwrapDEK(wrapped, kek)` reverses; throw `InvalidEncryptionKeyError` on unwrap failure | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+| 12 | Implement AES-256-GCM encrypt in `src/adapter/crypto/cipher.ts` — `encrypt(data, dek)` generates random 12-byte IV, encrypts via `crypto.subtle.encrypt`, prepends header (version byte + IV) to ciphertext | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+| 13 | Implement AES-256-GCM decrypt in `src/adapter/crypto/cipher.ts` — `decrypt(data, dek)` parses header to extract version and IV, decrypts ciphertext via `crypto.subtle.decrypt` | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+| 14 | Define `InvalidEncryptionKeyError` in `src/adapter/crypto/errors.ts` — custom error class thrown when DEK unwrap fails due to wrong password | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+| 15 | Create barrel exports — `src/adapter/crypto/index.ts` re-exports all crypto primitives and types, update `src/adapter/index.ts` to re-export `@strata/adapter/crypto` | E29 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:18:00Z |
+
+### Phase 3 — Encryption Integration in createStrata (E30)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 16 | Define `EncryptionOptions` type and add optional `encryption: { password: string }` field to `StrataConfig` | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 17 | Implement salt generation and storage — generate random 16-byte salt on first encrypted init, store as raw `Uint8Array` in `__strata_salt` blob via `StorageAdapter`, load on subsequent inits | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 18 | Implement DEK bootstrap on first encrypted init — generate DEK, derive KEK from password+salt+appId, wrap DEK, store wrapped DEK in `__strata_dek` blob via `StorageAdapter` | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 19 | Implement DEK load on subsequent encrypted init — load salt and wrapped DEK blobs from `StorageAdapter`, derive KEK from password+salt+appId, unwrap DEK; throw `InvalidEncryptionKeyError` if unwrap fails | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 20 | Create `encrypt`/`decrypt` callback factory — function that closes over initialized DEK and returns `(data: Uint8Array) => Promise<Uint8Array>` pair suitable as `AdapterBridge` crypto hooks | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 21 | Wire encryption into `createStrata()` — when `encryption` config present: run DEK bootstrap/load, create crypto callbacks, construct `AdapterBridge` with crypto hooks wrapping user-provided `StorageAdapter` | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 22 | Implement `changePassword(oldPassword, newPassword)` on Strata instance — derive old KEK, unwrap DEK, derive new KEK with same salt, re-wrap DEK, overwrite `__strata_dek` blob | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 23 | Implement `enableEncryption(password)` on Strata instance — generate DEK+salt, derive KEK, wrap DEK, store salt+DEK blobs, re-encrypt all existing data blobs via `StorageAdapter` list+read+encrypt+write | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+| 24 | Implement `disableEncryption(password)` on Strata instance — derive KEK, unwrap DEK, decrypt all existing data blobs, remove `__strata_salt` and `__strata_dek` blobs | E30 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:22:00Z |
+
+### Phase 4 — Schema Migration (E31)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 25 | Add `version` and `migrations` fields to `EntityDefinitionOptions` in `src/schema/types.ts` — `version?: number` (default 1), `migrations?: Record<number, (entity: unknown) => unknown>` keyed by target version | E31 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:25:00Z |
+| 26 | Store entity schema version in serialized partition data — add `__v: number` metadata field to each entity record on write, strip on read after migration | E31 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:25:00Z |
+| 27 | Implement on-load version check — during entity deserialization, compare stored `__v` against current `EntityDefinition.version`, flag entities needing migration | E31 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:25:00Z |
+| 28 | Implement migration runner — apply migration functions sequentially from stored version to current version (e.g., v1→v2→v3), update `__v` after each step | E31 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:25:00Z |
+| 29 | Wire migration into `AdapterBridge` deserialize pipeline — after deserialize (and decrypt if applicable), run migration check and apply migrations on each entity before returning data to store | E31 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:25:00Z |
+| 30 | Update `__strata` marker blob to track schema versions — store current version per entity type, detect version changes on startup to trigger re-processing of affected partitions | E31 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:25:00Z |
+| 31 | Update barrel exports for schema migration — export `migrations` option type and version-related types from `src/schema/index.ts` | E31 | developer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:25:00Z |
+
+### Phase 5 — Review & Verification
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 32 | Review Phase 1 — `StorageAdapter` interface, `AdapterBridge` serialize/deserialize/key-namespacing, `MemoryStorageAdapter`, type safety and design doc alignment | E28 | reviewer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:30:00Z |
+| 33 | Review Phase 2 — Encryption primitives for Web Crypto correctness, secure key handling, IV uniqueness, proper error propagation | E29 | reviewer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:30:00Z |
+| 34 | Review Phase 3 — DEK bootstrap/load lifecycle, password change flow, enable/disable encryption, `createStrata()` wiring, edge cases | E30 | reviewer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:30:00Z |
+| 35 | Review Phase 4 — Schema migration version tracking, migration runner correctness, pipeline integration, backward compatibility | E31 | reviewer | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:30:00Z |
+
+### Phase 6 — Unit Tests
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 36 | Unit tests for `StorageAdapter`/`MemoryStorageAdapter` — read/write/delete/list round-trips, null on missing key, prefix filtering | E28 | unit-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:29:00Z |
+| 37 | Unit tests for `AdapterBridge` — serialize/deserialize round-trip, key namespacing with appId, encrypt/decrypt hook integration, passthrough without hooks | E28 | unit-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:29:00Z |
+| 38 | Unit tests for encryption primitives — KEK derivation determinism, DEK generation randomness, wrap/unwrap round-trip, encrypt/decrypt round-trip, wrong-password throws `InvalidEncryptionKeyError`, header format validation | E29 | unit-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:29:00Z |
+| 39 | Unit tests for encryption lifecycle — DEK bootstrap on first init, DEK load on subsequent init, password change re-wraps DEK, enable/disable encryption transforms all blobs | E30 | unit-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:29:00Z |
+| 40 | Unit tests for schema migration — version stored on write, migration runner applies sequential transforms, missing migration throws, no-op when version matches | E31 | unit-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:29:00Z |
+
+### Phase 7 — Integration Tests
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 41 | Integration test — `AdapterBridge` end-to-end: `MemoryStorageAdapter` → `AdapterBridge` → `BlobAdapter` interface, write `PartitionBlob`, read back, verify round-trip | E28 | integration-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:35:00Z |
+| 42 | Integration test — encrypted `createStrata` lifecycle: init with password, save entities, dispose, re-init with same password reads data, re-init with wrong password throws | E30 | integration-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:35:00Z |
+| 43 | Integration test — password change: init encrypted, save data, change password, dispose, re-init with new password reads data, old password throws | E30 | integration-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:35:00Z |
+| 44 | Integration test — enable/disable encryption: init unencrypted, save data, enable encryption, verify data readable, disable encryption, verify data readable unencrypted | E30 | integration-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:35:00Z |
+| 45 | Integration test — schema migration on load: save entity at v1, update definition to v2 with migration, reload, verify entity migrated correctly with `__v` updated | E31 | integration-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:35:00Z |
+| 46 | Integration test — multi-version migration: save entity at v1, update definition to v3 with v1→v2 and v2→v3 migrations, reload, verify sequential migration applied | E31 | integration-tester | done | plan | 2026-03-26T10:00:00Z | 2026-03-26T18:35:00Z |
+
+---
 
 ## Sprint — Shared Types & Typed BlobAdapter
 Started: 2026-03-25T08:00:00Z

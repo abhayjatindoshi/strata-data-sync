@@ -2,15 +2,16 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  createStrata,
+  createStrataAsync,
   defineEntity,
   partitioned,
 } from 'strata-data-sync';
-import type { BlobAdapter, Tenant, PartitionBlob, Strata, Repository, SingletonRepository } from 'strata-data-sync';
+import type { StorageAdapter, Tenant, Strata, Repository, SingletonRepository } from 'strata-data-sync';
 
-// ─── File-system BlobAdapter ─────────────────────────────
+// ─── File-system StorageAdapter ──────────────────────────
 
-class FsBlobAdapter implements BlobAdapter {
+class FsStorageAdapter implements StorageAdapter {
+  readonly kind = 'storage' as const;
   constructor(private readonly rootDir: string) {}
 
   private resolvePath(tenant: Tenant | undefined, key: string): string {
@@ -21,19 +22,19 @@ class FsBlobAdapter implements BlobAdapter {
     return path.join(this.rootDir, key);
   }
 
-  async read(tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null> {
+  async read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null> {
     try {
-      const content = await fs.readFile(this.resolvePath(tenant, key), 'utf-8');
-      return JSON.parse(content) as PartitionBlob;
+      const buf = await fs.readFile(this.resolvePath(tenant, key));
+      return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
     } catch {
       return null;
     }
   }
 
-  async write(tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void> {
+  async write(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<void> {
     const filePath = this.resolvePath(tenant, key);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+    await fs.writeFile(filePath, data);
   }
 
   async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
@@ -82,12 +83,19 @@ const settingsDef = defineEntity<Settings>('settings', {
 class KeyStrategyDemo {
   private readonly strata: Strata;
 
-  constructor(adapter: BlobAdapter) {
-    this.strata = createStrata({
+  private constructor(strata: Strata) {
+    this.strata = strata;
+  }
+
+  static async create(storage: StorageAdapter, password: string): Promise<KeyStrategyDemo> {
+    const strata = await createStrataAsync({
+      appId: 'strata-example-fs',
       entities: [taskDef, noteDef, settingsDef],
-      localAdapter: adapter,
+      localAdapter: storage,
       deviceId: 'device-1',
+      encryption: { password },
     });
+    return new KeyStrategyDemo(strata);
   }
 
   async init(): Promise<void> {
@@ -95,7 +103,7 @@ class KeyStrategyDemo {
       name: 'Demo',
       meta: { container: 'demo-workspace' },
     });
-    await this.strata.tenants.load(tenant.id);
+    await this.strata.loadTenant(tenant.id);
   }
 
   demoGlobalStrategy(): void {
@@ -159,7 +167,7 @@ async function main(): Promise<void> {
   await fs.mkdir(rootDir, { recursive: true });
   console.log('Storage root:', rootDir);
 
-  const demo = new KeyStrategyDemo(new FsBlobAdapter(rootDir));
+  const demo = await KeyStrategyDemo.create(new FsStorageAdapter(rootDir), 's3cret-passw0rd!');
   await demo.init();
 
   demo.demoGlobalStrategy();

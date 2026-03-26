@@ -30,6 +30,7 @@ createStrata({
     const m = meta as GoogleDriveMeta;
     return m.folderId.substring(0, 8);  // short, deterministic
   },
+  // ... other config
 });
 ```
 
@@ -45,7 +46,7 @@ type TenantManager = {
   load(tenantId: string): Promise<void>;
   delink(tenantId: string): Promise<void>;
   delete(tenantId: string): Promise<void>;
-  activeTenant$: Observable<Tenant | undefined>;
+  activeTenant$: BehaviorSubject<Tenant | undefined>;
 };
 ```
 
@@ -63,7 +64,7 @@ type TenantManager = {
 - **Not an entity** — TenantManager owns storage directly via `BlobAdapter` I/O. No repo dependency (avoids circular dependency — repo requires a loaded tenant).
 - **Stored as** `__tenants` blob with `meta = undefined` (app space).
 - **Local primary** — write to local adapter instantly. Sync to cloud in background.
-- **Multi-device merge** — union-by-tenant-ID. Tenant list is append-mostly, no HLC needed. Duplicates resolved by matching tenant ID.
+- **Multi-device merge** — merge by tenant ID with `updatedAt` comparison — newer wins for conflicts. Tenant list is append-mostly. Duplicates resolved by matching tenant ID.
 
 ## Tenant Lifecycle
 
@@ -100,14 +101,49 @@ User A shares folder with User B
 
 ## Marker Blob
 
-`__strata` blob stored at each tenant's meta location. Contains:
+`__strata` blob stored at each tenant's meta location. Stored as a `PartitionBlob` with the marker data nested under `__system.marker`:
 
 ```json
 {
-  "version": 1,
-  "createdAt": "2026-03-22T10:30:00.000Z",
-  "entityTypes": ["transaction", "account"]
+  "__system": {
+    "marker": {
+      "version": 1,
+      "createdAt": "2026-03-22T10:30:00.000Z",
+      "entityTypes": ["transaction", "account"],
+      "indexes": {
+        "transaction": {
+          "2026-03": { "hash": 1928374, "count": 412, "deletedCount": 0, "updatedAt": 1711300000 }
+        }
+      }
+    }
+  },
+  "deleted": {}
 }
 ```
 
+The `indexes` field contains all partition indexes for all entity types, eliminating the need for separate index blobs.
+
 Used by `setup()` to detect whether a cloud location already has strata data.
+
+## Tenant Preferences Blob
+
+`__tenant_prefs` blob stored at each tenant's meta location. Contains shareable preferences used by `setup()` to import the tenant's display name and appearance from a shared location.
+
+```typescript
+type TenantPrefs = {
+  readonly name: string;
+  readonly icon?: string;
+  readonly color?: string;
+};
+```
+
+Stored as a `PartitionBlob` with the prefs nested under `__prefs.prefs`:
+
+```json
+{
+  "__prefs": { "prefs": { "name": "Project X", "icon": "📁", "color": "#3b82f6" } },
+  "deleted": {}
+}
+```
+
+When `setup()` opens a shared location, it reads `__tenant_prefs` to populate the tenant's name, icon, and color in the local tenant list.

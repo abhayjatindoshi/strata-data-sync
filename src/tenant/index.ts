@@ -3,7 +3,6 @@ export type {
   CreateTenantOptions,
   SetupTenantOptions,
   TenantManagerOptions,
-  Subscribable,
   TenantManager as TenantManagerType,
 } from './types';
 export type { TenantPrefs } from './tenant-prefs';

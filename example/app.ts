@@ -22,6 +22,7 @@ class MultiTenantDemo {
 
   constructor() {
     this.strata = createStrata({
+      appId: 'strata-example-memory',
       entities: [taskDef, noteDef],
       localAdapter: createMemoryBlobAdapter(),
       deviceId: 'device-1',
@@ -51,7 +52,7 @@ class MultiTenantDemo {
   }
 
   private async seedWorkTenant(tenantId: string): Promise<void> {
-    await this.strata.tenants.load(tenantId);
+    await this.strata.loadTenant(tenantId);
 
     const tasks = this.strata.repo(taskDef) as Repository<Task>;
     tasks.save({ title: 'Ship v2 release', done: false });
@@ -65,7 +66,7 @@ class MultiTenantDemo {
   }
 
   private async seedPersonalTenant(tenantId: string): Promise<void> {
-    await this.strata.tenants.load(tenantId);
+    await this.strata.loadTenant(tenantId);
     console.log('\n--- Switched to Personal tenant ---');
     console.log('Active tenant:', this.strata.tenants.activeTenant$.getValue()?.name);
 

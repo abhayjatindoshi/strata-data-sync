@@ -6,6 +6,7 @@ import { partitionHash } from '@strata/persistence';
 import type { EntityStore } from './types';
 
 export class Store implements EntityStore {
+  readonly kind = 'blob' as const;
   private readonly partitions = new Map<string, Map<string, unknown>>();
   private readonly tombstones = new Map<string, Map<string, Hlc>>();
   private readonly dirtyKeys = new Set<string>();

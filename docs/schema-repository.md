@@ -57,6 +57,7 @@ type Repository<T> = {
   deleteMany(ids: ReadonlyArray<string>): void;
   observe(id: string): Observable<T | undefined>;
   observeQuery(opts?: QueryOptions<T>): Observable<ReadonlyArray<T>>;
+  dispose(): void;
 };
 ```
 
@@ -68,6 +69,7 @@ type SingletonRepository<T> = {
   save(entity: T): void;
   delete(): boolean;
   observe(): Observable<T | undefined>;
+  dispose(): void;
 };
 ```
 
@@ -103,6 +105,26 @@ type QueryOptions<T> = {
 ```
 
 Framework applies: filter → sort → offset/limit. All sync, all in-memory.
+
+## Entity Migration
+
+Entity definitions support versioned migrations for evolving entity shapes over time:
+
+```typescript
+const TaskDef = defineEntity<Task>('task', {
+  version: 2,
+  migrations: {
+    2: (old: unknown) => {
+      const prev = old as { title: string };
+      return { ...prev, priority: 'normal' };  // add default priority
+    },
+  },
+});
+```
+
+- `version` defaults to `1` if not specified
+- `migrations` is a record keyed by target version number
+- `migrateEntity(entity, storedVersion, targetVersion, migrations)` steps through sequential migration functions
 
 ## In-Memory Store
 

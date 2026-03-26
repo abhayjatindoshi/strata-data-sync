@@ -1,1 +1,1 @@
-// FlushScheduler removed — all data movement now uses syncBetween
+// FlushScheduler removed — all data movement now uses syncBetween via SyncScheduler.

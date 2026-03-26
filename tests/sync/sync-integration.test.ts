@@ -1,18 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createMemoryBlobAdapter } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
-import {
-  saveAllIndexes,
-} from '@strata/persistence';
 import type { PartitionIndex } from '@strata/persistence';
 import type { Hlc } from '@strata/hlc';
-import { createStore } from '@strata/store';
-import { createEventBus } from '@strata/reactive';
 import {
   syncMergePhase,
   updateIndexesAfterSync,
-  applyMergedToStore,
-  loadAllIndexPairs,
 } from '@strata/sync';
 
 const tenant: Tenant = { id: 'test', name: 'T', meta: { container: 'test' }, createdAt: new Date(), updatedAt: new Date() };
@@ -172,83 +165,5 @@ describe('updateIndexesAfterSync', () => {
 
     expect(updatedLocal['2026-01'].hash).toBe(111);
     expect(updatedLocal['2026-02'].hash).not.toBe(222);
-  });
-});
-
-describe('applyMergedToStore', () => {
-  it('upserts entities and removes tombstoned entities from store', () => {
-    const store = createStore();
-    const eventBus = createEventBus();
-
-    store.setEntity('task.2026-01', 'task.2026-01.old', { id: 'task.2026-01.old' });
-
-    const mergedResults = [{
-      partitionKey: '2026-01',
-      entities: {
-        'task.2026-01.a': { id: 'task.2026-01.a', value: 'merged' },
-      },
-      tombstones: {
-        'task.2026-01.old': {
-          timestamp: 3000, counter: 0, nodeId: 'n2',
-        } as Hlc,
-      },
-    }];
-
-    applyMergedToStore(store, entityName, mergedResults, eventBus);
-
-    expect(store.getEntity('task.2026-01', 'task.2026-01.a')).toBeDefined();
-    expect(store.getEntity('task.2026-01', 'task.2026-01.old')).toBeUndefined();
-  });
-
-  it('emits entity event via event bus', () => {
-    const store = createStore();
-    const eventBus = createEventBus();
-    const listener = vi.fn();
-    eventBus.on(listener);
-
-    const mergedResults = [{
-      partitionKey: '2026-01',
-      entities: { 'task.2026-01.a': { id: 'task.2026-01.a' } },
-      tombstones: {},
-    }];
-
-    applyMergedToStore(store, entityName, mergedResults, eventBus);
-
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith({ entityName: 'task' });
-  });
-
-  it('does not emit when no merged results', () => {
-    const store = createStore();
-    const eventBus = createEventBus();
-    const listener = vi.fn();
-    eventBus.on(listener);
-
-    applyMergedToStore(store, entityName, [], eventBus);
-
-    expect(listener).not.toHaveBeenCalled();
-  });
-
-  it('applies multiple merged partition results', () => {
-    const store = createStore();
-    const eventBus = createEventBus();
-
-    const mergedResults = [
-      {
-        partitionKey: '2026-01',
-        entities: { 'task.2026-01.a': { id: 'a' } },
-        tombstones: {},
-      },
-      {
-        partitionKey: '2026-02',
-        entities: { 'task.2026-02.b': { id: 'b' } },
-        tombstones: {},
-      },
-    ];
-
-    applyMergedToStore(store, entityName, mergedResults, eventBus);
-
-    expect(store.getEntity('task.2026-01', 'task.2026-01.a')).toBeDefined();
-    expect(store.getEntity('task.2026-02', 'task.2026-02.b')).toBeDefined();
   });
 });

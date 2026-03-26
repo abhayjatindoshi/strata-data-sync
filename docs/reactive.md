@@ -53,7 +53,7 @@ function observeQuery(opts?: QueryOptions<T>): Observable<ReadonlyArray<T>> {
   return changeSignal.pipe(
     startWith(undefined),                     // trigger initial emission
     map(() => query(opts)),                   // sync Map scan + filter + sort
-    distinctUntilChanged(resultsChanged),
+    distinctUntilChanged((prev, next) => !resultsChanged(prev, next)),
   );
 }
 ```
@@ -99,6 +99,8 @@ function saveMany(entities: T[]): string[] {
 100 saves → 1 signal → observers re-scan once → 1 render. Not 100 signals → 100 renders.
 
 Single `save()` emits immediately and synchronously. No debounce. Behavior is explicit — app uses `saveMany` for loops.
+
+**Note:** `saveMany()` and `deleteMany()` signal the entity type `Subject` directly, bypassing the event bus `emit()`. This means external event bus listeners (e.g., the dirty tracker in `Strata`) do not fire for batch operations — only for single `save()`/`delete()` calls.
 
 ## Event Bus
 

@@ -44,7 +44,7 @@ describe('Full lifecycle integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'Workspace', meta });
-    await strata1.tenants.load(tenant.id);
+    await strata1.loadTenant(tenant.id);
 
     const repo1 = strata1.repo(TaskDef) as Repository<Task>;
     const id1 = repo1.save({ title: 'Buy groceries', done: false });
@@ -58,7 +58,7 @@ describe('Full lifecycle integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.tenants.load(tenant.id);
+    await strata2.loadTenant(tenant.id);
 
     const repo2 = strata2.repo(TaskDef) as Repository<Task>;
     const loaded1 = repo2.get(id1);
@@ -84,7 +84,7 @@ describe('Full lifecycle integration', () => {
       options: { flushDebounceMs: 60000 }, // Long debounce to ensure data isn't flushed before dispose
     }));
     const tenant = await strata.tenants.create({ name: 'W', meta });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     repo.save({ title: 'Urgent', done: false });
@@ -98,7 +98,7 @@ describe('Full lifecycle integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.tenants.load(tenant.id);
+    await strata2.loadTenant(tenant.id);
     const repo2 = strata2.repo(TaskDef) as Repository<Task>;
     const all = repo2.query();
     expect(all).toHaveLength(1);
@@ -125,13 +125,13 @@ describe('Full lifecycle integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'T', meta: { b: 1 } });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
     await strata.dispose();
 
     await expect(strata.sync()).rejects.toThrow('disposed');
   });
 
-  it('post-dispose: tenants.load() rejects', async () => {
+  it('post-dispose: loadTenant() rejects', async () => {
     const strata = track(createStrata({
       entities: [TaskDef],
       localAdapter: createMemoryBlobAdapter(),
@@ -140,7 +140,7 @@ describe('Full lifecycle integration', () => {
     const tenant = await strata.tenants.create({ name: 'T', meta: { b: 1 } });
     await strata.dispose();
 
-    await expect(strata.tenants.load(tenant.id)).rejects.toThrow('disposed');
+    await expect(strata.loadTenant(tenant.id)).rejects.toThrow('disposed');
   });
 
   it('dispose is idempotent — second call returns same promise', async () => {
@@ -165,7 +165,7 @@ describe('Full lifecycle integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta });
-    await strata1.tenants.load(tenant.id);
+    await strata1.loadTenant(tenant.id);
 
     const taskRepo = strata1.repo(TaskDef) as Repository<Task>;
     const settingsRepo = strata1.repo(SettingsDef) as SingletonRepository<Settings>;
@@ -180,7 +180,7 @@ describe('Full lifecycle integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.tenants.load(tenant.id);
+    await strata2.loadTenant(tenant.id);
 
     const taskRepo2 = strata2.repo(TaskDef) as Repository<Task>;
     const settingsRepo2 = strata2.repo(SettingsDef) as SingletonRepository<Settings>;
@@ -200,7 +200,7 @@ describe('Full lifecycle integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta });
-    await strata1.tenants.load(tenant.id);
+    await strata1.loadTenant(tenant.id);
 
     const repo1 = strata1.repo(EventDef) as Repository<Event>;
     const id1 = repo1.save({ name: 'Concert', date: new Date('2026-06-15'), category: 'music' });
@@ -213,7 +213,7 @@ describe('Full lifecycle integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.tenants.load(tenant.id);
+    await strata2.loadTenant(tenant.id);
 
     const repo2 = strata2.repo(EventDef) as Repository<Event>;
     const loaded1 = repo2.get(id1);

@@ -197,7 +197,7 @@ describe('createStrata', () => {
         name: 'Test Workspace',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()?.id).toBe(tenant.id);
     });
 
@@ -220,9 +220,9 @@ describe('createStrata', () => {
         meta: { bucket: 't2' },
       });
 
-      await strata.tenants.load(t1.id);
+      await strata.loadTenant(t1.id);
       // Load a second tenant — should stop the first scheduler
-      await strata.tenants.load(t2.id);
+      await strata.loadTenant(t2.id);
 
       expect(strata.tenants.activeTenant$.getValue()?.id).toBe(t2.id);
     });
@@ -239,7 +239,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()?.name).toBe('Test');
     });
 
@@ -266,7 +266,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
 
       expect(events.some(e => e.type === 'cloud-unreachable')).toBe(true);
     });
@@ -285,7 +285,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
       await expect(strata.sync()).rejects.toThrow('No cloud adapter configured');
     });
 
@@ -302,7 +302,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
 
       const result = await strata.sync();
       expect(result).toBeDefined();
@@ -325,7 +325,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
       await strata.sync();
 
       const types = events.map(e => e.type);
@@ -349,7 +349,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
 
       // Sabotage cloud adapter to cause sync failure
       cloudAdapter.read = () => {
@@ -378,7 +378,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
 
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Test', done: false });
@@ -399,7 +399,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
 
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Test', done: false });
@@ -435,7 +435,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
       await strata.sync();
       expect(events.length).toBeGreaterThan(0);
 
@@ -480,14 +480,14 @@ describe('createStrata', () => {
       await expect(strata.sync()).rejects.toThrow('Strata instance is disposed');
     });
 
-    it('tenants.load() rejects after dispose', async () => {
+    it('loadTenant() rejects after dispose', async () => {
       ({ strata } = makeStrata());
       const tenant = await strata.tenants.create({
         name: 'Test',
         meta: { bucket: 'test' },
       });
       await strata.dispose();
-      await expect(strata.tenants.load(tenant.id)).rejects.toThrow(
+      await expect(strata.loadTenant(tenant.id)).rejects.toThrow(
         'Strata instance is disposed',
       );
     });
@@ -504,7 +504,7 @@ describe('createStrata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.tenants.load(tenant.id);
+      await strata.loadTenant(tenant.id);
 
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Flush Test', done: false });

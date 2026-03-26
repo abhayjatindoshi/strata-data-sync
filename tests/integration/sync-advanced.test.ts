@@ -58,7 +58,7 @@ describe('Sync advanced integration', () => {
     });
 
     // Load tenant — cloud hydrate will fail, should fall back to local
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     // Should have emitted cloud-unreachable
     expect(events.some(e => e.type === 'cloud-unreachable')).toBe(true);
@@ -84,7 +84,7 @@ describe('Sync advanced integration', () => {
       name: 'Test',
       meta: { folder: 'shared' },
     });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     repo.save({ title: 'Item', done: false, priority: 1 });
@@ -164,7 +164,7 @@ describe('Sync advanced integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.tenants.load(tenant.id);
+    await strataA.loadTenant(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false, priority: 1 });
@@ -183,7 +183,7 @@ describe('Sync advanced integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.tenants.load(tenant.id);
+    await strataB.loadTenant(tenant.id);
 
     // B's observe should emit the entity from A
     const repoB = strataB.repo(TaskDef) as Repository<Task>;

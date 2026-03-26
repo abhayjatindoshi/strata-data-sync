@@ -38,7 +38,7 @@ describe('Dirty tracking integration', () => {
       name: 'Test',
       meta: { b: 1 },
     });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     // Initially not dirty
     expect(strata.isDirty).toBe(false);
@@ -65,7 +65,7 @@ describe('Dirty tracking integration', () => {
       name: 'Test',
       meta: { b: 1 },
     });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const emissions: boolean[] = [];
     const sub = strata.isDirty$.subscribe(v => emissions.push(v));

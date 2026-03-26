@@ -45,7 +45,7 @@ describe('Persistence round-trip integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata1.tenants.load(tenant.id);
+    await strata1.loadTenant(tenant.id);
 
     const repo1 = strata1.repo(TransactionDef) as Repository<Transaction>;
     const targetDate = new Date('2026-06-15T10:30:00.000Z');
@@ -59,7 +59,7 @@ describe('Persistence round-trip integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.tenants.load(tenant.id);
+    await strata2.loadTenant(tenant.id);
 
     const repo2 = strata2.repo(TransactionDef) as Repository<Transaction>;
     const loaded = repo2.get(id);
@@ -83,7 +83,7 @@ describe('Persistence round-trip integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const repo = strata.repo(TransactionDef) as Repository<Transaction>;
     repo.save({ amount: 100, date: new Date(), accountId: 'checking' });
@@ -166,7 +166,7 @@ describe('Persistence round-trip integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata1.tenants.load(tenant.id);
+    await strata1.loadTenant(tenant.id);
 
     const repo1 = strata1.repo(ItemDef) as Repository<Item>;
     const id = repo1.save({ name: 'Widget', category: 'A' });
@@ -185,7 +185,7 @@ describe('Persistence round-trip integration', () => {
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.tenants.load(tenant.id);
+    await strata2.loadTenant(tenant.id);
 
     const repo2 = strata2.repo(ItemDef) as Repository<Item>;
     const loaded = repo2.get(id);
@@ -202,7 +202,7 @@ describe('Persistence round-trip integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const repo = strata.repo(ItemDef) as Repository<Item>;
     const id = repo.save({ name: 'To Delete', category: 'temp' });

@@ -42,14 +42,14 @@ One blob per `entityName.partitionKey`:
 
 ### Transform Pipeline
 
-Per-adapter transforms applied between serialization and adapter I/O:
+Per-adapter composable transforms applied between serialization and storage I/O via `AdapterBridge`:
 
 ```
-Write: JSON string → TextEncoder → transform[0] → transform[1] → adapter.write(bytes)
-Read:  adapter.read() → transform[1]⁻¹ → transform[0]⁻¹ → TextDecoder → JSON.parse
+Write: PartitionBlob → serialize → transform[0].encode → transform[1].encode → StorageAdapter.write(bytes)
+Read:  StorageAdapter.read() → transform[1].decode → transform[0].decode → deserialize → PartitionBlob
 ```
 
-Transforms are configurable per-adapter. Framework ships `gzip()` and `encrypt(key)`.
+Transforms implement `BlobTransform` (`encode`/`decode`). Framework ships `encryptionTransform()`. Apps can provide custom transforms (e.g., compression).
 
 ## Hashing
 
@@ -79,15 +79,19 @@ function partitionHash(entities: Entity[]): number {
 
 ### Partition Index
 
-One index blob per entity type: `__index.{entityName}`
+All partition indexes are stored inside the `__strata` marker blob (not as separate blobs). One index per entity type:
 
 ```json
 {
-  "2026-01": { "hash": 3847291, "count": 847, "updatedAt": 1711100000 },
-  "2026-02": { "hash": 9182736, "count": 923, "updatedAt": 1711200000 },
-  "2026-03": { "hash": 1928374, "count": 412, "updatedAt": 1711300000 }
+  "transaction": {
+    "2026-01": { "hash": 3847291, "count": 847, "deletedCount": 12, "updatedAt": 1711100000 },
+    "2026-02": { "hash": 9182736, "count": 923, "deletedCount": 5, "updatedAt": 1711200000 },
+    "2026-03": { "hash": 1928374, "count": 412, "deletedCount": 0, "updatedAt": 1711300000 }
+  }
 }
 ```
+
+Each entry has `hash`, `count`, `deletedCount` (tombstone count), and `updatedAt`.
 
 Used for:
 - Partition discovery on cold start (which partitions exist for `query()` without partition key)
@@ -97,11 +101,11 @@ Updated on every flush.
 
 ## Flush Timing
 
-- **Debounced**: 2 seconds of idle after last write. Configured by app.
+- **Periodic**: every 2 seconds (configurable via `localFlushIntervalMs`), the sync scheduler runs `syncBetween(store → localAdapter)` to persist dirty partitions
 - **Dispose**: forces immediate flush
 - **`save()`** is sync (Map only) — flush is async background I/O
 
-Multiple rapid saves → one serialization + one adapter write after 2s idle.
+Multiple rapid saves → one serialization + one adapter write at the next interval tick.
 
 ## HLC (Hybrid Logical Clock)
 
@@ -147,6 +151,14 @@ function enqueue(source, target): Promise<void> {
   // ... create new queue item
 }
 ```
+
+### Sync Implementation — `syncBetween`
+
+All sync directions use a single generic function `syncBetween(adapterA, adapterB, store, entityNames, tenant)` that handles bidirectional merge between any two `BlobAdapter` endpoints:
+
+- **Phase 1 (Hydrate)**: `syncBetween(cloudAdapter, localAdapter, store, ...)`
+- **Phase 2 (Periodic)**: `syncBetween(store, localAdapter, ...)` + `syncBetween(localAdapter, cloudAdapter, ...)`
+- **Phase 3 (Manual)**: same as Phase 2 but immediate
 
 ### Sync Cycle (local ↔ cloud)
 

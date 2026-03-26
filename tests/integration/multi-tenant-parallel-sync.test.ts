@@ -86,7 +86,7 @@ describe('Multi-tenant parallel sync integration', () => {
       name: 'Workspace A',
       meta: { folder: 'ws-a' },
     });
-    await strataA.tenants.load(tenantA.id);
+    await strataA.loadTenant(tenantA.id);
 
     const noteRepoA = strataA.repo(NoteDef) as Repository<Note>;
     const idA1 = noteRepoA.save({ title: 'Note in A', body: 'body-a', priority: 1 });
@@ -107,7 +107,7 @@ describe('Multi-tenant parallel sync integration', () => {
       name: 'Workspace B',
       meta: { folder: 'ws-b' },
     });
-    await strataB.tenants.load(tenantB.id);
+    await strataB.loadTenant(tenantB.id);
 
     const noteRepoB = strataB.repo(NoteDef) as Repository<Note>;
     const idB1 = noteRepoB.save({ title: 'Note in B', body: 'body-b', priority: 10 });
@@ -134,7 +134,7 @@ describe('Multi-tenant parallel sync integration', () => {
       meta: { folder: 'ws-a' },
       id: tenantA.id,
     });
-    await strataA2.tenants.load(tenantA.id);
+    await strataA2.loadTenant(tenantA.id);
 
     const noteRepoA2 = strataA2.repo(NoteDef) as Repository<Note>;
     expect(noteRepoA2.get(idB1)).toBeUndefined();
@@ -154,7 +154,7 @@ describe('Multi-tenant parallel sync integration', () => {
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'Shared', meta });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     // Device 1 saves a note
     const noteRepo = strata.repo(NoteDef) as Repository<Note>;
@@ -205,7 +205,7 @@ describe('Multi-tenant parallel sync integration', () => {
       deviceId: 'device-A',
     }));
     const tenant = await strataA.tenants.create({ name: 'Shared', meta });
-    await strataA.tenants.load(tenant.id);
+    await strataA.loadTenant(tenant.id);
 
     const repoA = strataA.repo(NoteDef) as Repository<Note>;
     const sharedId = repoA.save({ title: 'Original', body: 'v0', priority: 1 });
@@ -219,7 +219,7 @@ describe('Multi-tenant parallel sync integration', () => {
       deviceId: 'device-B',
     }));
     await strataB.tenants.create({ name: 'Shared', meta, id: tenant.id });
-    await strataB.tenants.load(tenant.id);
+    await strataB.loadTenant(tenant.id);
 
     const repoB = strataB.repo(NoteDef) as Repository<Note>;
     expect(repoB.get(sharedId)!.title).toBe('Original');
@@ -259,13 +259,13 @@ describe('Multi-tenant parallel sync integration', () => {
     const tenantB = await strata.tenants.create({ name: 'B', meta: metaB });
 
     // Work in tenant A
-    await strata.tenants.load(tenantA.id);
+    await strata.loadTenant(tenantA.id);
     const noteRepo = strata.repo(NoteDef) as Repository<Note>;
     noteRepo.save({ title: 'A note', body: 'a', priority: 1 });
     await strata.sync();
 
     // Switch to tenant B
-    await strata.tenants.load(tenantB.id);
+    await strata.loadTenant(tenantB.id);
     const noteRepoB = strata.repo(NoteDef) as Repository<Note>;
     noteRepoB.save({ title: 'B note', body: 'b', priority: 2 });
     await strata.sync();
@@ -287,7 +287,7 @@ describe('Multi-tenant parallel sync integration', () => {
     });
 
     // Switch back to tenant A — re-load triggers cloud hydration
-    await strata.tenants.load(tenantA.id);
+    await strata.loadTenant(tenantA.id);
     const noteRepoA2 = strata.repo(NoteDef) as Repository<Note>;
 
     // Should see both the original note and the externally injected one
@@ -315,7 +315,7 @@ describe('Multi-tenant parallel sync integration', () => {
     }));
 
     const tenant = await strata.tenants.create({ name: 'Shared', meta });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const noteRepo = strata.repo(NoteDef) as Repository<Note>;
     noteRepo.save({ title: 'Local', body: 'local', priority: 1 });
@@ -361,7 +361,7 @@ describe('Multi-tenant parallel sync integration', () => {
       deviceId: 'device-A',
     }));
     const tenant = await strataA.tenants.create({ name: 'Multi', meta });
-    await strataA.tenants.load(tenant.id);
+    await strataA.loadTenant(tenant.id);
 
     // Device A writes notes
     const noteRepoA = strataA.repo(NoteDef) as Repository<Note>;
@@ -380,7 +380,7 @@ describe('Multi-tenant parallel sync integration', () => {
       deviceId: 'device-B',
     }));
     await strataB.tenants.create({ name: 'Multi', meta, id: tenant.id });
-    await strataB.tenants.load(tenant.id);
+    await strataB.loadTenant(tenant.id);
 
     const noteRepoB = strataB.repo(NoteDef) as Repository<Note>;
     const projectRepoB = strataB.repo(ProjectDef) as Repository<Project>;
@@ -423,7 +423,7 @@ describe('Multi-tenant parallel sync integration', () => {
 
     const s1 = makeDevice('dev-1');
     const tenant = await s1.tenants.create({ name: 'Trio', meta });
-    await s1.tenants.load(tenant.id);
+    await s1.loadTenant(tenant.id);
 
     const r1 = s1.repo(NoteDef) as Repository<Note>;
     r1.save({ title: 'From 1', body: 'b1', priority: 1 });
@@ -432,7 +432,7 @@ describe('Multi-tenant parallel sync integration', () => {
     // Dev 2 joins
     const s2 = makeDevice('dev-2');
     await s2.tenants.create({ name: 'Trio', meta, id: tenant.id });
-    await s2.tenants.load(tenant.id);
+    await s2.loadTenant(tenant.id);
     const r2 = s2.repo(NoteDef) as Repository<Note>;
     r2.save({ title: 'From 2', body: 'b2', priority: 2 });
     await s2.sync();
@@ -440,7 +440,7 @@ describe('Multi-tenant parallel sync integration', () => {
     // Dev 3 joins
     const s3 = makeDevice('dev-3');
     await s3.tenants.create({ name: 'Trio', meta, id: tenant.id });
-    await s3.tenants.load(tenant.id);
+    await s3.loadTenant(tenant.id);
     const r3 = s3.repo(NoteDef) as Repository<Note>;
     r3.save({ title: 'From 3', body: 'b3', priority: 3 });
     await s3.sync();

@@ -26,7 +26,6 @@ export { diffEntityMaps, mergePartition } from './merge';
 export {
   syncMergePhase,
   updateIndexesAfterSync,
-  applyMergedToStore,
 } from './sync-phase';
 export { purgeStaleTombstones, DEFAULT_TOMBSTONE_RETENTION_MS } from './tombstone';
 export { SyncLock, createSyncLock } from './sync-lock';

@@ -1,3 +1,5 @@
+import type { BehaviorSubject } from 'rxjs';
+
 export type Tenant = {
   readonly id: string;
   readonly name: string;
@@ -23,11 +25,6 @@ export type TenantManagerOptions = {
   readonly entityTypes?: readonly string[];
 };
 
-export type Subscribable<T> = {
-  getValue(): T;
-  subscribe(callback: (value: T) => void): { unsubscribe(): void };
-};
-
 export type TenantManager = {
   list(): Promise<ReadonlyArray<Tenant>>;
   create(opts: CreateTenantOptions): Promise<Tenant>;
@@ -35,5 +32,5 @@ export type TenantManager = {
   load(tenantId: string): Promise<void>;
   delink(tenantId: string): Promise<void>;
   delete(tenantId: string): Promise<void>;
-  readonly activeTenant$: Subscribable<Tenant | undefined>;
+  readonly activeTenant$: BehaviorSubject<Tenant | undefined>;
 };

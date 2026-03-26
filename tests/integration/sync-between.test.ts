@@ -49,7 +49,7 @@ describe('syncBetween integration', () => {
       name: 'Test',
       meta: { folder: 'test' },
     });
-    await strataA.tenants.load(tenant.id);
+    await strataA.loadTenant(tenant.id);
 
     const repo = strataA.repo(TaskDef) as Repository<Task>;
     const id1 = repo.save({ title: 'Task 1', done: false });
@@ -75,7 +75,7 @@ describe('syncBetween integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.tenants.load(tenant.id);
+    await strataA.loadTenant(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const idA = repoA.save({ title: 'From A', done: false });
@@ -88,7 +88,7 @@ describe('syncBetween integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.tenants.load(tenant.id);
+    await strataB.loadTenant(tenant.id);
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     const idB = repoB.save({ title: 'From B', done: true });
@@ -113,7 +113,7 @@ describe('syncBetween integration', () => {
       name: 'Test',
       meta: { folder: 'test' },
     });
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     repo.save({ title: 'Task 1', done: false });

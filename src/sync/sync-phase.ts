@@ -104,26 +104,3 @@ export async function updateIndexesAfterSync(
   log('updated indexes for %s after sync', entityName);
   return { updatedLocal, updatedCloud };
 }
-
-export function applyMergedToStore(
-  store: EntityStore,
-  entityName: string,
-  mergedResults: ReadonlyArray<MergedPartitionResult>,
-  eventBus: EntityEventBus,
-): void {
-  for (const { partitionKey, entities, tombstones } of mergedResults) {
-    const entityKey = partitionBlobKey(entityName, partitionKey);
-
-    for (const [id, entity] of Object.entries(entities)) {
-      store.setEntity(entityKey, id, entity);
-    }
-
-    for (const id of Object.keys(tombstones)) {
-      store.deleteEntity(entityKey, id);
-    }
-  }
-
-  if (mergedResults.length > 0) {
-    eventBus.emit({ entityName });
-  }
-}

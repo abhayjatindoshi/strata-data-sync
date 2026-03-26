@@ -41,7 +41,7 @@ describe('Tenant integration', () => {
       meta: { bucket: 'ws1' },
     });
 
-    await strata.tenants.load(tenant.id);
+    await strata.loadTenant(tenant.id);
     expect(strata.tenants.activeTenant$.getValue()?.id).toBe(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
@@ -87,7 +87,7 @@ describe('Tenant integration', () => {
     }));
 
     const tenantA = await strataA.tenants.create({ name: 'A', meta: { bucket: 'a' } });
-    await strataA.tenants.load(tenantA.id);
+    await strataA.loadTenant(tenantA.id);
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     repoA.save({ title: 'Task for A', done: false });
     expect(repoA.query()).toHaveLength(1);
@@ -100,7 +100,7 @@ describe('Tenant integration', () => {
       deviceId: 'dev-1',
     }));
     const tenantB = await strataB.tenants.create({ name: 'B', meta: { bucket: 'b' } });
-    await strataB.tenants.load(tenantB.id);
+    await strataB.loadTenant(tenantB.id);
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     // B should have no entities — isolated local storage
     expect(repoB.query()).toHaveLength(0);
