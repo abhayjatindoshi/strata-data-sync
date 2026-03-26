@@ -6,57 +6,57 @@ import {
   defineEntity,
   partitioned,
 } from 'strata-data-sync';
-import type { BlobAdapter, Meta, Strata, Repository, SingletonRepository } from 'strata-data-sync';
+import type { BlobAdapter, Tenant, PartitionBlob, Strata, Repository, SingletonRepository } from 'strata-data-sync';
 
 // ─── File-system BlobAdapter ─────────────────────────────
-// Local storage writes with meta=undefined, so blobs go to rootDir.
-// Tenant marker blobs use meta.container to scope into subfolders.
 
-function createFsBlobAdapter(rootDir: string): BlobAdapter {
-  function resolvePath(meta: Meta, key: string): string {
-    const container = (meta as Record<string, unknown>)?.container as string | undefined;
+class FsBlobAdapter implements BlobAdapter {
+  constructor(private readonly rootDir: string) {}
+
+  private resolvePath(tenant: Tenant | undefined, key: string): string {
+    const container = tenant?.meta?.container as string | undefined;
     if (container) {
-      return path.join(rootDir, container, key);
+      return path.join(this.rootDir, container, key);
     }
-    return path.join(rootDir, key);
+    return path.join(this.rootDir, key);
   }
 
-  return {
-    async read(meta, key) {
-      try {
-        return await fs.readFile(resolvePath(meta, key));
-      } catch {
-        return null;
-      }
-    },
-    async write(meta, key, data) {
-      const filePath = resolvePath(meta, key);
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      const decoded = new TextDecoder().decode(data);
-      const dataToWrite = JSON.stringify(JSON.parse(decoded), null, 2);
-      await fs.writeFile(filePath, dataToWrite);
-    },
-    async delete(meta, key) {
-      try {
-        await fs.unlink(resolvePath(meta, key));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    async list(meta, prefix) {
-      const dir = path.dirname(resolvePath(meta, prefix));
-      try {
-        const files = await fs.readdir(dir);
-        const base = prefix.includes('/') ? prefix.slice(0, prefix.lastIndexOf('/') + 1) : '';
-        return files
-          .map(f => base + f)
-          .filter(f => f.startsWith(prefix));
-      } catch {
-        return [];
-      }
-    },
-  };
+  async read(tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null> {
+    try {
+      const content = await fs.readFile(this.resolvePath(tenant, key), 'utf-8');
+      return JSON.parse(content) as PartitionBlob;
+    } catch {
+      return null;
+    }
+  }
+
+  async write(tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void> {
+    const filePath = this.resolvePath(tenant, key);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+  }
+
+  async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
+    try {
+      await fs.unlink(this.resolvePath(tenant, key));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
+    const dir = path.dirname(this.resolvePath(tenant, prefix));
+    try {
+      const files = await fs.readdir(dir);
+      const base = prefix.includes('/') ? prefix.slice(0, prefix.lastIndexOf('/') + 1) : '';
+      return files
+        .map(f => base + f)
+        .filter(f => f.startsWith(prefix));
+    } catch {
+      return [];
+    }
+  }
 }
 
 // ─── Entity types ────────────────────────────────────────
@@ -67,18 +67,88 @@ type Settings = { theme: string; language: string };
 
 // ─── Entity definitions (different key strategies) ───────
 
-// Global: all tasks in one partition (task._)
 const taskDef = defineEntity<Task>('task');
 
-// Partitioned: notes split by first character of body
 const noteDef = defineEntity<Note>('note', {
   keyStrategy: partitioned((n: Note) => n.body[0].toLowerCase()),
 });
 
-// Singleton: one settings record
 const settingsDef = defineEntity<Settings>('settings', {
   keyStrategy: 'singleton',
 });
+
+// ─── Key-strategy demo app ───────────────────────────────
+
+class KeyStrategyDemo {
+  private readonly strata: Strata;
+
+  constructor(adapter: BlobAdapter) {
+    this.strata = createStrata({
+      entities: [taskDef, noteDef, settingsDef],
+      localAdapter: adapter,
+      deviceId: 'device-1',
+    });
+  }
+
+  async init(): Promise<void> {
+    const tenant = await this.strata.tenants.create({
+      name: 'Demo',
+      meta: { container: 'demo-workspace' },
+    });
+    await this.strata.tenants.load(tenant.id);
+  }
+
+  demoGlobalStrategy(): void {
+    console.log('\n=== Global strategy (task) ===');
+    const repo = this.strata.repo(taskDef) as Repository<Task>;
+    repo.save({ title: 'Ship v2', done: false, category: 'dev' });
+    repo.save({ title: 'Write tests', done: true, category: 'dev' });
+    const coffeeId = repo.save({ title: 'Buy coffee', done: false, category: 'personal' });
+
+    for (const t of repo.query()) {
+      console.log(`  - [${t.category}] ${t.title} (${t.done ? 'done' : 'todo'})`);
+    }
+
+    repo.delete(coffeeId);
+    console.log(`Deleted "Buy coffee", remaining: ${repo.query().length}`);
+  }
+
+  demoPartitionedStrategy(): void {
+    console.log('\n=== Partitioned strategy (note) ===');
+    const repo = this.strata.repo(noteDef) as Repository<Note>;
+    repo.save({ body: 'Alpha release next week' });
+    const askId = repo.save({ body: 'Ask about deployment' });
+    repo.save({ body: 'Book flight to NYC' });
+    repo.save({ body: 'Buy new keyboard' });
+    repo.save({ body: 'Call the dentist' });
+
+    for (const n of repo.query()) {
+      console.log(`  - ${n.body}`);
+    }
+
+    repo.delete(askId);
+    console.log(`Deleted "Ask about deployment", remaining: ${repo.query().length}`);
+  }
+
+  demoSingletonStrategy(): void {
+    console.log('\n=== Singleton strategy (settings) ===');
+    const repo = this.strata.repo(settingsDef) as SingletonRepository<Settings>;
+    repo.save({ theme: 'dark', language: 'en' });
+
+    const settings = repo.get();
+    console.log(`Settings: theme=${settings?.theme}, language=${settings?.language}`);
+
+    repo.save({ ...settings!, theme: 'light' });
+    console.log(`Updated:  theme=${repo.get()?.theme}, language=${repo.get()?.language}`);
+
+    repo.delete();
+    console.log(`Deleted settings, get() = ${repo.get()}`);
+  }
+
+  async dispose(): Promise<void> {
+    await this.strata.dispose();
+  }
+}
 
 // ─── Main ────────────────────────────────────────────────
 
@@ -89,90 +159,17 @@ async function main(): Promise<void> {
   await fs.mkdir(rootDir, { recursive: true });
   console.log('Storage root:', rootDir);
 
-  const localAdapter = createFsBlobAdapter(rootDir);
+  const demo = new KeyStrategyDemo(new FsBlobAdapter(rootDir));
+  await demo.init();
 
-  const strata = createStrata({
-    entities: [taskDef, noteDef, settingsDef],
-    localAdapter,
-    deviceId: 'device-1',
-  });
+  demo.demoGlobalStrategy();
+  demo.demoPartitionedStrategy();
+  demo.demoSingletonStrategy();
 
-  // ── Create tenant ────────────────────────────────────
-
-  const tenant = await strata.tenants.create({
-    name: 'Demo',
-    meta: { container: 'demo-workspace' },
-  });
-  await strata.tenants.load(tenant.id);
-
-  // ── Global strategy: all tasks in one partition ──────
-
-  console.log('\n=== Global strategy (task) ===');
-  const taskRepo = strata.repo(taskDef) as Repository<Task>;
-  const shipId = taskRepo.save({ title: 'Ship v2', done: false, category: 'dev' });
-  taskRepo.save({ title: 'Write tests', done: true, category: 'dev' });
-  const coffeeId = taskRepo.save({ title: 'Buy coffee', done: false, category: 'personal' });
-
-  const tasks = taskRepo.query();
-  console.log(`All tasks: ${tasks.length}`);
-  for (const t of tasks) {
-    console.log(`  - [${t.category}] ${t.title} (${t.done ? 'done' : 'todo'})`);
-  }
-
-  // Delete a task
-  taskRepo.delete(coffeeId);
-  console.log(`Deleted "Buy coffee" (id=${coffeeId})`);
-  console.log(`Tasks after delete: ${taskRepo.query().length}`);
-
-  // ── Partitioned strategy: notes by first letter ──────
-
-  console.log('\n=== Partitioned strategy (note) ===');
-  const noteRepo = strata.repo(noteDef) as Repository<Note>;
-  noteRepo.save({ body: 'Alpha release next week' });
-  const askId = noteRepo.save({ body: 'Ask about deployment' });
-  noteRepo.save({ body: 'Book flight to NYC' });
-  noteRepo.save({ body: 'Buy new keyboard' });
-  noteRepo.save({ body: 'Call the dentist' });
-
-  const notes = noteRepo.query();
-  console.log(`All notes: ${notes.length}`);
-  for (const n of notes) {
-    console.log(`  - ${n.body}`);
-  }
-
-  // Delete a note (from partition "a")
-  noteRepo.delete(askId);
-  console.log(`Deleted "Ask about deployment" (id=${askId})`);
-  console.log(`Notes after delete: ${noteRepo.query().length}`);
-
-  // ── Singleton strategy: one settings record ──────────
-
-  console.log('\n=== Singleton strategy (settings) ===');
-  const settingsRepo = strata.repo(settingsDef) as SingletonRepository<Settings>;
-  settingsRepo.save({ theme: 'dark', language: 'en' });
-
-  const settings = settingsRepo.get();
-  console.log(`Settings: theme=${settings?.theme}, language=${settings?.language}`);
-
-  // update it
-  settingsRepo.save({ ...settings!, theme: 'light' });
-  const updated = settingsRepo.get();
-  console.log(`Updated:  theme=${updated?.theme}, language=${updated?.language}`);
-
-  // Delete singleton
-  settingsRepo.delete();
-  console.log(`Deleted settings, get() = ${settingsRepo.get()}`);
-
-  // ── Flush & print files on disk ──────────────────────
-
-  await strata.dispose();
+  await demo.dispose();
 
   console.log('\n--- Files on disk ---');
   await printTree(rootDir, '');
-  // task._          — all tasks in one global partition
-  // note.a, note.b, note.c — notes partitioned by first letter
-  // settings._      — singleton settings record
-
   console.log('\nDone. Data persisted in example/.tmp/');
 }
 

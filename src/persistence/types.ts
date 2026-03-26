@@ -1,5 +1,4 @@
 import type { Hlc } from '@strata/hlc';
-import type { Tenant } from '@strata/adapter';
 
 export type PartitionIndexEntry = {
   readonly hash: number;
@@ -16,5 +15,3 @@ export type PartitionBlob = {
   readonly deleted: Record<string, Record<string, Hlc>>;
   readonly [entityName: string]: Record<string, unknown> | Record<string, Record<string, Hlc>>;
 };
-
-export type TenantListBlob = ReadonlyArray<Tenant>;

@@ -15,106 +15,88 @@ type Note = { body: string };
 const taskDef = defineEntity<Task>('task');
 const noteDef = defineEntity<Note>('note');
 
-// ─── Helpers ─────────────────────────────────────────────
+// ─── Multi-tenant demo ──────────────────────────────────
 
-function printTasks(strata: Strata, label: string): void {
-  const repo = strata.repo(taskDef) as Repository<Task>;
-  const tasks = repo.query();
-  console.log(`\n[${label}] Tasks (${tasks.length}):`);
-  for (const t of tasks) {
-    const status = t.done ? 'done' : 'todo';
-    console.log(`  - ${t.title} (${status})`);
+class MultiTenantDemo {
+  private readonly strata: Strata;
+
+  constructor() {
+    this.strata = createStrata({
+      entities: [taskDef, noteDef],
+      localAdapter: createMemoryBlobAdapter(),
+      deviceId: 'device-1',
+    });
   }
-}
 
-function printNotes(strata: Strata, label: string): void {
-  const repo = strata.repo(noteDef) as Repository<Note>;
-  const notes = repo.query();
-  console.log(`[${label}] Notes (${notes.length}):`);
-  for (const n of notes) {
-    console.log(`  - ${n.body}`);
+  async run(): Promise<void> {
+    const work = await this.strata.tenants.create({
+      name: 'Work',
+      meta: { container: 'work-workspace' },
+    });
+    const personal = await this.strata.tenants.create({
+      name: 'Personal',
+      meta: { container: 'personal-workspace' },
+    });
+
+    console.log('Created tenants:');
+    for (const t of await this.strata.tenants.list()) {
+      console.log(`  • ${t.name} (${t.id})`);
+    }
+
+    await this.seedWorkTenant(work.id);
+    await this.seedPersonalTenant(personal.id);
+
+    await this.strata.dispose();
+    console.log('\nDone.');
+  }
+
+  private async seedWorkTenant(tenantId: string): Promise<void> {
+    await this.strata.tenants.load(tenantId);
+
+    const tasks = this.strata.repo(taskDef) as Repository<Task>;
+    tasks.save({ title: 'Ship v2 release', done: false });
+    tasks.save({ title: 'Review PRs', done: true });
+    tasks.save({ title: 'Update docs', done: false });
+
+    const notes = this.strata.repo(noteDef) as Repository<Note>;
+    notes.save({ body: 'Standup at 9am' });
+
+    this.printRepo('Work', tasks, notes);
+  }
+
+  private async seedPersonalTenant(tenantId: string): Promise<void> {
+    await this.strata.tenants.load(tenantId);
+    console.log('\n--- Switched to Personal tenant ---');
+    console.log('Active tenant:', this.strata.tenants.activeTenant$.getValue()?.name);
+
+    const tasks = this.strata.repo(taskDef) as Repository<Task>;
+    tasks.save({ title: 'Buy groceries', done: false });
+
+    const open = tasks.query({ where: { done: false } });
+    console.log(`\nOpen tasks: ${open.length}`);
+    for (const t of open) {
+      console.log(`  - ${t.title}`);
+    }
+
+    const sub = tasks.observeQuery().subscribe((all) => {
+      console.log(`\n[Reactive] Task count changed: ${all.length}`);
+    });
+    tasks.save({ title: 'Call dentist', done: true });
+    sub.unsubscribe();
+  }
+
+  private printRepo(label: string, tasks: Repository<Task>, notes: Repository<Note>): void {
+    console.log(`\n[${label}] Tasks (${tasks.query().length}):`);
+    for (const t of tasks.query()) {
+      console.log(`  - ${t.title} (${t.done ? 'done' : 'todo'})`);
+    }
+    console.log(`[${label}] Notes (${notes.query().length}):`);
+    for (const n of notes.query()) {
+      console.log(`  - ${n.body}`);
+    }
   }
 }
 
 // ─── Main ────────────────────────────────────────────────
-// Demonstrates creating multiple tenants and switching between them.
-// Note: MemoryBlobAdapter is a single flat store — in production a
-// cloud adapter (e.g. Azure Blob, S3) uses meta to route each
-// tenant to its own container, providing full data isolation.
 
-async function main(): Promise<void> {
-  const localAdapter = createMemoryBlobAdapter();
-
-  const strata = createStrata({
-    entities: [taskDef, noteDef],
-    localAdapter,
-    deviceId: 'device-1',
-  });
-
-  // ── Create two tenants (workspaces) ──────────────────
-
-  const work = await strata.tenants.create({
-    name: 'Work',
-    meta: { container: 'work-workspace' },
-  });
-
-  const personal = await strata.tenants.create({
-    name: 'Personal',
-    meta: { container: 'personal-workspace' },
-  });
-
-  console.log('Created tenants:');
-  const tenants = await strata.tenants.list();
-  for (const t of tenants) {
-    console.log(`  • ${t.name} (${t.id})`);
-  }
-
-  // ── Load work tenant and add data ────────────────────
-
-  await strata.tenants.load(work.id);
-
-  const taskRepo = strata.repo(taskDef) as Repository<Task>;
-  taskRepo.save({ title: 'Ship v2 release', done: false });
-  taskRepo.save({ title: 'Review PRs', done: true });
-  taskRepo.save({ title: 'Update docs', done: false });
-
-  const noteRepo = strata.repo(noteDef) as Repository<Note>;
-  noteRepo.save({ body: 'Standup at 9am' });
-
-  printTasks(strata, 'Work');
-  printNotes(strata, 'Work');
-
-  // ── Switch to personal tenant ────────────────────────
-
-  await strata.tenants.load(personal.id);
-  console.log('\n--- Switched to Personal tenant ---');
-  console.log('Active tenant:', strata.tenants.activeTenant$.getValue()?.name);
-
-  // ── Query & update ───────────────────────────────────
-
-  const taskRepo2 = strata.repo(taskDef) as Repository<Task>;
-  taskRepo2.save({ title: 'Buy groceries', done: false });
-
-  const allTasks = taskRepo2.query({ where: { done: false } });
-  console.log(`\nOpen tasks: ${allTasks.length}`);
-  for (const t of allTasks) {
-    console.log(`  - ${t.title}`);
-  }
-
-  // ── Observe reactive changes ─────────────────────────
-
-  const sub = taskRepo2.observeQuery().subscribe((tasks) => {
-    console.log(`\n[Reactive] Task count changed: ${tasks.length}`);
-  });
-
-  taskRepo2.save({ title: 'Call dentist', done: true });
-
-  sub.unsubscribe();
-
-  // ── Clean up ─────────────────────────────────────────
-
-  await strata.dispose();
-  console.log('\nDone.');
-}
-
-main().catch(console.error);
+new MultiTenantDemo().run().catch(console.error);

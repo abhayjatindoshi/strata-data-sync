@@ -1,6 +1,7 @@
 import type { Hlc } from '@strata/hlc';
 import type { Tenant } from '@strata/adapter';
 import { STRATA_MARKER_KEY } from '@strata/adapter';
+import type { PartitionBlob } from '@strata/persistence';
 import { partitionHash } from '@strata/persistence';
 import type { EntityStore } from './types';
 
@@ -8,7 +9,7 @@ export class Store implements EntityStore {
   private readonly partitions = new Map<string, Map<string, unknown>>();
   private readonly tombstones = new Map<string, Map<string, Hlc>>();
   private readonly dirtyKeys = new Set<string>();
-  private storedMarkerBlob: unknown = null;
+  private storedMarkerBlob: PartitionBlob | null = null;
 
   getEntity(entityKey: string, id: string): unknown | undefined {
     return this.partitions.get(entityKey)?.get(id);
@@ -91,7 +92,7 @@ export class Store implements EntityStore {
 
   // ─── BlobAdapter interface ─────────────────────────────
 
-  async read(_tenant: Tenant | undefined, key: string): Promise<unknown> {
+  async read(_tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null> {
     if (key === STRATA_MARKER_KEY) {
       return this.buildMarkerBlob();
     }
@@ -116,7 +117,7 @@ export class Store implements EntityStore {
     };
   }
 
-  async write(_tenant: Tenant | undefined, key: string, data: unknown): Promise<void> {
+  async write(_tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void> {
     if (key === STRATA_MARKER_KEY) {
       this.storedMarkerBlob = data;
       return;
@@ -124,12 +125,10 @@ export class Store implements EntityStore {
     const dotIndex = key.indexOf('.');
     if (dotIndex < 0) return;
     const entityName = key.substring(0, dotIndex);
-    const blob = data as Record<string, unknown>;
     const entities =
-      (blob[entityName] as Record<string, unknown> | undefined) ?? {};
-    const deletedSection = blob['deleted'] as Record<string, unknown> | undefined;
-    const tombstoneData =
-      (deletedSection?.[entityName] as Record<string, Hlc> | undefined) ?? {};
+      (data[entityName] as Record<string, unknown> | undefined) ?? {};
+    const deletedSection = data['deleted'] as Record<string, Record<string, Hlc>> | undefined;
+    const tombstoneData = deletedSection?.[entityName] ?? {};
 
     const partition = new Map<string, unknown>();
     for (const [id, entity] of Object.entries(entities)) {
@@ -161,7 +160,7 @@ export class Store implements EntityStore {
     return keys;
   }
 
-  private buildMarkerBlob(): Record<string, unknown> {
+  private buildMarkerBlob(): PartitionBlob {
     const indexes: Record<string, Record<string, { hash: number; count: number; deletedCount: number; updatedAt: number }>> = {};
     for (const entityKey of this.partitions.keys()) {
       const dotIndex = entityKey.indexOf('.');
@@ -191,10 +190,15 @@ export class Store implements EntityStore {
     }
 
     return {
-      version: 1,
-      createdAt: new Date(),
-      entityTypes: [],
-      indexes,
+      __system: {
+        marker: {
+          version: 1,
+          createdAt: new Date(),
+          entityTypes: [],
+          indexes,
+        },
+      },
+      deleted: {},
     };
   }
 }

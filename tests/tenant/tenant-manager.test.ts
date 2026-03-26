@@ -77,8 +77,9 @@ describe('TenantManager', () => {
       const created = await tm.create({ name: 'T', meta: { folder: 'f1' } });
       const marker = await adapter.read(created, STRATA_MARKER_KEY);
       expect(marker).not.toBeNull();
-      const parsed = marker as { version: number };
-      expect(parsed.version).toBe(1);
+      const system = (marker as Record<string, unknown>)['__system'] as Record<string, unknown>;
+      const markerData = system['marker'] as { version: number };
+      expect(markerData.version).toBe(1);
     });
 
     it('persists tenant to list', async () => {
@@ -124,7 +125,7 @@ describe('TenantManager', () => {
       const adapter = createMemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'shared-id', name: 'Shared', meta: { folder: 'shared' }, createdAt: new Date(), updatedAt: new Date() };
-      await adapter.write(tempTenant, STRATA_MARKER_KEY, marker);
+      await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
       const tm = createTenantManager(adapter, { deriveTenantId: () => 'shared-id' });
       const tenant = await tm.setup({ meta: { folder: 'shared' }, name: 'Shared' });
@@ -145,7 +146,7 @@ describe('TenantManager', () => {
       const adapter = createMemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'derived-id', name: '', meta: { folder: 'f1' }, createdAt: new Date(), updatedAt: new Date() };
-      await adapter.write(tempTenant, STRATA_MARKER_KEY, marker);
+      await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
       const tm = createTenantManager(adapter, {
         deriveTenantId: () => 'derived-id',
@@ -161,7 +162,7 @@ describe('TenantManager', () => {
       const adapter = createMemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'default-id', name: '', meta: {}, createdAt: new Date(), updatedAt: new Date() };
-      await adapter.write(tempTenant, STRATA_MARKER_KEY, marker);
+      await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
       const tm = createTenantManager(adapter, { deriveTenantId: () => 'default-id' });
       const tenant = await tm.setup({ meta: {} });

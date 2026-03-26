@@ -86,7 +86,7 @@ describe('Sharing flow', () => {
     const adapter = createMemoryBlobAdapter();
     const tempTenant = makeTenant('bad-ver', {});
     const marker = { version: 99, createdAt: new Date(), entityTypes: [] };
-    await adapter.write(tempTenant, STRATA_MARKER_KEY, marker);
+    await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
     const tm = createTenantManager(adapter, { deriveTenantId: () => 'bad-ver' });
     await expect(tm.setup({ meta: {} })).rejects.toThrow(

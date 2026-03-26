@@ -1,15 +1,19 @@
 import type { BlobAdapter, Tenant } from '@strata/adapter';
 import { STRATA_MARKER_KEY } from '@strata/adapter';
-import type { AllIndexes, PartitionIndex } from './types';
+import type { AllIndexes, PartitionIndex, PartitionBlob } from './types';
+
+const MARKER_ENTITY_KEY = '__system';
 
 export async function loadAllIndexes(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
 ): Promise<AllIndexes> {
-  const data = await adapter.read(tenant, STRATA_MARKER_KEY);
-  if (!data) return {};
-  const blob = data as { indexes?: AllIndexes };
-  return blob.indexes ?? {};
+  const blob = await adapter.read(tenant, STRATA_MARKER_KEY);
+  if (!blob) return {};
+  const systemEntities = blob[MARKER_ENTITY_KEY] as Record<string, unknown> | undefined;
+  if (!systemEntities) return {};
+  const marker = systemEntities['marker'] as { indexes?: AllIndexes } | undefined;
+  return marker?.indexes ?? {};
 }
 
 export async function saveAllIndexes(
@@ -18,13 +22,18 @@ export async function saveAllIndexes(
   indexes: AllIndexes,
 ): Promise<void> {
   const existing = await adapter.read(tenant, STRATA_MARKER_KEY);
-  let blob: Record<string, unknown>;
+  let markerData: Record<string, unknown>;
   if (existing) {
-    blob = existing as Record<string, unknown>;
+    const systemEntities = existing[MARKER_ENTITY_KEY] as Record<string, unknown> | undefined;
+    markerData = systemEntities?.['marker'] as Record<string, unknown> ?? { version: 1, createdAt: new Date(), entityTypes: [] };
   } else {
-    blob = { version: 1, createdAt: new Date(), entityTypes: [] };
+    markerData = { version: 1, createdAt: new Date(), entityTypes: [] };
   }
-  blob.indexes = indexes;
+  markerData['indexes'] = indexes;
+  const blob: PartitionBlob = {
+    [MARKER_ENTITY_KEY]: { marker: markerData },
+    deleted: {},
+  };
   await adapter.write(tenant, STRATA_MARKER_KEY, blob);
 }
 

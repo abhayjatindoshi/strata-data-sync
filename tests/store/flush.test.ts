@@ -84,7 +84,7 @@ describe('loadPartitionFromAdapter', () => {
     const adapter = createMemoryBlobAdapter();
     const store = createStore();
 
-    const blob = { task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } } };
+    const blob = { task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } }, deleted: {} };
     await adapter.write(undefined, 'task._', blob);
 
     const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');

@@ -84,12 +84,9 @@ export async function updateIndexesAfterSync(
     const blob = await localAdapter.read(tenant, blobKey);
     if (!blob) continue;
 
-    const data = blob as Record<string, unknown>;
     const entities =
-      (data[entityName] as Record<string, unknown> | undefined) ?? {};
-    const deleted = data['deleted'] as Record<string, unknown> | undefined;
-    const tombstones =
-      (deleted?.[entityName] as Record<string, Hlc> | undefined) ?? {};
+      (blob[entityName] as Record<string, unknown> | undefined) ?? {};
+    const tombstones = blob.deleted[entityName] ?? {};
 
     const hlcMap = buildHlcMap(entities, tombstones);
     const hash = partitionHash(hlcMap);

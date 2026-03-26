@@ -1,5 +1,6 @@
 import type { Hlc } from '@strata/hlc';
 import { compareHlc } from '@strata/hlc';
+import type { PartitionBlob } from '@strata/persistence';
 import type { EntityDiffResult, MergeResult, SyncEntity } from './types';
 import { resolveConflict, resolveEntityTombstone } from './conflict';
 
@@ -65,25 +66,17 @@ function resolveBothEntry(
 }
 
 export function mergePartition(
-  localBlob: unknown,
-  cloudBlob: unknown,
+  localBlob: PartitionBlob,
+  cloudBlob: PartitionBlob,
   entityName: string,
 ): MergeResult {
-  const localData = localBlob as Record<string, unknown>;
-  const cloudData = cloudBlob as Record<string, unknown>;
-
   const localEntities =
-    (localData[entityName] as Record<string, unknown> | undefined) ?? {};
+    (localBlob[entityName] as Record<string, unknown> | undefined) ?? {};
   const cloudEntities =
-    (cloudData[entityName] as Record<string, unknown> | undefined) ?? {};
+    (cloudBlob[entityName] as Record<string, unknown> | undefined) ?? {};
 
-  // Type assertions needed: deserialize returns unknown structure from JSON blobs
-  const deletedLocal = localData['deleted'] as Record<string, unknown> | undefined;
-  const deletedCloud = cloudData['deleted'] as Record<string, unknown> | undefined;
-  const localTombstones =
-    (deletedLocal?.[entityName] as Record<string, Hlc> | undefined) ?? {};
-  const cloudTombstones =
-    (deletedCloud?.[entityName] as Record<string, Hlc> | undefined) ?? {};
+  const localTombstones = localBlob.deleted[entityName] ?? {};
+  const cloudTombstones = cloudBlob.deleted[entityName] ?? {};
 
   const diff = diffEntityMaps(
     localEntities, localTombstones, cloudEntities, cloudTombstones,

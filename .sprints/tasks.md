@@ -1,4 +1,58 @@
-<!-- Active: sprint-unified-sync-refactor -->
+<!-- Active: sprint-shared-types-typed-adapter -->
+
+## Sprint — Shared Types & Typed BlobAdapter
+Started: 2026-03-25T08:00:00Z
+
+Epics: E27 (shared-types-typed-adapter)
+
+Normalize all adapter data to `PartitionBlob`. Type `BlobAdapter.read()` to return `PartitionBlob | null` and `BlobAdapter.write()` to accept `PartitionBlob`. Restructure `__strata` marker and `__tenants` list as PartitionBlob-format blobs. Remove `MarkerBlob` and `TenantListBlob` types. Keep `Tenant` in `tenant/types.ts` and `PartitionBlob` in `persistence/types.ts` — no `src/types/` shared module needed. Fix `example/app-fs.ts`.
+
+### Phase 1 — Type the BlobAdapter Interface
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 1 | Update `BlobAdapter` interface in `src/adapter/types.ts` — change `read()` return type from `Promise<unknown>` to `Promise<PartitionBlob \| null>`, change `write()` data param from `unknown` to `PartitionBlob`, import `PartitionBlob` from `@strata/persistence` | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:20:00Z |
+| 2 | Move `Tenant` type definition from `src/adapter/types.ts` back to `src/tenant/types.ts`; update `src/adapter/types.ts` to import `Tenant` from `@strata/tenant`; update barrel re-exports to preserve public API | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:22:00Z |
+| 3 | Update `MemoryBlobAdapter` in `src/adapter/memory.ts` — store `PartitionBlob` values instead of `unknown`, use structured clone for defensive copy on `PartitionBlob` objects | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:24:00Z |
+
+### Phase 2 — Restructure `__strata` Marker as PartitionBlob
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 4 | Restructure `__strata` marker blob to PartitionBlob format in `src/tenant/marker-blob.ts` — store marker data (version, createdAt, entityTypes, indexes) as an entity keyed by a well-known ID within a system partition; remove `MarkerBlob` type | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:26:00Z |
+| 5 | Update `writeMarkerBlob` and `readMarkerBlob` in `src/tenant/marker-blob.ts` to produce and consume `PartitionBlob` format instead of the removed `MarkerBlob` type | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:26:00Z |
+| 6 | Update `loadAllIndexes`/`saveAllIndexes` in `src/persistence/partition-index.ts` to read/write indexes from the restructured `__strata` PartitionBlob | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:28:00Z |
+
+### Phase 3 — Restructure `__tenants` List as PartitionBlob
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 7 | Restructure `__tenants` blob to PartitionBlob format — each `Tenant` stored as an entity keyed by `tenant.id` in the partition entity map; remove `TenantListBlob` type from `src/persistence/types.ts` | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:30:00Z |
+| 8 | Update `loadTenantList`/`saveTenantList` in `src/tenant/tenant-list.ts` to read/write PartitionBlob format (extract tenants from entity map, write tenants keyed by ID) | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:30:00Z |
+| 9 | Update `mergeTenantLists`, `pushTenantList`, `pullTenantList` in tenant sync code to work with PartitionBlob-based tenant storage | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:30:00Z |
+
+### Phase 4 — Update Store & Framework Code
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 10 | Update `src/store/store.ts` BlobAdapter methods (`read`, `write`) to return/accept `PartitionBlob` instead of `unknown` | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:34:00Z |
+| 11 | Update all framework code that consumes adapter `read()` results to use `PartitionBlob` instead of `unknown` — sync modules (`src/sync/`), tenant modules (`src/tenant/`), strata entry point (`src/strata.ts`) | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:34:00Z |
+| 12 | Fix `example/app-fs.ts` — replace broken `Meta` import with `Tenant`, update FS adapter to conform to typed `PartitionBlob` BlobAdapter interface | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:36:00Z |
+
+### Phase 5 — Cleanup
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 13 | Delete `src/types/` shared module files if they exist (types stay in their origin modules) | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:38:00Z |
+| 14 | Update barrel exports across all affected modules (`src/adapter/index.ts`, `src/persistence/index.ts`, `src/tenant/index.ts`) — remove `MarkerBlob`, `TenantListBlob` exports; ensure `Tenant` re-exported from adapter barrel for backward compatibility | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:38:00Z |
+
+### Phase 6 — Tests, Review & Verification
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 15 | Update all unit and integration tests for `PartitionBlob`-typed BlobAdapter, restructured `__strata` marker, and restructured `__tenants` list | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:40:00Z |
+| 16 | Review all changes for type safety, design alignment, and completeness | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:40:00Z |
+| 17 | Build (`npm run build`) and verify all tests pass (`npm test`) | E27 | developer | done | plan | 2026-03-25T08:00:00Z | 2026-03-25T06:40:00Z |
 
 ## Sprint — Unified Sync Refactor
 Started: 2026-03-24T21:00:00Z

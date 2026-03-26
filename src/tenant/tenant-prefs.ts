@@ -1,9 +1,11 @@
 import debug from 'debug';
 import type { BlobAdapter, Tenant } from '@strata/adapter';
+import type { PartitionBlob } from '@strata/persistence';
 
 const log = debug('strata:tenant');
 
 const TENANT_PREFS_KEY = '__tenant_prefs';
+const PREFS_ENTITY_KEY = '__prefs';
 
 export type TenantPrefs = {
   readonly name: string;
@@ -16,7 +18,11 @@ export async function saveTenantPrefs(
   tenant: Tenant | undefined,
   prefs: TenantPrefs,
 ): Promise<void> {
-  await adapter.write(tenant, TENANT_PREFS_KEY, prefs);
+  const blob: PartitionBlob = {
+    [PREFS_ENTITY_KEY]: { prefs },
+    deleted: {},
+  };
+  await adapter.write(tenant, TENANT_PREFS_KEY, blob);
   log('saved tenant prefs');
 }
 
@@ -24,7 +30,9 @@ export async function loadTenantPrefs(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
 ): Promise<TenantPrefs | undefined> {
-  const data = await adapter.read(tenant, TENANT_PREFS_KEY);
-  if (!data) return undefined;
-  return data as TenantPrefs;
+  const blob = await adapter.read(tenant, TENANT_PREFS_KEY);
+  if (!blob) return undefined;
+  const prefsEntities = blob[PREFS_ENTITY_KEY] as Record<string, unknown> | undefined;
+  if (!prefsEntities) return undefined;
+  return prefsEntities['prefs'] as TenantPrefs | undefined;
 }

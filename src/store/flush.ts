@@ -116,16 +116,12 @@ export async function loadPartitionFromAdapter(
   partitionKey: string,
 ): Promise<Map<string, unknown>> {
   const key = partitionBlobKey(entityName, partitionKey);
-  const data = await adapter.read(tenant, key);
-  if (!data) return new Map();
+  const blob = await adapter.read(tenant, key);
+  if (!blob) return new Map();
 
-  const blob = data as Record<string, unknown>;
   const entities =
     (blob[entityName] as Record<string, unknown> | undefined) ?? {};
-
-  const deletedSection = blob['deleted'] as Record<string, unknown> | undefined;
-  const tombstoneData =
-    (deletedSection?.[entityName] as Record<string, Hlc> | undefined) ?? {};
+  const tombstoneData = blob.deleted[entityName] ?? {};
 
   const entityKey = partitionBlobKey(entityName, partitionKey);
   for (const [id, hlc] of Object.entries(tombstoneData)) {

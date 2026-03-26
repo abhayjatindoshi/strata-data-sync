@@ -7,7 +7,7 @@ export type {
   TenantManager as TenantManagerType,
 } from './types';
 export type { TenantPrefs } from './tenant-prefs';
-export type { MarkerBlob } from './marker-blob';
+export type { MarkerData } from './marker-blob';
 export { loadTenantList, saveTenantList } from './tenant-list';
 export { TenantManager, createTenantManager } from './tenant-manager';
 export { mergeTenantLists, pushTenantList, pullTenantList } from './tenant-sync';

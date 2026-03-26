@@ -1,16 +1,11 @@
-export type Tenant = {
-  readonly id: string;
-  readonly name: string;
-  readonly icon?: string;
-  readonly color?: string;
-  readonly meta: Readonly<Record<string, unknown>>;
-  readonly createdAt: Date;
-  readonly updatedAt: Date;
-};
+import type { PartitionBlob } from '@strata/persistence';
+import type { Tenant } from '@strata/tenant';
+
+export type { Tenant } from '@strata/tenant';
 
 export type BlobAdapter = {
-  read(tenant: Tenant | undefined, key: string): Promise<unknown>;
-  write(tenant: Tenant | undefined, key: string, data: unknown): Promise<void>;
+  read(tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null>;
+  write(tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void>;
   delete(tenant: Tenant | undefined, key: string): Promise<boolean>;
   list(tenant: Tenant | undefined, prefix: string): Promise<string[]>;
 };
