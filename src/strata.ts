@@ -10,6 +10,7 @@ import {
   enableEncryption as enableEnc, disableEncryption as disableEnc,
 } from '@strata/adapter/encryption';
 import type { EntityDefinition } from '@strata/schema';
+import type { BlobMigration } from '@strata/schema/migration';
 import { createEventBus } from '@strata/reactive';
 import { createStore } from '@strata/store';
 import { createRepository, createSingletonRepository } from '@strata/repo';
@@ -18,7 +19,7 @@ import { createTenantManager } from '@strata/tenant';
 import type { TenantManagerType } from '@strata/tenant';
 import {
   createSyncLock, createSyncEventEmitter, createDirtyTracker,
-  createSyncScheduler, syncNow, hydrateFromCloud,
+  createSyncScheduler, syncNow,
   syncBetween,
 } from '@strata/sync';
 import type {
@@ -44,6 +45,7 @@ export type StrataConfig = {
   readonly deviceId: string;
   readonly encryption?: { readonly password: string };
   readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
+  readonly migrations?: ReadonlyArray<BlobMigration>;
   readonly options?: StrataOptions;
 };
 
@@ -151,12 +153,12 @@ export class Strata {
 
     if (!tenantId) return;
 
-    await this.loadTenant(tenantId);
+    await this.tenants.load(tenantId);
     const tenant = this.tenants.activeTenant$.getValue()!;
 
     if (this.config.cloudAdapter) {
       try {
-        await hydrateFromCloud(
+        await syncBetween(
           this.config.cloudAdapter, this.localAdapter,
           this.store, this.entityNames, tenant,
         );
@@ -174,6 +176,8 @@ export class Strata {
         this.store, this.entityNames, tenant, {
           localFlushIntervalMs: this.config.options?.localFlushIntervalMs,
           cloudSyncIntervalMs: this.config.options?.cloudSyncIntervalMs,
+          dirtyTracker: this.dirtyTracker,
+          syncEvents: this.syncEvents,
         },
       );
       this.syncScheduler.start();
@@ -204,14 +208,11 @@ export class Strata {
 
     this.syncEvents.emit({ type: 'sync-started' });
     try {
-      await syncNow(
+      const result = await syncNow(
         this.syncLock, this.localAdapter, this.config.cloudAdapter,
         this.store, this.entityNames, tenant,
       );
       this.dirtyTracker.clearDirty();
-      const result: SyncResult = {
-        entitiesUpdated: 0, conflictsResolved: 0, partitionsSynced: 0,
-      };
       this.syncEvents.emit({ type: 'sync-completed', result });
       return result;
     } catch (err) {

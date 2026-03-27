@@ -75,6 +75,8 @@ export type SyncEventEmitter = {
 export type SyncSchedulerOptions = {
   readonly localFlushIntervalMs?: number;
   readonly cloudSyncIntervalMs?: number;
+  readonly dirtyTracker?: DirtyTracker;
+  readonly syncEvents?: SyncEventEmitter;
 };
 
 export type SyncScheduler = {

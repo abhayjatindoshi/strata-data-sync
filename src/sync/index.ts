@@ -29,7 +29,6 @@ export {
 } from './sync-phase';
 export { purgeStaleTombstones, DEFAULT_TOMBSTONE_RETENTION_MS } from './tombstone';
 export { SyncLock, createSyncLock } from './sync-lock';
-export { hydrateFromCloud } from './hydrate';
 export { SyncScheduler, createSyncScheduler, syncNow } from './sync-scheduler';
 export { SyncEventEmitter, createSyncEventEmitter } from './sync-events';
 export { DirtyTracker, createDirtyTracker } from './dirty-tracker';

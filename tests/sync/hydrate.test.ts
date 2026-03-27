@@ -3,7 +3,7 @@ import { createMemoryBlobAdapter } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import { saveAllIndexes } from '@strata/persistence';
 import { createStore } from '@strata/store';
-import { hydrateFromCloud, syncBetween } from '@strata/sync';
+import { syncBetween } from '@strata/sync';
 
 const tenant: Tenant = { id: 't1', name: 'T', meta: { bucket: 'b' }, createdAt: new Date(), updatedAt: new Date() };
 
@@ -14,7 +14,7 @@ function makePartitionBlob(entityName: string, entities: Record<string, unknown>
   };
 }
 
-describe('hydrateFromCloud', () => {
+describe('hydrateFromCloud (via syncBetween)', () => {
   it('loads cloud partitions into store via local adapter', async () => {
     const cloudAdapter = createMemoryBlobAdapter();
     const localAdapter = createMemoryBlobAdapter();
@@ -26,9 +26,9 @@ describe('hydrateFromCloud', () => {
       task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
     });
 
-    const result = await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], tenant);
+    const result = await syncBetween(cloudAdapter, localAdapter, store, ['task'], tenant);
 
-    expect(result).toEqual(['task']);
+    expect(result.hydratedEntityNames).toEqual(['task']);
     expect(store.getEntity('task._', 'task._.abc')).toEqual(entity);
   });
 
@@ -44,7 +44,7 @@ describe('hydrateFromCloud', () => {
       task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
     });
 
-    await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], tenant);
+    await syncBetween(cloudAdapter, localAdapter, store, ['task'], tenant);
 
     const localBlob = await localAdapter.read(tenant, 'task._');
     expect(localBlob).not.toBeNull();
@@ -62,7 +62,7 @@ describe('hydrateFromCloud', () => {
       task: { '_': { hash: 222, count: 1, updatedAt: 1000 } },
     });
 
-    await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], tenant);
+    await syncBetween(cloudAdapter, localAdapter, store, ['task'], tenant);
 
     const tombstones = store.getTombstones('task._');
     expect(tombstones.get('task._.deleted1')).toEqual(tombstoneHlc);
@@ -77,20 +77,20 @@ describe('hydrateFromCloud', () => {
       task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
     });
 
-    const result = await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], tenant);
+    const result = await syncBetween(cloudAdapter, localAdapter, store, ['task'], tenant);
 
-    expect(result).toEqual(['task']);
+    expect(result.hydratedEntityNames).toEqual(['task']);
     const localBlob = await localAdapter.read(tenant, 'task._');
     expect(localBlob).toBeNull();
   });
 
-  it('returns empty when no cloud partitions exist', async () => {
+  it('returns entity names when no cloud partitions exist', async () => {
     const cloudAdapter = createMemoryBlobAdapter();
     const localAdapter = createMemoryBlobAdapter();
     const store = createStore();
 
-    const result = await hydrateFromCloud(cloudAdapter, localAdapter, store, ['task'], undefined);
-    expect(result).toEqual(['task']);
+    const result = await syncBetween(cloudAdapter, localAdapter, store, ['task'], undefined);
+    expect(result.hydratedEntityNames).toEqual(['task']);
   });
 });
 

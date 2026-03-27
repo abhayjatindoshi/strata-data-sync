@@ -1,4 +1,56 @@
-<!-- Active: sprint-test-cleanup-docs -->
+<!-- Active: sprint-migration-sync-cleanup -->
+
+## Sprint — Migration Redesign & Sync Cleanup
+Started: 2026-03-27T14:00:00Z
+
+Epics: E32 (Migration Redesign), E33 (Sync Cleanup & Redesign)
+
+### Phase 1 — Migration Redesign (E32)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 1 | Add `__v?: number` to `PartitionBlob` type | E32 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:05:00Z |
+| 2 | Create `BlobMigration` type and `migrateBlob()` function, replace entity-level `migrateEntity` | E32 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:05:00Z |
+| 3 | Add `migrations?: ReadonlyArray<BlobMigration>` to `StrataConfig` and wire through Strata class | E32 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:05:00Z |
+| 4 | Remove entity-level `version`/`migrations` from `EntityDefinitionOptions`, `EntityDefinition`, and `defineEntity` | E32 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:05:00Z |
+| 5 | Update `loadPartitionFromAdapter` to use blob-level migration instead of entity-level | E32 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:05:00Z |
+| 6 | Update barrel exports in `schema/index.ts` | E32 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:05:00Z |
+
+### Phase 2 — Sync Cleanup & Redesign (E33)
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 7 | Fix recursive `loadTenant` bug: change `this.loadTenant(tenantId)` → `this.tenants.load(tenantId)` | E33 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:10:00Z |
+| 8 | DM-13: Pass `DirtyTracker` to `SyncScheduler`, clear dirty only after successful cloud sync | E33 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:10:00Z |
+| 9 | DM-14: Update `syncNow` to return `SyncResult`, use real values in `Strata.sync()` | E33 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:10:00Z |
+| 10 | Emit sync events from scheduler cloud sync cycle (pass `SyncEventEmitter` to scheduler) | E33 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:10:00Z |
+| 11 | Deduplicate: inline `hydrateFromCloud`, use `syncBetween` directly in `Strata.loadTenant` | E33 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:10:00Z |
+| 12 | Rename `syncMemoryToLocal` → `flushToLocal`, remove `hydrateFromCloud` export | E33 | developer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:10:00Z |
+
+### Phase 3 — Review
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 13 | Review all E32 migration redesign changes | E32 | reviewer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:30:00Z |
+| 14 | Review all E33 sync cleanup changes | E33 | reviewer | done | plan | 2026-03-27T14:00:00Z | 2026-03-27T14:30:00Z |
+
+### Phase 4 — Unit Tests
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 15 | Update migration tests for blob-level approach | E32 | unit-tester | done | test | 2026-03-27T14:00:00Z | 2026-03-27T14:35:00Z |
+| 16 | Update sync scheduler and strata tests for DM-13, DM-14 changes | E33 | unit-tester | done | test | 2026-03-27T14:00:00Z | 2026-03-27T14:35:00Z |
+
+### Phase 5 — Integration Tests
+
+| # | Task | Epic | Assigned | Status | Source | Created | Completed |
+|---|------|------|----------|--------|--------|---------|----------|
+| 17 | Update integration migration tests for blob-level approach | E32 | integration-tester | done | test | 2026-03-27T14:00:00Z | 2026-03-27T14:35:00Z |
+| 18 | Build and run all tests to verify sprint changes | E33 | integration-tester | done | test | 2026-03-27T14:00:00Z | 2026-03-27T14:40:00Z |
+
+---
+
+<!-- Previous: sprint-test-cleanup-docs -->
 
 ## Sprint — Test Cleanup & Documentation Gaps
 Started: 2026-03-27T09:00:00Z

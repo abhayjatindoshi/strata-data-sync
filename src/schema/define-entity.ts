@@ -25,10 +25,8 @@ export function defineEntity<T>(
   }
 
   const deriveId = options?.deriveId ? wrapDeriveId(options.deriveId) : undefined;
-  const version = options?.version ?? 1;
-  const migrations = options?.migrations;
 
-  return { name, keyStrategy, deriveId, version, migrations };
+  return { name, keyStrategy, deriveId };
 }
 
 function wrapDeriveId<T>(fn: (entity: T) => string): (entity: T) => string {
