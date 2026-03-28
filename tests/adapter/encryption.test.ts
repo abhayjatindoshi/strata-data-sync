@@ -1,131 +1,86 @@
 import { describe, it, expect } from 'vitest';
-import { MemoryStorageAdapter } from '@strata/adapter';
-import {
-  initEncryption, changeEncryptionPassword,
-  enableEncryption, disableEncryption,
-} from '@strata/adapter/encryption';
-import { InvalidEncryptionKeyError } from '@strata/adapter/crypto';
+import { MemoryStorageAdapter, MemoryBlobAdapter, AdapterBridge } from '@strata/adapter';
+import { EncryptionTransformService, createEncryptedMarkerDek } from '@strata/adapter/encryption';
+import { InvalidEncryptionKeyError, encrypt, generateDek, exportDek } from '@strata/adapter/crypto';
 import { serialize, deserialize } from '@strata/persistence';
+import type { PartitionBlob } from '@strata/persistence';
 
-describe('Encryption lifecycle', () => {
+describe('EncryptionTransformService', () => {
   const appId = 'test-app';
 
-  describe('initEncryption', () => {
-    it('bootstraps new encryption on first call', async () => {
-      const storage = new MemoryStorageAdapter();
-      const ctx = await initEncryption(storage, appId, 'password');
-      expect(ctx.dek).toBeDefined();
-      expect(ctx.salt.length).toBe(16);
-      expect(ctx.encrypt).toBeTypeOf('function');
-      expect(ctx.decrypt).toBeTypeOf('function');
-    });
-
-    it('stores salt and DEK in storage', async () => {
-      const storage = new MemoryStorageAdapter();
-      await initEncryption(storage, appId, 'password');
-      const salt = await storage.read(undefined, `${appId}/__strata_salt`);
-      const dek = await storage.read(undefined, `${appId}/__strata_dek`);
-      expect(salt).not.toBeNull();
-      expect(dek).not.toBeNull();
-    });
-
-    it('loads existing DEK on subsequent call', async () => {
-      const storage = new MemoryStorageAdapter();
-      const ctx1 = await initEncryption(storage, appId, 'password');
-
-      // Encrypt some data
-      const plaintext = new Uint8Array([1, 2, 3]);
-      const encrypted = await ctx1.encrypt(plaintext);
-
-      // Re-init with same password
-      const ctx2 = await initEncryption(storage, appId, 'password');
-      const decrypted = await ctx2.decrypt(encrypted);
-      expect(decrypted).toEqual(plaintext);
-    });
-
-    it('wrong password throws InvalidEncryptionKeyError', async () => {
-      const storage = new MemoryStorageAdapter();
-      await initEncryption(storage, appId, 'correct');
-      await expect(initEncryption(storage, appId, 'wrong'))
-        .rejects.toThrow(InvalidEncryptionKeyError);
-    });
+  it('passthrough when not configured', async () => {
+    const svc = new EncryptionTransformService();
+    const transform = svc.toTransform();
+    const data = new Uint8Array([1, 2, 3]);
+    const encoded = await transform.encode(undefined, 'task.global', data);
+    expect(encoded).toEqual(data);
+    const decoded = await transform.decode(undefined, 'task.global', encoded);
+    expect(decoded).toEqual(data);
   });
 
-  describe('changeEncryptionPassword', () => {
-    it('allows re-init with new password after change', async () => {
-      const storage = new MemoryStorageAdapter();
-      const ctx1 = await initEncryption(storage, appId, 'old-pass');
-      const plaintext = new Uint8Array([10, 20, 30]);
-      const encrypted = await ctx1.encrypt(plaintext);
-
-      await changeEncryptionPassword(storage, appId, 'old-pass', 'new-pass');
-
-      // Old password no longer works
-      await expect(initEncryption(storage, appId, 'old-pass'))
-        .rejects.toThrow(InvalidEncryptionKeyError);
-
-      // New password works and can decrypt data encrypted with original DEK
-      const ctx2 = await initEncryption(storage, appId, 'new-pass');
-      const decrypted = await ctx2.decrypt(encrypted);
-      expect(decrypted).toEqual(plaintext);
-    });
-
-    it('throws when no encryption is configured', async () => {
-      const storage = new MemoryStorageAdapter();
-      await expect(changeEncryptionPassword(storage, appId, 'old', 'new'))
-        .rejects.toThrow('No encryption configured');
-    });
+  it('always passes through __tenants key', async () => {
+    const svc = new EncryptionTransformService();
+    await svc.setup('password', appId);
+    const transform = svc.toTransform();
+    const data = new Uint8Array([1, 2, 3]);
+    const encoded = await transform.encode(undefined, '__tenants', data);
+    expect(encoded).toEqual(data);
   });
 
-  describe('enableEncryption', () => {
-    it('encrypts existing unencrypted blobs', async () => {
-      const storage = new MemoryStorageAdapter();
-      const data = { task: { id1: { id: 'id1', title: 'test' } }, deleted: {} };
-      const serialized = serialize(data);
-      await storage.write(undefined, `${appId}/task.global`, serialized);
-
-      const ctx = await enableEncryption(storage, appId, 'password');
-
-      // Raw data should now be encrypted (different from original)
-      const raw = await storage.read(undefined, `${appId}/task.global`);
-      expect(raw).not.toEqual(serialized);
-
-      // But can be decrypted
-      const decrypted = await ctx.decrypt(raw!);
-      const restored = deserialize(decrypted);
-      expect(restored).toEqual(data);
-    });
+  it('encrypts/decrypts __strata with markerKey', async () => {
+    const svc = new EncryptionTransformService();
+    await svc.setup('password', appId);
+    const transform = svc.toTransform();
+    const data = new TextEncoder().encode('marker data');
+    const encrypted = await transform.encode(undefined, '__strata', data);
+    expect(encrypted).not.toEqual(data);
+    expect(encrypted[0]).toBe(1); // version byte
+    const decrypted = await transform.decode(undefined, '__strata', encrypted);
+    expect(decrypted).toEqual(data);
   });
 
-  describe('disableEncryption', () => {
-    it('decrypts all encrypted blobs and removes salt/DEK', async () => {
-      const storage = new MemoryStorageAdapter();
-      const ctx = await initEncryption(storage, appId, 'password');
+  it('wrong password fails to decrypt __strata', async () => {
+    const svc1 = new EncryptionTransformService();
+    await svc1.setup('correct', appId);
+    const data = new TextEncoder().encode('secret');
+    const encrypted = await svc1.toTransform().encode(undefined, '__strata', data);
 
-      // Write encrypted data
-      const data = { task: { id1: { id: 'id1' } }, deleted: {} };
-      const encrypted = await ctx.encrypt(serialize(data));
-      await storage.write(undefined, `${appId}/task.global`, encrypted);
+    const svc2 = new EncryptionTransformService();
+    await svc2.setup('wrong', appId);
+    await expect(svc2.toTransform().decode(undefined, '__strata', encrypted))
+      .rejects.toThrow(InvalidEncryptionKeyError);
+  });
 
-      await disableEncryption(storage, appId, 'password');
+  it('encrypts/decrypts data blobs with DEK', async () => {
+    const svc = new EncryptionTransformService();
+    await svc.setup('password', appId);
+    const { dek } = await createEncryptedMarkerDek();
+    svc.setDek(dek);
+    const transform = svc.toTransform();
+    const data = new TextEncoder().encode('entity data');
+    const encrypted = await transform.encode(undefined, 'task.global', data);
+    expect(encrypted).not.toEqual(data);
+    const decrypted = await transform.decode(undefined, 'task.global', encrypted);
+    expect(decrypted).toEqual(data);
+  });
 
-      // Salt and DEK should be removed
-      const salt = await storage.read(undefined, `${appId}/__strata_salt`);
-      const dek = await storage.read(undefined, `${appId}/__strata_dek`);
-      expect(salt).toBeNull();
-      expect(dek).toBeNull();
+  it('clear resets state', async () => {
+    const svc = new EncryptionTransformService();
+    await svc.setup('password', appId);
+    expect(svc.isConfigured).toBe(true);
+    svc.clear();
+    expect(svc.isConfigured).toBe(false);
+    // After clear, data passes through
+    const transform = svc.toTransform();
+    const data = new Uint8Array([1, 2, 3]);
+    const encoded = await transform.encode(undefined, '__strata', data);
+    expect(encoded).toEqual(data);
+  });
 
-      // Data should now be plain (readable without decryption)
-      const raw = await storage.read(undefined, `${appId}/task.global`);
-      const restored = deserialize(raw!);
-      expect(restored).toEqual(data);
-    });
-
-    it('wrong password throws', async () => {
-      const storage = new MemoryStorageAdapter();
-      await initEncryption(storage, appId, 'correct');
-      await expect(disableEncryption(storage, appId, 'wrong'))
-        .rejects.toThrow(InvalidEncryptionKeyError);
-    });
+  it('createEncryptedMarkerDek generates base64 dek', async () => {
+    const { dek, dekBase64 } = await createEncryptedMarkerDek();
+    expect(dek).toBeDefined();
+    expect(typeof dekBase64).toBe('string');
+    expect(dekBase64.length).toBeGreaterThan(0);
   });
 });

@@ -6,7 +6,7 @@
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "${workspaceFolder}/example/node_modules/.bin/tsx",
-      "args": ["${workspaceFolder}/example/app-fs.ts"],
+      "args": ["${workspaceFolder}/example/app-encrypted.ts"],
       "cwd": "${workspaceFolder}/example",
       "console": "integratedTerminal"
     }

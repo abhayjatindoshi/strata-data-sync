@@ -12,8 +12,8 @@ export type BlobAdapter = {
 };
 
 export type BlobTransform = {
-  encode(data: Uint8Array): Promise<Uint8Array>;
-  decode(data: Uint8Array): Promise<Uint8Array>;
+  encode(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<Uint8Array>;
+  decode(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<Uint8Array>;
 };
 
 export type StorageAdapter = {

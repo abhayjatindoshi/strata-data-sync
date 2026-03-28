@@ -3,12 +3,13 @@ import type { Observable } from 'rxjs';
 import { createHlc } from '@strata/hlc';
 import type { Hlc } from '@strata/hlc';
 import type { BlobAdapter, StorageAdapter } from '@strata/adapter';
-import { AdapterBridge } from '@strata/adapter';
+import { AdapterBridge, STRATA_MARKER_KEY } from '@strata/adapter';
 import {
-  changeEncryptionPassword,
-  initEncryption, encryptionTransform,
-  enableEncryption as enableEnc, disableEncryption as disableEnc,
+  EncryptionTransformService,
+  importDek,
 } from '@strata/adapter/encryption';
+import { deriveKey, encrypt as encryptData } from '@strata/adapter/crypto';
+import { serialize } from '@strata/persistence';
 import type { EntityDefinition } from '@strata/schema';
 import type { BlobMigration } from '@strata/schema/migration';
 import { EventBus } from '@strata/reactive';
@@ -16,6 +17,7 @@ import { Store } from '@strata/store';
 import { Repository, SingletonRepository } from '@strata/repo';
 import type { RepositoryType, SingletonRepositoryType } from '@strata/repo';
 import { TenantManager } from '@strata/tenant';
+import { readMarkerBlob } from '@strata/tenant/marker-blob';
 import type { TenantManagerType } from '@strata/tenant';
 import {
   SyncEngine, DirtyTracker,
@@ -43,7 +45,6 @@ export type StrataConfig = {
   readonly localAdapter: BlobAdapter | StorageAdapter;
   readonly cloudAdapter?: BlobAdapter;
   readonly deviceId: string;
-  readonly encryption?: { readonly password: string };
   readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
   readonly migrations?: ReadonlyArray<BlobMigration>;
   readonly options?: StrataOptions;
@@ -87,6 +88,7 @@ export class Strata {
   private readonly config: StrataConfig;
   private readonly localAdapter: BlobAdapter;
   private readonly storageAdapter: StorageAdapter | undefined;
+  private readonly encryptionService: EncryptionTransformService;
   private readonly dirtyFlushListener: (event: { fromSync?: boolean }) => void;
 
   private syncScheduler: SyncSchedulerType | null = null;
@@ -96,10 +98,13 @@ export class Strata {
   constructor(config: StrataConfig) {
     validateEntityDefinitions(config.entities);
     this.config = config;
+    this.encryptionService = new EncryptionTransformService();
 
     if (config.localAdapter.kind === 'storage') {
       this.storageAdapter = config.localAdapter;
-      this.localAdapter = new AdapterBridge(config.localAdapter, config.appId);
+      this.localAdapter = new AdapterBridge(config.localAdapter, {
+        transforms: [this.encryptionService.toTransform()],
+      });
     } else {
       this.storageAdapter = undefined;
       this.localAdapter = config.localAdapter;
@@ -111,6 +116,7 @@ export class Strata {
     this.syncEngine = new SyncEngine(
       this.store, this.localAdapter, config.cloudAdapter,
       config.entities.map(d => d.name), this.hlcRef, this.eventBus,
+      config.migrations,
     );
     this.dirtyTracker = new DirtyTracker();
     this.entityNames = config.entities.map(d => d.name);
@@ -125,9 +131,10 @@ export class Strata {
     }
 
     this.tenants = new TenantManager(this.localAdapter, {
+      appId: config.appId,
       entityTypes: this.entityNames,
       deriveTenantId: config.deriveTenantId,
-    });
+    }, this.encryptionService);
 
     const dirtyFlushListener = (event: { fromSync?: boolean }) => {
       if (!event.fromSync) {
@@ -148,9 +155,10 @@ export class Strata {
     await this.syncEngine.drain();
     this.store.clear();
     this.dirtyTracker.clearDirty();
+    this.encryptionService.clear();
   }
 
-  async loadTenant(tenantId?: string): Promise<void> {
+  async loadTenant(tenantId?: string, opts?: { password?: string }): Promise<void> {
     this.assertNotDisposed();
     await this.unloadCurrentTenant();
 
@@ -158,6 +166,25 @@ export class Strata {
 
     await this.tenants.load(tenantId);
     const tenant = this.tenants.activeTenant$.getValue()!;
+
+    // Detect encryption: read raw __strata bytes
+    if (this.storageAdapter) {
+      const rawBytes = await this.storageAdapter.read(tenant, STRATA_MARKER_KEY);
+      if (rawBytes && rawBytes.length > 0 && rawBytes[0] !== 0x7B) {
+        // Encrypted marker — password required
+        if (!opts?.password) {
+          throw new Error('Password required for encrypted tenant');
+        }
+        await this.encryptionService.setup(opts.password, this.config.appId);
+        // Now the transform is configured with markerKey — read marker through bridge
+        const marker = await readMarkerBlob(this.localAdapter, tenant);
+        if (!marker?.dek) {
+          throw new Error('Encrypted marker missing DEK');
+        }
+        const dek = await importDek(marker.dek);
+        this.encryptionService.setDek(dek);
+      }
+    }
 
     if (this.config.cloudAdapter) {
       try {
@@ -224,22 +251,33 @@ export class Strata {
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
     this.assertNotDisposed();
     if (!this.storageAdapter) throw new Error('localAdapter must be a StorageAdapter for encryption');
-    await changeEncryptionPassword(this.storageAdapter, this.config.appId, oldPassword, newPassword);
+    const tenant = this.tenants.activeTenant$.getValue();
+    if (!tenant) throw new Error('No tenant loaded');
+
+    // Read current __strata raw bytes — should be encrypted
+    const rawBytes = await this.storageAdapter.read(tenant, STRATA_MARKER_KEY);
+    if (!rawBytes || rawBytes[0] === 0x7B) {
+      throw new Error('Current tenant is not encrypted');
+    }
+
+    // Re-encrypt with new password
+    const newMarkerKey = await deriveKey(newPassword, this.config.appId);
+
+    // Read the marker through bridge (already decrypted by current transform)
+    const marker = await readMarkerBlob(this.localAdapter, tenant);
+    if (!marker) throw new Error('Failed to read marker blob');
+
+    // Re-serialize and encrypt with new markerKey
+    const blob = { __system: { marker }, deleted: {} };
+    const serialized = serialize(blob);
+    const reEncrypted = await encryptData(serialized, newMarkerKey);
+    await this.storageAdapter.write(tenant, STRATA_MARKER_KEY, reEncrypted);
+
+    // Update the encryption service with new markerKey
+    await this.encryptionService.setup(newPassword, this.config.appId);
+    this.encryptionService.setDek(await importDek(marker.dek!));
+
     log('encryption password changed');
-  }
-
-  async enableEncryption(password: string): Promise<void> {
-    this.assertNotDisposed();
-    if (!this.storageAdapter) throw new Error('localAdapter must be a StorageAdapter for encryption');
-    await enableEnc(this.storageAdapter, this.config.appId, password);
-    log('encryption enabled');
-  }
-
-  async disableEncryption(password: string): Promise<void> {
-    this.assertNotDisposed();
-    if (!this.storageAdapter) throw new Error('localAdapter must be a StorageAdapter for encryption');
-    await disableEnc(this.storageAdapter, this.config.appId, password);
-    log('encryption disabled');
   }
 
   dispose(): Promise<void> {
@@ -254,20 +292,4 @@ export class Strata {
     })();
     return this.disposePromise;
   }
-}
-
-// ─── Factory ─────────────────────────────────────────────
-
-export async function createStrataAsync(config: StrataConfig): Promise<Strata> {
-  if (config.localAdapter.kind === 'storage' && config.encryption) {
-    const storage = config.localAdapter;
-    const encCtx = await initEncryption(
-      storage, config.appId, config.encryption.password,
-    );
-    const localAdapter = new AdapterBridge(storage, config.appId, {
-      transforms: [encryptionTransform(encCtx)],
-    });
-    return new Strata({ ...config, localAdapter });
-  }
-  return new Strata(config);
 }

@@ -3,7 +3,6 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   Strata,
-  createStrataAsync,
   MemoryBlobAdapter,
   defineEntity,
   partitioned,

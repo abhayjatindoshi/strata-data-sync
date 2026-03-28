@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  createStrataAsync,
+  Strata,
   defineEntity,
   partitioned,
 } from 'strata-data-sync';
@@ -98,12 +98,11 @@ async function main(): Promise<void> {
   console.log(`  ${rawBytes.length} bytes, hex: ${rawBytes.subarray(0, 32).toString('hex')}…\n`);
 
   // Decrypt and load via Strata
-  const strata = await createStrataAsync({
+  const strata = new Strata({
     appId,
     entities: [taskDef, noteDef, settingsDef],
     localAdapter: storage,
     deviceId: 'device-reader',
-    encryption: { password },
   });
 
   // Load existing tenant

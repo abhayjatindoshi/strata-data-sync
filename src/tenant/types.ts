@@ -13,6 +13,7 @@ export type CreateTenantOptions = {
   readonly name: string;
   readonly meta: Record<string, unknown>;
   readonly id?: string;
+  readonly encryption?: { readonly password: string };
 };
 
 export type SetupTenantOptions = {
@@ -21,6 +22,7 @@ export type SetupTenantOptions = {
 };
 
 export type TenantManagerOptions = {
+  readonly appId?: string;
   readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
   readonly entityTypes?: readonly string[];
 };

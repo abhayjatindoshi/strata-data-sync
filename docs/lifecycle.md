@@ -198,46 +198,23 @@ Tracks whether any data has not yet reached the cloud. Clears after successful c
 
 ## Encryption Methods
 
-The `Strata` class exposes three methods for managing at-rest encryption. All three require `localAdapter` to be a `StorageAdapter` (not a raw `BlobAdapter`).
+Encryption is per-tenant — configured at tenant creation and enforced at tenant load. Requires `localAdapter` to be a `StorageAdapter`.
 
 ```typescript
-// Enable encryption on an unencrypted instance.
-// Generates DEK + salt, derives KEK, wraps DEK, stores salt + DEK blobs,
-// and re-encrypts all existing data blobs via StorageAdapter.
-await strata.enableEncryption(password);
+// Create an encrypted tenant
+const tenant = await strata.tenants.create({
+  name: 'Work',
+  meta: {},
+  encryption: { password: 'user-secret' },
+});
 
-// Disable encryption on an encrypted instance.
-// Derives KEK, unwraps DEK, decrypts all existing data blobs,
-// and removes __strata_salt and __strata_dek blobs.
-await strata.disableEncryption(password);
+// Load encrypted tenant (password required)
+await strata.loadTenant(tenant.id, { password: 'user-secret' });
 
-// Change the encryption password.
-// Derives old KEK, unwraps DEK, derives new KEK with same salt,
-// re-wraps DEK, and overwrites __strata_dek blob.
+// Change the encryption password (re-encrypts __strata only, DEK unchanged)
 await strata.changePassword(oldPassword, newPassword);
 ```
 
-Throws `Error` if `localAdapter` is not a `StorageAdapter`.
+Encryption is immutable at tenant creation — it cannot be enabled or disabled after the fact. Password can be changed at any time via `changePassword`.
 
-## `createStrataAsync` Factory
-
-Async version of `createStrata` that handles `StorageAdapter` wrapping and encryption initialization in one step.
-
-```typescript
-const strata = await createStrataAsync({
-  appId: 'my-app',
-  entities: [taskDef, accountDef],
-  localAdapter: myStorageAdapter,   // StorageAdapter (not BlobAdapter)
-  cloudAdapter: myCloudAdapter,
-  deviceId: 'device-1',
-  encryption: { password: 'user-secret' },
-});
-```
-
-When `localAdapter` is a `StorageAdapter` and `encryption` config is provided, `createStrataAsync`:
-
-1. Calls `initEncryption(storageAdapter, appId, password)` to bootstrap or load the DEK
-2. Wraps the `StorageAdapter` with `AdapterBridge`, passing `encryptionTransform(encCtx)` as a transform
-3. Constructs the `Strata` instance with the wrapped adapter
-
-If `localAdapter` is a `BlobAdapter` or no `encryption` config is provided, it behaves identically to `createStrata`.
+Detection is automatic: `loadTenant` reads the raw `__strata` marker bytes. If the first byte is `{` (JSON), the tenant is unencrypted. Otherwise, it's encrypted and throws if no password is provided.

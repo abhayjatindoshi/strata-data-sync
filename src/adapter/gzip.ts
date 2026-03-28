@@ -29,13 +29,13 @@ function toArrayBuffer(data: Uint8Array): ArrayBuffer {
 
 export function gzipTransform(): BlobTransform {
   return {
-    async encode(data: Uint8Array): Promise<Uint8Array> {
+    async encode(_tenant, _key, data: Uint8Array): Promise<Uint8Array> {
       const stream = new Blob([toArrayBuffer(data)])
         .stream()
         .pipeThrough(new CompressionStream('gzip'));
       return streamToUint8Array(stream);
     },
-    async decode(data: Uint8Array): Promise<Uint8Array> {
+    async decode(_tenant, _key, data: Uint8Array): Promise<Uint8Array> {
       const stream = new Blob([toArrayBuffer(data)])
         .stream()
         .pipeThrough(new DecompressionStream('gzip'));

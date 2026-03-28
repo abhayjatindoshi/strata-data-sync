@@ -1,6 +1,10 @@
 import debug from 'debug';
 import { BehaviorSubject } from 'rxjs';
 import type { BlobAdapter } from '@strata/adapter';
+import {
+  EncryptionTransformService,
+  createEncryptedMarkerDek,
+} from '@strata/adapter/encryption';
 import type {
   Tenant,
   CreateTenantOptions,
@@ -34,6 +38,7 @@ export class TenantManager {
   constructor(
     private readonly adapter: BlobAdapter,
     private readonly options?: TenantManagerOptions,
+    private readonly encryptionService?: EncryptionTransformService,
   ) {
     this.subject = new BehaviorSubject<Tenant | undefined>(undefined);
     this.activeTenant$ = this.subject;
@@ -76,7 +81,21 @@ export class TenantManager {
       updatedAt: now,
     };
 
-    await writeMarkerBlob(this.adapter, tenant, this.options?.entityTypes ?? []);
+    let dekBase64: string | undefined;
+    if (opts.encryption && this.encryptionService) {
+      const { dek, dekBase64: b64 } = await createEncryptedMarkerDek();
+      dekBase64 = b64;
+      await this.encryptionService.setup(
+        opts.encryption.password, this.options?.appId ?? '',
+      );
+      this.encryptionService.setDek(dek);
+    }
+
+    await writeMarkerBlob(this.adapter, tenant, this.options?.entityTypes ?? [], dekBase64);
+
+    if (opts.encryption && this.encryptionService) {
+      this.encryptionService.clear();
+    }
 
     await this.persistList([...tenants, tenant]);
     log('created tenant %s', id);

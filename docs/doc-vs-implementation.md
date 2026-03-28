@@ -1,7 +1,7 @@
 # Doc vs Implementation Analysis
 
 Generated: 2026-03-27T03:10:00Z
-Updated: 2026-03-27T12:00:00Z
+Updated: 2026-03-28T14:40:00Z
 
 Issue codes: `DM` = Design Mismatch, `MD` = Missing Documentation, `DO` = Doc-Only (not implemented)
 
@@ -18,19 +18,19 @@ Issue codes: `DM` = Design Mismatch, `MD` = Missing Documentation, `DO` = Doc-On
 | DM-3 | Schema | [schema-repository.md](schema-repository.md) | `SingletonRepository<T>` return types are `T \| undefined` | Returns `(T & BaseEntity) \| undefined` | **FIXED** |
 | DM-4 | Schema | [schema-repository.md](schema-repository.md) | `SingletonRepository.save(entity: T): void` | Signature is `save(entity: T & Partial<BaseEntity>): void` | **FIXED** |
 | DM-5 | Schema | [schema-repository.md](schema-repository.md) | Entity migration via `defineEntity({ version: 2, migrations: {...} })` | Migration is blob-level via `BlobMigration` | **FIXED** |
-| DM-6 | Sync | [persistence-sync.md](persistence-sync.md) | Stale detection: re-check metadata after merge, skip ops if local changed during sync | Not implemented — `syncBetween` has no re-check logic | Open |
+| DM-6 | Sync | [persistence-sync.md](persistence-sync.md) | Stale detection: re-check metadata after merge, skip ops if local changed during sync | `isStale()` snapshots indexes before merge, re-checks adapter A before writing back | **FIXED** |
 | DM-7 | HLC | [persistence-sync.md](persistence-sync.md) | `tickRemote()` called on merge with remote data | `tick()` now called during `syncBetween` merge to advance local HLC | **FIXED** |
 
 ### MEDIUM severity
 
 | Code | Module | Doc | Doc says | Implementation does | Status |
 |---|---|---|---|---|---|
-| DM-8 | Adapter | [adapter.md](adapter.md) | `EncryptionHeader` type implies single serialized blob `{ salt, encryptedDek, version }` | Salt and DEK stored as separate keys (`__strata_salt`, `__strata_dek`); `version` field never persisted | Open |
-| DM-9 | Sync | [persistence-sync.md](persistence-sync.md) | `SyncResult.entitiesUpdated` — name implies entity count | Value is `partitionsCopied` count — different unit than name suggests | Open |
-| DM-10 | Sync | [persistence-sync.md](persistence-sync.md) | `SyncResult.conflictsResolved` — implies count of actual conflicts | Counts all entities in merged partitions, including non-conflicted entities from localOnly/cloudOnly | Open |
-| DM-11 | Sync | [persistence-sync.md](persistence-sync.md) | Directional flows: cloud→local→memory, memory→local, local→cloud | `syncBetween()` always does bidirectional merge; the directional distinction is lost | Open |
-| DM-12 | Sync | [persistence-sync.md](persistence-sync.md) | Store described as separate from adapters | `EntityStore` implements `BlobAdapter` interface — store is a full adapter peer, not documented as such | Open |
-| DM-13 | Strata | [lifecycle.md](lifecycle.md) | `BlobMigration` support in `StrataConfig.migrations` | Field defined but never passed to `loadPartitionFromAdapter()` — dead code, migrations never execute | Open |
+| DM-8 | Adapter | [adapter.md](adapter.md) | `EncryptionHeader` type implies single serialized blob `{ salt, encryptedDek, version }` | Type removed. Per-tenant encryption uses markerKey (derived from password+appId) to encrypt `__strata` which contains raw DEK | **FIXED** |
+| DM-9 | Sync | [persistence-sync.md](persistence-sync.md) | `SyncResult.entitiesUpdated` — name implies entity count | Value counts partition-level changes to target — documented with clarification | **FIXED** |
+| DM-10 | Sync | [persistence-sync.md](persistence-sync.md) | `SyncResult.conflictsResolved` — implies count of actual conflicts | Counts partition-level changes to source — documented with clarification | **FIXED** |
+| DM-11 | Sync | [persistence-sync.md](persistence-sync.md) | Directional flows: cloud→local→memory, memory→local, local→cloud | `syncBetween()` always does bidirectional merge; doc updated to use `↔` arrows and clarify | **FIXED** |
+| DM-12 | Sync | [persistence-sync.md](persistence-sync.md) | Store described as separate from adapters | `EntityStore` implements `BlobAdapter` — documented in sync section as a `BlobAdapter` peer | **FIXED** |
+| DM-13 | Strata | [lifecycle.md](lifecycle.md) | `BlobMigration` support in `StrataConfig.migrations` | Wired through `SyncEngine` → `syncBetween` — migrations applied lazily on blob read during sync | **FIXED** |
 | DM-14 | HLC | [persistence-sync.md](persistence-sync.md) | `createHlc()` type comment: `timestamp: number // max(wall clock, last known timestamp)` | Initial timestamp is `0`, not wall clock. Comment describes runtime principle, not initial state | **FIXED** (documented) |
 
 ### MINOR severity
@@ -72,7 +72,7 @@ Issue codes: `DM` = Design Mismatch, `MD` = Missing Documentation, `DO` = Doc-On
 | DO-1 | `compress()` transform function | [adapter.md](adapter.md) | **FIXED** — replaced with `gzipTransform()` |
 | DO-2 | Entity-level `version` + `migrations` on `defineEntity` | [schema-repository.md](schema-repository.md) | **FIXED** — replaced with `BlobMigration` docs |
 | DO-3 | `migrateEntity(entity, storedVersion, targetVersion, migrations)` | [schema-repository.md](schema-repository.md) | **FIXED** — replaced with `migrateBlob()` docs |
-| DO-4 | Stale detection (re-check metadata after merge) | [persistence-sync.md](persistence-sync.md) | Open — not implemented in `syncBetween` or `syncMergePhase` |
+| DO-4 | Stale detection (re-check metadata after merge) | [persistence-sync.md](persistence-sync.md) | **FIXED** — `isStale()` implemented in `syncBetween` |
 | DO-5 | `tickRemote()` in framework merge flow | [persistence-sync.md](persistence-sync.md) | **FIXED** — merged into `tick()`, wired into `syncBetween` |
 | DO-6 | Background/scheduled tenant list sync | [tenant.md](tenant.md) | **FIXED** — doc updated to state manual invocation required |
 
@@ -85,9 +85,9 @@ Items to review and resolve. Each may result in code changes, doc updates, or ac
 | # | Topic | Related issues | Status |
 |---|---|---|---|
 | Q-1 | HLC: `tickLocal`/`tickRemote` merged into `tick()`, wired into sync merge flow | DM-7, DM-14, DO-5, MD-13, MD-15 | **Resolved** |
-| Q-2 | Sync workflow: `syncBetween` is always bidirectional, directional model in docs is misleading | DM-11 | Pending |
-| Q-3 | SyncResult: field names (`entitiesUpdated`, `conflictsResolved`) don't match their actual values | DM-9, DM-10 | Pending |
+| Q-2 | Sync workflow: `syncBetween` is always bidirectional, directional model in docs is misleading | DM-11 | **Resolved** — doc updated to use `↔` arrows, clarify bidirectional merge |
+| Q-3 | SyncResult: field names (`entitiesUpdated`, `conflictsResolved`) don't match their actual values | DM-9, DM-10 | **Resolved** — documented as partition-level counts with clarification note |
 | Q-4 | Sync lock: `target` parameter is vestigial, all calls pass `source === target` | DM-17 | **Resolved** — `SyncEngine` replaces `SyncLock` with proper `source`/`target` locations |
-| Q-5 | Encryption: doc implies single header blob, implementation uses two separate keys; no `version` persisted | DM-8 | Pending |
-| Q-6 | Migrations: `StrataConfig.migrations` exists but is dead code — never wired to `loadPartitionFromAdapter` | DM-13 | Pending |
-| Q-7 | Tenant manager: no auto-reload, no cloud sync, no freshness check on `load()` | DO-6 (partially fixed) | Pending |
+| Q-5 | Encryption: doc implies single header blob, implementation uses two separate keys; no `version` persisted | DM-8 | **Resolved** — redesigned: per-tenant encryption, DEK inside `__strata`, no separate files |
+| Q-6 | Migrations: `StrataConfig.migrations` exists but is dead code — never wired to `loadPartitionFromAdapter` | DM-13 | **Resolved** — wired through `SyncEngine` → `syncBetween`, applied lazily on read |
+| Q-7 | Tenant manager: no auto-reload, no cloud sync, no freshness check on `load()` | DO-6 (partially fixed) | **Resolved** — by design, manual invocation required |

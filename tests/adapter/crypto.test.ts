@@ -1,39 +1,42 @@
 import { describe, it, expect } from 'vitest';
 import {
-  deriveKek, generateDek, wrapDek, unwrapDek,
+  deriveKey, generateDek, exportDek, importDek,
   encrypt, decrypt, InvalidEncryptionKeyError,
 } from '@strata/adapter/crypto';
 
 describe('Encryption primitives', () => {
   const appId = 'test-app';
 
-  describe('deriveKek', () => {
-    it('produces a CryptoKey from password+salt+appId', async () => {
-      const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
-      const kek = await deriveKek('password', salt, appId);
-      expect(kek).toBeDefined();
-      expect(kek.algorithm).toMatchObject({ name: 'AES-GCM' });
+  describe('deriveKey', () => {
+    it('produces a CryptoKey from password+appId', async () => {
+      const key = await deriveKey('password', appId);
+      expect(key).toBeDefined();
+      expect(key.algorithm).toMatchObject({ name: 'AES-GCM' });
     });
 
     it('same inputs produce same key', async () => {
-      const salt = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-      const kek1 = await deriveKek('password', salt, appId);
-      const kek2 = await deriveKek('password', salt, appId);
-      // Export both keys to compare raw bytes
-      const dek = await generateDek();
-      const wrapped1 = await wrapDek(dek, kek1);
-      // Wrapping with kek1 should be unwrappable with kek2
-      const unwrapped = await unwrapDek(wrapped1, kek2);
-      expect(unwrapped).toBeDefined();
+      const key1 = await deriveKey('password', appId);
+      const key2 = await deriveKey('password', appId);
+      const data = new TextEncoder().encode('test');
+      const encrypted = await encrypt(data, key1);
+      const decrypted = await decrypt(encrypted, key2);
+      expect(decrypted).toEqual(data);
     });
 
     it('different passwords produce different keys', async () => {
-      const salt = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-      const kek1 = await deriveKek('password1', salt, appId);
-      const kek2 = await deriveKek('password2', salt, appId);
-      const dek = await generateDek();
-      const wrapped = await wrapDek(dek, kek1);
-      await expect(unwrapDek(wrapped, kek2)).rejects.toThrow(InvalidEncryptionKeyError);
+      const key1 = await deriveKey('password1', appId);
+      const key2 = await deriveKey('password2', appId);
+      const data = new TextEncoder().encode('test');
+      const encrypted = await encrypt(data, key1);
+      await expect(decrypt(encrypted, key2)).rejects.toThrow();
+    });
+
+    it('different appIds produce different keys', async () => {
+      const key1 = await deriveKey('password', 'app-1');
+      const key2 = await deriveKey('password', 'app-2');
+      const data = new TextEncoder().encode('test');
+      const encrypted = await encrypt(data, key1);
+      await expect(decrypt(encrypted, key2)).rejects.toThrow();
     });
   });
 
@@ -53,26 +56,22 @@ describe('Encryption primitives', () => {
     });
   });
 
-  describe('wrapDek / unwrapDek', () => {
-    it('round-trip', async () => {
-      const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
-      const kek = await deriveKek('password', salt, appId);
+  describe('exportDek / importDek', () => {
+    it('round-trips DEK through base64', async () => {
       const dek = await generateDek();
-      const wrapped = await wrapDek(dek, kek);
-      const unwrapped = await unwrapDek(wrapped, kek);
+      const b64 = await exportDek(dek);
+      const imported = await importDek(b64);
 
       const original = await globalThis.crypto.subtle.exportKey('raw', dek);
-      const recovered = await globalThis.crypto.subtle.exportKey('raw', unwrapped);
+      const recovered = await globalThis.crypto.subtle.exportKey('raw', imported);
       expect(new Uint8Array(recovered)).toEqual(new Uint8Array(original));
     });
 
-    it('wrong KEK throws InvalidEncryptionKeyError', async () => {
-      const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
-      const kek1 = await deriveKek('correct', salt, appId);
-      const kek2 = await deriveKek('wrong', salt, appId);
+    it('exported DEK is a base64 string', async () => {
       const dek = await generateDek();
-      const wrapped = await wrapDek(dek, kek1);
-      await expect(unwrapDek(wrapped, kek2)).rejects.toThrow(InvalidEncryptionKeyError);
+      const b64 = await exportDek(dek);
+      expect(typeof b64).toBe('string');
+      expect(b64.length).toBeGreaterThan(0);
     });
   });
 

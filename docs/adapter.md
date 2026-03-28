@@ -117,71 +117,104 @@ The framework handles:
 
 ## Encryption
 
-Encryption is handled via a KEK/DEK envelope pattern using AES-256-GCM, exposed as a `BlobTransform`.
+Encryption is per-tenant, using a key hierarchy based on AES-256-GCM. Each encrypted tenant has its own DEK (Data Encryption Key), stored inside the encrypted `__strata` marker blob.
 
-### `EncryptionContext`
+### Key Hierarchy
+
+```
+password + appId + tenantId → PBKDF2 (100k iterations) → markerKey
+                                                              │
+                                              Encrypts/decrypts __strata blob
+                                              __strata contains raw DEK (base64)
+                                                              │
+                                              DEK encrypts all data blobs
+```
+
+### Per-Tenant Encryption
+
+Encryption is opt-in at tenant creation:
 
 ```typescript
-type EncryptionContext = {
-  readonly dek: CryptoKey;
-  readonly salt: Uint8Array;
-  readonly encrypt: (data: Uint8Array) => Promise<Uint8Array>;
-  readonly decrypt: (data: Uint8Array) => Promise<Uint8Array>;
-};
+// Encrypted tenant
+await strata.tenants.create({
+  name: 'Work',
+  meta: {},
+  encryption: { password: 'my-secret' },
+});
+
+// Unencrypted tenant
+await strata.tenants.create({ name: 'Personal', meta: {} });
 ```
+
+Loading an encrypted tenant requires the password:
+
+```typescript
+await strata.loadTenant(tenantId, { password: 'my-secret' });
+```
+
+Detection is automatic — `loadTenant` reads the raw `__strata` bytes. If the first byte is `{` (JSON), the tenant is unencrypted. Otherwise, it's encrypted and a password is required.
+
+### Encrypted File Format
+
+```
+[version 1B] [IV 12B] [AES-GCM ciphertext]
+```
+
+All encrypted files (including `__strata`) use this format. The `__tenants` file is always plaintext.
 
 ### Low-Level Crypto Functions
 
-The framework exports the underlying cryptographic primitives from `crypto.ts`:
-
 | Function | Purpose |
 |---|---|
-| `deriveKek(password, salt, appId)` | Derives a Key Encryption Key from password via PBKDF2 |
+| `deriveKey(password, tenantId, appId)` | Derives an AES-256-GCM key via PBKDF2 |
 | `generateDek()` | Generates a random AES-256-GCM Data Encryption Key |
-| `wrapDek(dek, kek)` | Wraps (encrypts) the DEK with the KEK |
-| `unwrapDek(wrappedDek, kek)` | Unwraps (decrypts) the DEK with the KEK |
-| `encrypt(data, dek)` | Encrypts a `Uint8Array` with AES-256-GCM (prepends random IV) |
-| `decrypt(data, dek)` | Decrypts a `Uint8Array` (reads IV from prefix) |
+| `exportDek(dek)` | Exports DEK to base64 string |
+| `importDek(base64)` | Imports DEK from base64 string |
+| `encrypt(data, key)` | Encrypts a `Uint8Array` with AES-256-GCM (prepends version + IV) |
+| `decrypt(data, key)` | Decrypts a `Uint8Array` (reads version + IV from prefix) |
 
-`InvalidEncryptionKeyError` is thrown when decryption fails due to a wrong password/key.
+`InvalidEncryptionKeyError` is thrown when decryption fails due to a wrong password.
 
-### Key Storage
+### `EncryptionTransformService`
 
-Salt and DEK are stored as **separate keys** in the `StorageAdapter`:
+Stateful transform service that handles per-tenant encryption:
 
-| Key | Contents |
-|---|---|
-| `appId/__strata_salt` | Raw 16-byte salt used for PBKDF2 key derivation |
-| `appId/__strata_dek` | AES-KW wrapped DEK (encrypted with the KEK) |
+```typescript
+const service = new EncryptionTransformService();
+await service.setup(password, tenantId, appId);  // derives markerKey
+service.setDek(dek);                              // set DEK after loading marker
+service.toTransform();                            // returns BlobTransform
+service.clear();                                  // clears all keys
+```
 
-There is no combined `EncryptionHeader` blob — salt and DEK are independent entries.
+Behavior by key:
+- `__tenants` → always passthrough (plaintext)
+- `__strata` → encrypt/decrypt with markerKey
+- All other keys → encrypt/decrypt with DEK
 
 ### Usage
 
 ```typescript
-// Initialize (derives keys, bootstraps salt + wrapped DEK on first call)
-const encCtx = await initEncryption(storage, appId, password);
-
-// Convert to a BlobTransform and use with AdapterBridge
-const bridge = new AdapterBridge(storage, appId, {
-  transforms: [encryptionTransform(encCtx)],
-});
-
-// Or use createStrataAsync which does both automatically:
-const strata = await createStrataAsync({
+const strata = new Strata({
   appId: 'my-app',
-  localAdapter: myStorageAdapter,  // StorageAdapter
-  encryption: { password },
-  // ... other config
+  localAdapter: myStorageAdapter,
+  entities: [myEntity],
+  deviceId: 'device-1',
 });
+
+// Create encrypted tenant
+const tenant = await strata.tenants.create({
+  name: 'Work',
+  meta: {},
+  encryption: { password: 's3cret' },
+});
+
+// Load with password
+await strata.loadTenant(tenant.id, { password: 's3cret' });
+
+// Change password (re-encrypts __strata only, DEK unchanged)
+await strata.changePassword('s3cret', 'new-s3cret');
 ```
-
-Additional encryption APIs on `Strata`:
-- `strata.enableEncryption(password)` — encrypts all existing data
-- `strata.disableEncryption(password)` — decrypts all data
-- `strata.changePassword(oldPassword, newPassword)` — re-wraps the DEK
-
-Key material stored in the `StorageAdapter` at `appId/__strata_salt` and `appId/__strata_dek`.
 
 ## `MemoryBlobAdapter`
 

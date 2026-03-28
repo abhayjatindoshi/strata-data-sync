@@ -6,6 +6,8 @@ import { compareHlc } from '@strata/hlc';
 import type { AllIndexes, PartitionBlob } from '@strata/persistence';
 import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
 import { partitionHash, updatePartitionIndexEntry } from '@strata/persistence';
+import type { BlobMigration } from '@strata/schema/migration';
+import { migrateBlob } from '@strata/schema/migration';
 import { diffPartitions } from './diff';
 import { mergePartition } from './merge';
 import type { SyncEntity, SyncEntityChange, SyncBetweenResult } from './types';
@@ -32,6 +34,7 @@ async function buildPlan(
   adapterB: BlobAdapter,
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
+  migrations?: ReadonlyArray<BlobMigration>,
 ): Promise<SyncPlan> {
   const [indexesA, indexesB] = await Promise.all([
     loadAllIndexes(adapterA, tenant),
@@ -48,11 +51,11 @@ async function buildPlan(
 
     await planCopies(
       adapterA, adapterB, tenant, entityName,
-      diff.localOnly, diff.cloudOnly, applyToA, applyToB,
+      diff.localOnly, diff.cloudOnly, applyToA, applyToB, migrations,
     );
     await planMerges(
       adapterA, adapterB, tenant, entityName,
-      diff.diverged, applyToA, applyToB,
+      diff.diverged, applyToA, applyToB, migrations,
     );
   }
 
@@ -68,18 +71,21 @@ async function planCopies(
   bOnly: ReadonlyArray<string>,
   applyToA: SyncChange[],
   applyToB: SyncChange[],
+  migrations?: ReadonlyArray<BlobMigration>,
 ): Promise<void> {
   for (const partitionKey of aOnly) {
     const key = partitionBlobKey(entityName, partitionKey);
-    const blob = await adapterA.read(tenant, key);
+    let blob = await adapterA.read(tenant, key);
     if (blob) {
+      if (migrations) blob = migrateBlob(blob, migrations, entityName);
       applyToB.push({ entityName, partitionKey, key, blob });
     }
   }
   for (const partitionKey of bOnly) {
     const key = partitionBlobKey(entityName, partitionKey);
-    const blob = await adapterB.read(tenant, key);
+    let blob = await adapterB.read(tenant, key);
     if (blob) {
+      if (migrations) blob = migrateBlob(blob, migrations, entityName);
       applyToA.push({ entityName, partitionKey, key, blob });
     }
   }
@@ -93,16 +99,21 @@ async function planMerges(
   diverged: ReadonlyArray<string>,
   applyToA: SyncChange[],
   applyToB: SyncChange[],
+  migrations?: ReadonlyArray<BlobMigration>,
 ): Promise<void> {
   for (const partitionKey of diverged) {
     const key = partitionBlobKey(entityName, partitionKey);
-    const [blobA, blobB] = await Promise.all([
+    let [blobA, blobB] = await Promise.all([
       adapterA.read(tenant, key),
       adapterB.read(tenant, key),
     ]);
     if (!blobA || !blobB) {
       log('skipping merge for %s: missing blob', key);
       continue;
+    }
+    if (migrations) {
+      blobA = migrateBlob(blobA, migrations, entityName);
+      blobB = migrateBlob(blobB, migrations, entityName);
     }
     const merged = mergePartition(blobA, blobB, entityName);
     const mergedBlob: PartitionBlob = {
@@ -244,8 +255,9 @@ export async function syncBetween(
   adapterB: BlobAdapter,
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
+  migrations?: ReadonlyArray<BlobMigration>,
 ): Promise<SyncBetweenResult> {
-  const plan = await buildPlan(adapterA, adapterB, entityNames, tenant);
+  const plan = await buildPlan(adapterA, adapterB, entityNames, tenant, migrations);
 
   if (plan.applyToB.length === 0 && plan.applyToA.length === 0) {
     return { changesForA: [], changesForB: [], stale: false, maxHlc: undefined };

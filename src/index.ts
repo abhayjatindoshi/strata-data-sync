@@ -1,4 +1,4 @@
-export { Strata, createStrataAsync, validateEntityDefinitions } from './strata';
+export { Strata, validateEntityDefinitions } from './strata';
 export type { StrataConfig, StrataOptions } from './strata';
 
 export * from '@strata/hlc';

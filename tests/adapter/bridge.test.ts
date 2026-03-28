@@ -5,13 +5,11 @@ import type { PartitionBlob } from '@strata/persistence';
 import type { Hlc } from '@strata/hlc';
 
 describe('AdapterBridge', () => {
-  const appId = 'test-app';
-
   function createBridge(options?: {
     transforms?: ReadonlyArray<BlobTransform>;
   }) {
     const storage = new MemoryStorageAdapter();
-    const bridge = new AdapterBridge(storage, appId, options);
+    const bridge = new AdapterBridge(storage, options);
     return { storage, bridge };
   }
 
@@ -37,15 +35,11 @@ describe('AdapterBridge', () => {
     expect(result).toBeNull();
   });
 
-  it('namespaces keys with appId', async () => {
+  it('keys pass through to storage without namespacing', async () => {
     const { storage, bridge } = createBridge();
     await bridge.write(undefined, 'task.global', sampleBlob);
-    // Key in underlying storage should be namespaced
-    const raw = await storage.read(undefined, `${appId}/task.global`);
+    const raw = await storage.read(undefined, 'task.global');
     expect(raw).not.toBeNull();
-    // Non-namespaced key should return null
-    const direct = await storage.read(undefined, 'task.global');
-    expect(direct).toBeNull();
   });
 
   it('list strips appId prefix from keys', async () => {
@@ -76,13 +70,13 @@ describe('AdapterBridge', () => {
     };
 
     const { storage, bridge } = createBridge({
-      transforms: [{ encode: xorTransform, decode: xorTransform }],
+      transforms: [{ encode: (_t, _k, d) => xorTransform(d), decode: (_t, _k, d) => xorTransform(d) }],
     });
 
     await bridge.write(undefined, 'task.global', sampleBlob);
 
     // Raw storage should contain XOR'd bytes, not plain JSON
-    const raw = await storage.read(undefined, `${appId}/task.global`);
+    const raw = await storage.read(undefined, 'task.global');
     expect(raw).not.toBeNull();
     const plainJson = new TextEncoder().encode(JSON.stringify(sampleBlob));
     // XOR'd data should differ from plain JSON

@@ -8,13 +8,10 @@ export { MemoryStorageAdapter } from './memory-storage';
 export { gzipTransform } from './gzip';
 export {
   encrypt, decrypt,
-  deriveKek, generateDek, wrapDek, unwrapDek,
+  deriveKey, generateDek, exportDek, importDek,
   InvalidEncryptionKeyError,
 } from './crypto';
-export type { EncryptionHeader } from './crypto';
 export {
-  initEncryption, changeEncryptionPassword,
-  enableEncryption, disableEncryption,
-  encryptionTransform,
+  EncryptionTransformService,
+  createEncryptedMarkerDek,
 } from './encryption';
-export type { EncryptionContext } from './encryption';

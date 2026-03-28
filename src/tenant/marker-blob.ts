@@ -12,18 +12,21 @@ export type MarkerData = {
   readonly createdAt: Date;
   readonly entityTypes: readonly string[];
   readonly indexes?: AllIndexes;
+  readonly dek?: string;
 };
 
 export async function writeMarkerBlob(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
   entityTypes: readonly string[],
+  dekBase64?: string,
 ): Promise<void> {
   const marker: MarkerData = {
     version: 1,
     createdAt: new Date(),
     entityTypes,
     indexes: {},
+    ...(dekBase64 ? { dek: dekBase64 } : {}),
   };
   const blob: PartitionBlob = {
     [MARKER_ENTITY_KEY]: { marker },

@@ -2,11 +2,11 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  createStrataAsync,
+  Strata,
   defineEntity,
   partitioned,
 } from 'strata-data-sync';
-import type { StorageAdapter, Tenant, Strata } from 'strata-data-sync';
+import type { StorageAdapter, Tenant } from 'strata-data-sync';
 
 // ─── File-system StorageAdapter ──────────────────────────
 
@@ -88,12 +88,11 @@ class KeyStrategyDemo {
   }
 
   static async create(storage: StorageAdapter, password: string): Promise<KeyStrategyDemo> {
-    const strata = await createStrataAsync({
+    const strata = new Strata({
       appId: 'strata-example-fs',
       entities: [taskDef, noteDef, settingsDef],
       localAdapter: storage,
       deviceId: 'device-1',
-      encryption: { password },
     });
     return new KeyStrategyDemo(strata);
   }
@@ -102,8 +101,9 @@ class KeyStrategyDemo {
     const tenant = await this.strata.tenants.create({
       name: 'Demo',
       meta: { container: 'demo-workspace' },
+      encryption: { password: 's3cret-passw0rd!' },
     });
-    await this.strata.loadTenant(tenant.id);
+    await this.strata.loadTenant(tenant.id, { password: 's3cret-passw0rd!' });
   }
 
   demoGlobalStrategy(): void {

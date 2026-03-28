@@ -1,11 +1,3 @@
-// ─── Types ───────────────────────────────────────────────
-
-export type EncryptionHeader = {
-  readonly salt: Uint8Array;
-  readonly encryptedDek: Uint8Array;
-  readonly version: number;
-};
-
 // ─── Errors ──────────────────────────────────────────────
 
 export class InvalidEncryptionKeyError extends Error {
@@ -28,11 +20,10 @@ function buf(data: Uint8Array): ArrayBuffer {
   return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
 }
 
-// ─── KEK derivation ─────────────────────────────────────
+// ─── Key derivation ─────────────────────────────────────
 
-export async function deriveKek(
+export async function deriveKey(
   password: string,
-  salt: Uint8Array,
   appId: string,
 ): Promise<CryptoKey> {
   const keyMaterial = await globalThis.crypto.subtle.importKey(
@@ -42,13 +33,10 @@ export async function deriveKek(
     false,
     ['deriveKey'],
   );
-  const appIdBytes = textEncoder.encode(appId);
-  const combinedSalt = new Uint8Array(salt.length + appIdBytes.length);
-  combinedSalt.set(salt);
-  combinedSalt.set(appIdBytes, salt.length);
+  const salt = textEncoder.encode(appId);
 
   return globalThis.crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: buf(combinedSalt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: buf(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -66,44 +54,16 @@ export async function generateDek(): Promise<CryptoKey> {
   );
 }
 
-// ─── DEK wrap / unwrap ──────────────────────────────────
-
-export async function wrapDek(
-  dek: CryptoKey,
-  kek: CryptoKey,
-): Promise<Uint8Array> {
-  const rawDek = await globalThis.crypto.subtle.exportKey('raw', dek);
-  const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_LENGTH));
-  const encrypted = await globalThis.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: buf(iv) },
-    kek,
-    rawDek,
-  );
-  const result = new Uint8Array(IV_LENGTH + encrypted.byteLength);
-  result.set(iv);
-  result.set(new Uint8Array(encrypted), IV_LENGTH);
-  return result;
+export async function exportDek(dek: CryptoKey): Promise<string> {
+  const raw = await globalThis.crypto.subtle.exportKey('raw', dek);
+  return btoa(String.fromCharCode(...new Uint8Array(raw)));
 }
 
-export async function unwrapDek(
-  wrapped: Uint8Array,
-  kek: CryptoKey,
-): Promise<CryptoKey> {
-  const iv = wrapped.slice(0, IV_LENGTH);
-  const ciphertext = wrapped.slice(IV_LENGTH);
-  let rawDek: ArrayBuffer;
-  try {
-    rawDek = await globalThis.crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: buf(iv) },
-      kek,
-      buf(ciphertext),
-    );
-  } catch {
-    throw new InvalidEncryptionKeyError();
-  }
+export async function importDek(base64: string): Promise<CryptoKey> {
+  const raw = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   return globalThis.crypto.subtle.importKey(
     'raw',
-    rawDek,
+    buf(raw),
     { name: 'AES-GCM', length: 256 },
     true,
     ['encrypt', 'decrypt'],

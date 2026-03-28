@@ -8,7 +8,7 @@ describe('AdapterBridge end-to-end integration', () => {
 
   it('MemoryStorageAdapter → AdapterBridge → BlobAdapter round-trip', async () => {
     const storage = new MemoryStorageAdapter();
-    const bridge = new AdapterBridge(storage, appId);
+    const bridge = new AdapterBridge(storage);
 
     const blob: PartitionBlob = {
       task: {
@@ -29,7 +29,7 @@ describe('AdapterBridge end-to-end integration', () => {
 
   it('multi-tenant isolation through AdapterBridge', async () => {
     const storage = new MemoryStorageAdapter();
-    const bridge = new AdapterBridge(storage, appId);
+    const bridge = new AdapterBridge(storage);
     const now = new Date();
     const t1 = { id: 'tenant-1', name: 'T1', meta: {}, createdAt: now, updatedAt: now } as const;
     const t2 = { id: 'tenant-2', name: 'T2', meta: {}, createdAt: now, updatedAt: now } as const;
@@ -55,7 +55,7 @@ describe('AdapterBridge end-to-end integration', () => {
       return result;
     };
 
-    const bridge = new AdapterBridge(storage, appId, { transforms: [{ encode: xor, decode: xor }] });
+    const bridge = new AdapterBridge(storage, { transforms: [{ encode: (_t, _k, d) => xor(d), decode: (_t, _k, d) => xor(d) }] });
 
     const blob: PartitionBlob = {
       items: { a: { id: 'a', name: 'test' } },
@@ -65,7 +65,7 @@ describe('AdapterBridge end-to-end integration', () => {
     await bridge.write(undefined, 'items.global', blob);
 
     // Verify underlying storage has encrypted (non-JSON) data
-    const raw = await storage.read(undefined, `${appId}/items.global`);
+    const raw = await storage.read(undefined, 'items.global');
     expect(raw).not.toBeNull();
     // Should not be valid JSON
     try {
@@ -82,7 +82,7 @@ describe('AdapterBridge end-to-end integration', () => {
 
   it('list and delete through bridge', async () => {
     const storage = new MemoryStorageAdapter();
-    const bridge = new AdapterBridge(storage, appId);
+    const bridge = new AdapterBridge(storage);
 
     const blob: PartitionBlob = { x: { a: 1 }, deleted: {} };
     await bridge.write(undefined, 'task.p1', blob);

@@ -137,16 +137,18 @@ When two versions of an entity conflict during sync, the winner (determined by `
 
 ```
 Phase 1 — Hydrate (app load):
-  cloud → local → memory
+  cloud ↔ local   then   local ↔ memory
   If cloud unreachable: load from local only, fire event
 
 Phase 2 — Periodic (background):
-  memory → local   every 2s (configurable)
-  local  → cloud   every 5m (configurable)
+  memory ↔ local   every 2s (configurable)
+  local  ↔ cloud   every 5m (configurable)
 
 Phase 3 — Manual (strata.sync()):
-  memory → local → cloud   (immediate, sequential)
+  memory ↔ local ↔ cloud   (immediate, sequential)
 ```
+
+Each arrow represents a `syncBetween(adapterA, adapterB)` call. All sync is **bidirectional merge** — changes flow both ways. The ordering controls which side is checked for staleness (adapter A is re-checked before writing back).
 
 ### Global Sync Lock
 
@@ -163,9 +165,9 @@ function enqueue(source, target): Promise<void> {
 
 ### Sync Implementation — `syncBetween`
 
-All sync directions use a single generic function `syncBetween(adapterA, adapterB, store, entityNames, tenant)` that handles bidirectional merge between any two `BlobAdapter` endpoints:
+All sync directions use a single generic function `syncBetween(adapterA, adapterB, entityNames, tenant)` that handles bidirectional merge between any two `BlobAdapter` endpoints (including the in-memory `Store`, which implements `BlobAdapter`):
 
-- **Phase 1 (Hydrate)**: `syncBetween(cloudAdapter, localAdapter, store, ...)`
+- **Phase 1 (Hydrate)**: `syncBetween(cloudAdapter, localAdapter, ...)` then `syncBetween(localAdapter, store, ...)`
 - **Phase 2 (Periodic)**: `syncBetween(store, localAdapter, ...)` + `syncBetween(localAdapter, cloudAdapter, ...)`
 - **Phase 3 (Manual)**: same as Phase 2 but immediate
 
@@ -173,10 +175,10 @@ Returns `SyncBetweenResult`:
 
 ```typescript
 type SyncBetweenResult = {
-  readonly hydratedEntityNames: ReadonlyArray<string>;  // entity types processed
-  readonly partitionsCopied: number;     // partitions that existed on only one side (full copy)
-  readonly partitionsMerged: number;     // partitions that existed on both sides (per-entity merge)
-  readonly conflictsResolved: number;    // total entities in merged partitions (includes non-conflicted)
+  readonly changesForA: ReadonlyArray<SyncEntityChange>;  // changes applied to adapter A
+  readonly changesForB: ReadonlyArray<SyncEntityChange>;  // changes applied to adapter B
+  readonly stale: boolean;     // true if adapter A changed during sync (changes skipped)
+  readonly maxHlc: Hlc | undefined;  // highest HLC seen across all synced entities
 };
 ```
 
@@ -237,11 +239,19 @@ Framework emits events, app subscribes:
 
 ```typescript
 type SyncEvent =
-  | { type: 'sync-started' }
-  | { type: 'sync-completed', result: SyncResult }
-  | { type: 'sync-failed', error: Error }
+  | { type: 'sync-started'; source: SyncLocation; target: SyncLocation }
+  | { type: 'sync-completed'; source: SyncLocation; target: SyncLocation; result: SyncResult }
+  | { type: 'sync-failed'; source: SyncLocation; target: SyncLocation; error: Error }
   | { type: 'cloud-unreachable' };
+
+type SyncResult = {
+  readonly entitiesUpdated: number;     // number of partition changes applied to target (B)
+  readonly conflictsResolved: number;   // number of partition changes applied to source (A)
+  readonly partitionsSynced: number;    // total partition changes (A + B)
+};
 ```
+
+Note: `entitiesUpdated` and `conflictsResolved` count **partition-level changes**, not individual entities. A partition change may contain multiple entity updates.
 
 ### Stale Detection
 
