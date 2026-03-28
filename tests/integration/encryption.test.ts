@@ -6,8 +6,8 @@ import {
   encryptionTransform,
   InvalidEncryptionKeyError,
 } from '@strata/adapter';
-import { createStrata, defineEntity } from '@strata/index';
-import type { Strata, Repository } from '@strata/index';
+import { Strata, defineEntity } from '@strata/index';
+import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean };
 const TaskDef = defineEntity<Task>('task');
@@ -34,7 +34,7 @@ describe('Encrypted Strata lifecycle integration', () => {
     // Phase 1: init encrypted, save data
     const ctx1 = await initEncryption(storage, appId, 'secret');
     const bridge1 = new AdapterBridge(storage, appId, { transforms: [encryptionTransform(ctx1)] });
-    const strata1 = track(createStrata({
+    const strata1 = track(new Strata({
       appId,
       entities: [TaskDef],
       localAdapter: bridge1,
@@ -49,7 +49,7 @@ describe('Encrypted Strata lifecycle integration', () => {
     // Phase 2: re-init with same password, verify data
     const ctx2 = await initEncryption(storage, appId, 'secret');
     const bridge2 = new AdapterBridge(storage, appId, { transforms: [encryptionTransform(ctx2)] });
-    const strata2 = track(createStrata({
+    const strata2 = track(new Strata({
       appId,
       entities: [TaskDef],
       localAdapter: bridge2,
@@ -76,7 +76,7 @@ describe('Encrypted Strata lifecycle integration', () => {
     // Init and save data
     const ctx1 = await initEncryption(storage, appId, 'old-pass');
     const bridge1 = new AdapterBridge(storage, appId, { transforms: [encryptionTransform(ctx1)] });
-    const strata1 = track(createStrata({
+    const strata1 = track(new Strata({
       appId,
       entities: [TaskDef],
       localAdapter: bridge1,
@@ -98,7 +98,7 @@ describe('Encrypted Strata lifecycle integration', () => {
     // New password works and data is accessible
     const ctx2 = await initEncryption(storage, appId, 'new-pass');
     const bridge2 = new AdapterBridge(storage, appId, { transforms: [encryptionTransform(ctx2)] });
-    const strata2 = track(createStrata({
+    const strata2 = track(new Strata({
       appId,
       entities: [TaskDef],
       localAdapter: bridge2,

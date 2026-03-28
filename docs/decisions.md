@@ -51,7 +51,7 @@
 | P3 | Persistence | FNV-1a hash on sorted entity ID + HLC pairs | `hash(id:timestamp:counter:nodeId)` per entity, sorted by ID. Not on full blob. No key sorting. HLC uniqueness handles version collisions across devices. |
 | P4 | Persistence | One combined partition hash in the index | Hash all entity ID+HLC pairs → one hash per partition. Partition index stores `{ hash, count, updatedAt }` per partition key. |
 | P5 | Persistence | Partition index blob per entity type | `__index.transaction` lists all partition keys + hashes. Enables partition discovery for cold-start `query()` and sync hash comparison. |
-| P6 | Persistence | Debounced flush to adapter (1s idle) + flush on dispose | Reduces I/O for rapid saves. `save()` is sync to Map. Blob serialization + adapter write happens after 1s of no writes. `dispose()` forces immediate flush. |
+| P6 | Persistence | Periodic flush to adapter (2s interval) + flush on dispose | Reduces I/O for rapid saves. `save()` is sync to Map. Blob serialization + adapter write happens at the next interval tick. `dispose()` forces immediate flush. |
 | P7 | Persistence | One blob per `entityName.partitionKey` | Partition blob contains all entities for that partition. Same structure for local and cloud. |
 | P8 | Persistence | Configurable transform pipeline for compression/encryption | `transforms: [gzip(), encrypt(key)]` per adapter. Framework serializes JSON → transforms → adapter writes bytes. Reversed on read. |
 | P9 | Persistence | Transforms are per-adapter | Local and cloud can have different transform chains. E.g., encrypt cloud only, or compress cloud + encrypt both. |
@@ -267,7 +267,7 @@ These options were discussed and explicitly rejected. Do not reconsider during i
 - **No sorted keys** — hash is decoupled from blob format. Blob key ordering doesn't matter. Simplifies serializer to plain `JSON.stringify` + replacer.
 - **ID+HLC partition hash** — FNV-1a over sorted `id:timestamp:counter:nodeId` pairs. Not over full blob. Catches version collisions across devices (HLC includes nodeId). One combined hash per partition stored in index.
 - **Partition index** — `__index.entityName` blob. Maps partition keys to `{ hash, count, updatedAt }`. Enables cold-start partition discovery and sync hash comparison.
-- **Debounced flush** — 1 second idle after last write. Reduces I/O for rapid saves. `dispose()` forces immediate flush. `save()` itself is sync (Map only).
+- **Periodic flush** — 2 second interval (configurable). Reduces I/O for rapid saves. `dispose()` forces immediate flush. `save()` itself is sync (Map only).
 - **Configurable transform pipeline** — per-adapter `transforms: [gzip(), encrypt(key)]`. Framework serializes JSON → transforms → adapter writes bytes. Reversed on read. Local and cloud can have different transforms.
 - **HLC format** — `{ timestamp: number, counter: number, nodeId: string }`. Stored on each entity. Used for conflict resolution and partition hashing.
 - **No Zod dependency** — `defineEntity` stays TypeScript-generic-only. Framework handles type serialization via JSON replacer/reviver, not schema introspection.

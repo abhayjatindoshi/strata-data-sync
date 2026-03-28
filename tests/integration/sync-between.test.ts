@@ -1,10 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import { loadAllIndexes } from '@strata/persistence';
 
@@ -29,10 +28,10 @@ describe('syncBetween integration', () => {
 
   async function createDevice(
     deviceId: string,
-    cloudAdapter: ReturnType<typeof createMemoryBlobAdapter>,
+    cloudAdapter: ReturnType<typeof MemoryBlobAdapter>,
   ) {
-    const localAdapter = createMemoryBlobAdapter();
-    const strata = track(createStrata({
+    const localAdapter = new MemoryBlobAdapter();
+    const strata = track(new Strata({
       entities: [TaskDef],
       localAdapter,
       cloudAdapter,
@@ -42,7 +41,7 @@ describe('syncBetween integration', () => {
   }
 
   it('deletedCount is tracked in partition index after flush and sync', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     const { strata: strataA, localAdapter } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
@@ -67,7 +66,7 @@ describe('syncBetween integration', () => {
   });
 
   it('syncBetween propagates data bidirectionally through full lifecycle', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     // Device A saves data and syncs
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -106,7 +105,7 @@ describe('syncBetween integration', () => {
   });
 
   it('indexes are consistent on both local and cloud after sync', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     const { strata, localAdapter } = await createDevice('device-A', sharedCloud);
     const tenant = await strata.tenants.create({

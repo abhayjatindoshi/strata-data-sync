@@ -1,4 +1,5 @@
 import type { Hlc } from '@strata/hlc';
+import type { Tenant } from '@strata/adapter';
 
 export type PartitionDiffResult = {
   readonly localOnly: ReadonlyArray<string>;
@@ -26,30 +27,28 @@ export type SyncEntity = {
   readonly hlc: Hlc;
 };
 
-export type SyncDirection =
-  | 'memory-to-local'
-  | 'local-to-cloud'
-  | 'cloud-to-local'
-  | 'cloud-to-memory';
+export type SyncEntityChange = {
+  readonly key: string;
+  readonly updatedIds: ReadonlyArray<string>;
+  readonly deletedIds: ReadonlyArray<string>;
+};
+
+export type SyncBetweenResult = {
+  readonly changesForA: ReadonlyArray<SyncEntityChange>;
+  readonly changesForB: ReadonlyArray<SyncEntityChange>;
+  readonly stale: boolean;
+  readonly maxHlc: Hlc | undefined;
+};
+
+export type SyncLocation = 'memory' | 'local' | 'cloud';
 
 export type SyncQueueItem = {
-  readonly source: SyncDirection;
-  readonly target: SyncDirection;
+  readonly source: SyncLocation;
+  readonly target: SyncLocation;
   readonly fn: () => Promise<void>;
   readonly promise: Promise<void>;
   readonly resolve: () => void;
   readonly reject: (err: Error) => void;
-};
-
-export type SyncLock = {
-  enqueue(
-    source: SyncDirection,
-    target: SyncDirection,
-    fn: () => Promise<void>,
-  ): Promise<void>;
-  isRunning(): boolean;
-  drain(): Promise<void>;
-  dispose(): void;
 };
 
 export type SyncResult = {
@@ -59,30 +58,40 @@ export type SyncResult = {
 };
 
 export type SyncEvent =
-  | { readonly type: 'sync-started' }
-  | { readonly type: 'sync-completed'; readonly result: SyncResult }
-  | { readonly type: 'sync-failed'; readonly error: Error }
+  | { readonly type: 'sync-started'; readonly source: SyncLocation; readonly target: SyncLocation }
+  | { readonly type: 'sync-completed'; readonly source: SyncLocation; readonly target: SyncLocation; readonly result: SyncResult }
+  | { readonly type: 'sync-failed'; readonly source: SyncLocation; readonly target: SyncLocation; readonly error: Error }
   | { readonly type: 'cloud-unreachable' };
 
 export type SyncEventListener = (event: SyncEvent) => void;
 
-export type SyncEventEmitter = {
+export type SyncEnqueueResult = {
+  readonly result: SyncBetweenResult;
+  readonly deduplicated: boolean;
+};
+
+export type SyncEngine = {
+  sync(
+    source: SyncLocation,
+    target: SyncLocation,
+    tenant: Tenant | undefined,
+  ): Promise<SyncEnqueueResult>;
+  emit(event: SyncEvent): void;
   on(listener: SyncEventListener): void;
   off(listener: SyncEventListener): void;
-  emit(event: SyncEvent): void;
+  drain(): Promise<void>;
+  dispose(): void;
 };
 
 export type SyncSchedulerOptions = {
   readonly localFlushIntervalMs?: number;
   readonly cloudSyncIntervalMs?: number;
   readonly dirtyTracker?: DirtyTracker;
-  readonly syncEvents?: SyncEventEmitter;
 };
 
 export type SyncScheduler = {
   start(): void;
   stop(): void;
-  dispose(): Promise<void>;
 };
 
 export type DirtyTracker = {

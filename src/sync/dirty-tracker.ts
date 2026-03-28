@@ -22,7 +22,3 @@ export class DirtyTracker {
     }
   }
 }
-
-export function createDirtyTracker(): DirtyTrackerType {
-  return new DirtyTracker();
-}

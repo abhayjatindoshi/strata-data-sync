@@ -171,10 +171,3 @@ export class TenantManager {
     log('deleted tenant %s', tenantId);
   }
 }
-
-export function createTenantManager(
-  adapter: BlobAdapter,
-  options?: TenantManagerOptions,
-): TenantManagerType {
-  return new TenantManager(adapter, options);
-}

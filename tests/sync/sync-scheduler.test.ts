@@ -1,48 +1,53 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
-import { serialize } from '@strata/persistence';
+import { MemoryBlobAdapter } from '@strata/adapter';
+import { createHlc } from '@strata/hlc';
+import { EventBus } from '@strata/reactive';
 import { saveAllIndexes } from '@strata/persistence';
-import { createStore } from '@strata/store';
-import { createSyncLock, createSyncScheduler, syncNow } from '@strata/sync';
+import { Store } from '@strata/store';
+import { SyncEngine, SyncScheduler } from '@strata/sync';
 
-function makePartitionBlob(entityName: string, entities: Record<string, unknown>, tombstones: Record<string, unknown> = {}): Uint8Array {
+function makePartitionBlob(entityName: string, entities: Record<string, unknown>, tombstones: Record<string, unknown> = {}): Record<string, unknown> {
   return ({
     [entityName]: entities,
     deleted: { [entityName]: tombstones },
   });
 }
 
-describe('createSyncScheduler', () => {
+function makeEngine(opts?: { cloud?: boolean }) {
+  const store = new Store();
+  const local = new MemoryBlobAdapter();
+  const cloud = opts?.cloud !== false ? new MemoryBlobAdapter() : undefined;
+  const hlcRef = { current: createHlc('test') };
+  const eventBus = new EventBus();
+  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus);
+  return { engine, store, local, cloud };
+}
+
+describe('SyncScheduler', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
   it('start begins periodic timers', () => {
     vi.useFakeTimers();
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const { engine } = makeEngine();
 
-    const scheduler = createSyncScheduler(
-      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+    const scheduler = new SyncScheduler(
+      engine, undefined, true,
       { localFlushIntervalMs: 100, cloudSyncIntervalMs: 500 },
     );
 
     scheduler.start();
-    expect(lock.isRunning()).toBe(false);
     scheduler.stop();
   });
 
   it('stop clears timers', () => {
     vi.useFakeTimers();
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const { engine } = makeEngine();
+    const syncSpy = vi.spyOn(engine, 'sync');
 
-    const scheduler = createSyncScheduler(
-      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+    const scheduler = new SyncScheduler(
+      engine, undefined, true,
       { localFlushIntervalMs: 100, cloudSyncIntervalMs: 500 },
     );
 
@@ -50,190 +55,101 @@ describe('createSyncScheduler', () => {
     scheduler.stop();
 
     vi.advanceTimersByTime(1000);
-    expect(lock.isRunning()).toBe(false);
-  });
-
-  it('dispose stops timers and drains lock', async () => {
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
-
-    const scheduler = createSyncScheduler(
-      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
-    );
-
-    scheduler.start();
-    await scheduler.dispose();
-    // After dispose, lock should be disposed
-    await expect(
-      lock.enqueue('memory-to-local', 'memory-to-local', async () => {}),
-    ).rejects.toThrow('disposed');
+    expect(syncSpy).not.toHaveBeenCalled();
+    syncSpy.mockRestore();
   });
 });
 
-describe('createSyncScheduler — timer callbacks', () => {
+describe('SyncScheduler — timer callbacks', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('local flush interval enqueues memory-to-local on tick', async () => {
+  it('local flush interval calls sync memory→local on tick', async () => {
     vi.useFakeTimers();
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
-    const enqueueSpy = vi.spyOn(lock, 'enqueue');
+    const { engine } = makeEngine();
+    const syncSpy = vi.spyOn(engine, 'sync');
 
-    const scheduler = createSyncScheduler(
-      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+    const scheduler = new SyncScheduler(
+      engine, undefined, true,
       { localFlushIntervalMs: 50, cloudSyncIntervalMs: 100000 },
     );
 
     scheduler.start();
     vi.advanceTimersByTime(50);
 
-    expect(enqueueSpy).toHaveBeenCalledWith(
-      'memory-to-local', 'memory-to-local', expect.any(Function),
-    );
+    expect(syncSpy).toHaveBeenCalledWith('memory', 'local', undefined);
 
     scheduler.stop();
-    enqueueSpy.mockRestore();
+    syncSpy.mockRestore();
   });
 
-  it('cloud sync interval enqueues local-to-cloud on tick', async () => {
+  it('cloud sync interval calls sync local→cloud on tick', async () => {
     vi.useFakeTimers();
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
-    const enqueueSpy = vi.spyOn(lock, 'enqueue');
+    const { engine } = makeEngine();
+    const syncSpy = vi.spyOn(engine, 'sync');
 
-    const scheduler = createSyncScheduler(
-      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+    const scheduler = new SyncScheduler(
+      engine, undefined, true,
       { localFlushIntervalMs: 100000, cloudSyncIntervalMs: 50 },
     );
 
     scheduler.start();
     vi.advanceTimersByTime(50);
 
-    expect(enqueueSpy).toHaveBeenCalledWith(
-      'local-to-cloud', 'local-to-cloud', expect.any(Function),
-    );
+    expect(syncSpy).toHaveBeenCalledWith('local', 'cloud', undefined);
 
     scheduler.stop();
-    enqueueSpy.mockRestore();
+    syncSpy.mockRestore();
   });
 
   it('catches local flush errors without crashing', async () => {
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const { engine, local } = makeEngine();
+    local.read = async () => { throw new Error('write failed'); };
 
-    store.setEntity('bad._', 'bad._.1', {});
-    localAdapter.write = async () => { throw new Error('write failed'); };
-
-    const scheduler = createSyncScheduler(
-      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+    const scheduler = new SyncScheduler(
+      engine, undefined, true,
       { localFlushIntervalMs: 20, cloudSyncIntervalMs: 100000 },
     );
 
     scheduler.start();
-    // Wait for the interval to fire and the enqueued operation to fail
     await new Promise(r => setTimeout(r, 100));
-    await lock.drain().catch(() => {});
+    await engine.drain().catch(() => {});
     scheduler.stop();
   });
 
   it('catches cloud sync errors without crashing', async () => {
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const { engine, cloud } = makeEngine();
+    cloud!.read = async () => { throw new Error('network failed'); };
 
-    cloudAdapter.read = async () => { throw new Error('network failed'); };
-
-    const scheduler = createSyncScheduler(
-      lock, localAdapter, cloudAdapter, store, ['task'], undefined,
+    const scheduler = new SyncScheduler(
+      engine, undefined, true,
       { localFlushIntervalMs: 100000, cloudSyncIntervalMs: 20 },
     );
 
     scheduler.start();
     await new Promise(r => setTimeout(r, 100));
-    await lock.drain().catch(() => {});
+    await engine.drain().catch(() => {});
     scheduler.stop();
   });
-});
 
-describe('syncNow', () => {
-  it('flushes local then syncs with cloud', async () => {
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
+  it('does not start cloud timer when hasCloud is false', () => {
+    vi.useFakeTimers();
+    const { engine } = makeEngine({ cloud: false });
+    const syncSpy = vi.spyOn(engine, 'sync');
 
-    store.setEntity('task._', 'task._.a1', {
-      id: 'task._.a1', name: 'T1',
-      hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' },
-    });
+    const scheduler = new SyncScheduler(
+      engine, undefined, false,
+      { localFlushIntervalMs: 50, cloudSyncIntervalMs: 50 },
+    );
 
-    await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
+    scheduler.start();
+    vi.advanceTimersByTime(100);
 
-    // After sync, no errors means both phases completed
-    expect(lock.isRunning()).toBe(false);
-  });
+    const calls = syncSpy.mock.calls;
+    expect(calls.every(c => c[0] === 'memory' && c[1] === 'local')).toBe(true);
 
-  it('loads cloud-only partitions into store during sync', async () => {
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
-
-    const cloudEntity = {
-      id: 'task._.c1', name: 'CloudOnly',
-      hlc: { timestamp: 1000, counter: 0, nodeId: 'cloud' },
-    };
-
-    await cloudAdapter.write(undefined, 'task._',
-      makePartitionBlob('task', { 'task._.c1': cloudEntity }));
-    await saveAllIndexes(cloudAdapter, undefined, {
-      task: { '_': { hash: 333, count: 1, updatedAt: 1000 } },
-    });
-
-    await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
-
-    expect(store.getEntity('task._', 'task._.c1')).toBeDefined();
-  });
-
-  it('processes diverged partitions during cloud sync', async () => {
-    const lock = createSyncLock();
-    const localAdapter = createMemoryBlobAdapter();
-    const cloudAdapter = createMemoryBlobAdapter();
-    const store = createStore();
-
-    const localEntity = {
-      id: 'task._.a1', name: 'LocalVer',
-      hlc: { timestamp: 2000, counter: 0, nodeId: 'local' },
-    };
-    const cloudEntity = {
-      id: 'task._.a1', name: 'CloudVer',
-      hlc: { timestamp: 1000, counter: 0, nodeId: 'cloud' },
-    };
-
-    await localAdapter.write(undefined, 'task._',
-      makePartitionBlob('task', { 'task._.a1': localEntity }));
-    await saveAllIndexes(localAdapter, undefined, {
-      task: { '_': { hash: 111, count: 1, updatedAt: 1000 } },
-    });
-
-    await cloudAdapter.write(undefined, 'task._',
-      makePartitionBlob('task', { 'task._.a1': cloudEntity }));
-    await saveAllIndexes(cloudAdapter, undefined, {
-      task: { '_': { hash: 222, count: 1, updatedAt: 1000 } },
-    });
-
-    await syncNow(lock, localAdapter, cloudAdapter, store, ['task'], undefined);
-    expect(lock.isRunning()).toBe(false);
+    scheduler.stop();
+    syncSpy.mockRestore();
   });
 });

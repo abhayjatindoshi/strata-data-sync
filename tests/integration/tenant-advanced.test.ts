@@ -1,15 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
   saveTenantPrefs,
   loadTenantPrefs,
   pushTenantList,
   pullTenantList,
   loadTenantList,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
 
 type Task = { title: string; done: boolean };
 
@@ -31,7 +30,7 @@ describe('Tenant advanced integration', () => {
   }
 
   it('tenant preferences sync — save prefs on A, load on B via shared cloud', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
     const meta = { folder: 'shared' };
 
     // Device A saves prefs to cloud
@@ -51,12 +50,12 @@ describe('Tenant advanced integration', () => {
   });
 
   it('tenant list multi-device merge — A creates X, B creates Y, both end up with both', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
-    const localA = createMemoryBlobAdapter();
-    const localB = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
+    const localA = new MemoryBlobAdapter();
+    const localB = new MemoryBlobAdapter();
 
     // Device A creates tenant X
-    const strataA = track(createStrata({
+    const strataA = track(new Strata({
       entities: [TaskDef],
       localAdapter: localA,
       deviceId: 'dev-A',
@@ -64,7 +63,7 @@ describe('Tenant advanced integration', () => {
     await strataA.tenants.create({ name: 'Tenant X', meta: { b: 'x' } });
 
     // Device B creates tenant Y
-    const strataB = track(createStrata({
+    const strataB = track(new Strata({
       entities: [TaskDef],
       localAdapter: localB,
       deviceId: 'dev-B',

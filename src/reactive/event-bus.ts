@@ -20,7 +20,3 @@ export class EventBus implements EntityEventBus {
     }
   }
 }
-
-export function createEventBus(): EntityEventBus {
-  return new EventBus();
-}

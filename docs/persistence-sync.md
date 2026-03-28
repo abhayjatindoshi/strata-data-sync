@@ -117,10 +117,19 @@ type Hlc = {
 };
 ```
 
-- Stamped on every entity on `save()`
-- `tickLocal()` on local write, `tickRemote()` on merge with remote data
-- Comparison: timestamp first, then counter, then nodeId (string compare as tiebreaker)
-- Guarantees total ordering across devices without synchronized clocks
+### Initial State
+
+`createHlc(nodeId)` returns `{ timestamp: 0, counter: 0, nodeId }`. The timestamp starts at `0`, not the current wall clock. The first call to `tickLocal()` advances it to `Date.now()`.
+
+### Usage
+
+- `tickLocal(hlc)` — called on every `save()`. Advances timestamp to `max(Date.now(), hlc.timestamp)` and resets or increments counter.
+- `tickRemote(local, remote)` — exported and available for apps but **not called by the framework** during sync. The framework only uses `compareHlc()` for conflict resolution. Apps may call `tickRemote()` to advance their local clock when receiving external data outside the sync engine.
+- `compareHlc(a, b)` — compares timestamp, then counter, then nodeId (string tiebreaker). Guarantees total deterministic ordering.
+
+### Post-Merge Semantics
+
+When two versions of an entity conflict during sync, the winner (determined by `compareHlc`) keeps its **original HLC unchanged**. No new timestamp is generated on merge — the winning entity is stored as-is on both sides.
 
 ## Sync Engine
 
@@ -159,6 +168,17 @@ All sync directions use a single generic function `syncBetween(adapterA, adapter
 - **Phase 1 (Hydrate)**: `syncBetween(cloudAdapter, localAdapter, store, ...)`
 - **Phase 2 (Periodic)**: `syncBetween(store, localAdapter, ...)` + `syncBetween(localAdapter, cloudAdapter, ...)`
 - **Phase 3 (Manual)**: same as Phase 2 but immediate
+
+Returns `SyncBetweenResult`:
+
+```typescript
+type SyncBetweenResult = {
+  readonly hydratedEntityNames: ReadonlyArray<string>;  // entity types processed
+  readonly partitionsCopied: number;     // partitions that existed on only one side (full copy)
+  readonly partitionsMerged: number;     // partitions that existed on both sides (per-entity merge)
+  readonly conflictsResolved: number;    // total entities in merged partitions (includes non-conflicted)
+};
+```
 
 ### Sync Cycle (local ↔ cloud)
 

@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { createStore } from '@strata/store';
-import { createMemoryBlobAdapter } from '@strata/adapter';
+import { Store } from '@strata/store';
+import { MemoryBlobAdapter } from '@strata/adapter';
 import { loadPartitionFromAdapter } from '@strata/store/flush';
 
 describe('loadPartitionFromAdapter', () => {
   it('loads entities from blob without deleted section', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapter = new MemoryBlobAdapter();
+    const store = new Store();
 
     const blob = { task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } }, deleted: {} };
     await adapter.write(undefined, 'task._', blob);
@@ -19,8 +19,8 @@ describe('loadPartitionFromAdapter', () => {
   });
 
   it('returns empty map when blob does not exist', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapter = new MemoryBlobAdapter();
+    const store = new Store();
 
     const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
 
@@ -28,8 +28,8 @@ describe('loadPartitionFromAdapter', () => {
   });
 
   it('loads entities and tombstones from blob with deleted section', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapter = new MemoryBlobAdapter();
+    const store = new Store();
 
     const blob = {
       task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } },

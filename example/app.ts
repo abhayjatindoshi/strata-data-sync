@@ -1,9 +1,9 @@
 import {
-  createStrata,
-  createMemoryBlobAdapter,
+  Strata,
+  MemoryBlobAdapter,
   defineEntity,
 } from 'strata-data-sync';
-import type { Strata, Repository } from 'strata-data-sync';
+import type { RepositoryType } from 'strata-data-sync';
 
 // ─── Entity types ────────────────────────────────────────
 
@@ -21,10 +21,10 @@ class MultiTenantDemo {
   private readonly strata: Strata;
 
   constructor() {
-    this.strata = createStrata({
+    this.strata = new Strata({
       appId: 'strata-example-memory',
       entities: [taskDef, noteDef],
-      localAdapter: createMemoryBlobAdapter(),
+      localAdapter: new MemoryBlobAdapter(),
       deviceId: 'device-1',
     });
   }
@@ -54,12 +54,12 @@ class MultiTenantDemo {
   private async seedWorkTenant(tenantId: string): Promise<void> {
     await this.strata.loadTenant(tenantId);
 
-    const tasks = this.strata.repo(taskDef) as Repository<Task>;
+    const tasks = this.strata.repo(taskDef);
     tasks.save({ title: 'Ship v2 release', done: false });
     tasks.save({ title: 'Review PRs', done: true });
     tasks.save({ title: 'Update docs', done: false });
 
-    const notes = this.strata.repo(noteDef) as Repository<Note>;
+    const notes = this.strata.repo(noteDef);
     notes.save({ body: 'Standup at 9am' });
 
     this.printRepo('Work', tasks, notes);
@@ -70,7 +70,7 @@ class MultiTenantDemo {
     console.log('\n--- Switched to Personal tenant ---');
     console.log('Active tenant:', this.strata.tenants.activeTenant$.getValue()?.name);
 
-    const tasks = this.strata.repo(taskDef) as Repository<Task>;
+    const tasks = this.strata.repo(taskDef);
     tasks.save({ title: 'Buy groceries', done: false });
 
     const open = tasks.query({ where: { done: false } });
@@ -86,7 +86,7 @@ class MultiTenantDemo {
     sub.unsubscribe();
   }
 
-  private printRepo(label: string, tasks: Repository<Task>, notes: Repository<Note>): void {
+  private printRepo(label: string, tasks: RepositoryType<Task>, notes: RepositoryType<Note>): void {
     console.log(`\n[${label}] Tasks (${tasks.query().length}):`);
     for (const t of tasks.query()) {
       console.log(`  - ${t.title} (${t.done ? 'done' : 'todo'})`);

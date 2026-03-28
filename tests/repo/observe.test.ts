@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import { createStore } from '@strata/store';
-import { createEventBus } from '@strata/reactive';
+import { Store } from '@strata/store';
+import { EventBus } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
-import { createRepository } from '@strata/repo';
+import { Repository } from '@strata/repo';
 import type { Hlc } from '@strata/hlc';
 
 type Item = { name: string; category: string; price: number };
@@ -16,9 +16,9 @@ const ItemDef = defineEntity<Item>('item');
 
 describe('Repository.observe', () => {
   it('emits current value on subscribe', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
 
     const value = await firstValueFrom(repo.observe(id));
@@ -27,18 +27,18 @@ describe('Repository.observe', () => {
   });
 
   it('emits undefined for non-existent entity', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const value = await firstValueFrom(repo.observe('item._.nonexistent'));
     expect(value).toBeUndefined();
   });
 
   it('emits updated value when entity changes', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
 
     const values: Array<(Item & { id: string; version: number }) | undefined> = [];
@@ -56,9 +56,9 @@ describe('Repository.observe', () => {
   });
 
   it('suppresses emission when version unchanged', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
 
     const values: unknown[] = [];
@@ -76,9 +76,9 @@ describe('Repository.observe', () => {
   });
 
   it('emits undefined after entity is deleted', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
 
     const values: unknown[] = [];
@@ -96,9 +96,9 @@ describe('Repository.observe', () => {
 
 describe('Repository.observeQuery', () => {
   it('emits current results on subscribe', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.save({ name: 'A', category: 'cat1', price: 10 });
     repo.save({ name: 'B', category: 'cat2', price: 20 });
 
@@ -107,9 +107,9 @@ describe('Repository.observeQuery', () => {
   });
 
   it('emits updated results when entities change', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const emissions: ReadonlyArray<unknown>[] = [];
     const sub = repo.observeQuery().subscribe(v => emissions.push(v));
@@ -124,9 +124,9 @@ describe('Repository.observeQuery', () => {
   });
 
   it('applies query filter options', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.save({ name: 'A', category: 'cat1', price: 10 });
     repo.save({ name: 'B', category: 'cat2', price: 20 });
 
@@ -138,9 +138,9 @@ describe('Repository.observeQuery', () => {
   });
 
   it('suppresses emission when results unchanged', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.save({ name: 'A', category: 'cat1', price: 10 });
 
     const emissions: unknown[] = [];
@@ -158,9 +158,9 @@ describe('Repository.observeQuery', () => {
 
 describe('entityComparator', () => {
   it('treats two undefined values as equal', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const values: unknown[] = [];
     const sub = repo.observe('item._.nonexistent').subscribe(v => values.push(v));
@@ -177,9 +177,9 @@ describe('entityComparator', () => {
 
 describe('resultsChanged', () => {
   it('detects length changes', async () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const emissions: unknown[] = [];
     const sub = repo.observeQuery().subscribe(v => emissions.push(v));

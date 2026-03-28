@@ -4,33 +4,23 @@ export type {
   MergeResult,
   MergedPartitionResult,
   SyncEntity,
-  SyncDirection,
+  SyncEntityChange,
+  SyncBetweenResult,
+  SyncLocation,
   SyncQueueItem,
-  SyncLock as SyncLockType,
   SyncResult,
   SyncEvent,
   SyncEventListener,
-  SyncEventEmitter as SyncEventEmitterType,
+  SyncEnqueueResult,
+  SyncEngine as SyncEngineType,
   SyncSchedulerOptions,
   SyncScheduler as SyncSchedulerType,
   DirtyTracker as DirtyTrackerType,
 } from './types';
-export { loadAllIndexPairs, diffPartitions } from './diff';
-export {
-  copyPartitionToCloud,
-  copyPartitionToLocal,
-  syncCopyPhase,
-} from './copy';
+export { diffPartitions } from './diff';
 export { resolveConflict, resolveEntityTombstone } from './conflict';
-export { diffEntityMaps, mergePartition } from './merge';
-export {
-  syncMergePhase,
-  updateIndexesAfterSync,
-} from './sync-phase';
-export { purgeStaleTombstones, DEFAULT_TOMBSTONE_RETENTION_MS } from './tombstone';
-export { SyncLock, createSyncLock } from './sync-lock';
-export { SyncScheduler, createSyncScheduler, syncNow } from './sync-scheduler';
-export { SyncEventEmitter, createSyncEventEmitter } from './sync-events';
-export { DirtyTracker, createDirtyTracker } from './dirty-tracker';
-export type { SyncBetweenResult } from './unified';
+export { mergePartition } from './merge';
+export { SyncEngine } from './sync-engine';
+export { SyncScheduler } from './sync-scheduler';
+export { DirtyTracker } from './dirty-tracker';
 export { syncBetween } from './unified';

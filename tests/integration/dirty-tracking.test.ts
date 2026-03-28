@@ -1,10 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean };
@@ -27,10 +26,10 @@ describe('Dirty tracking integration', () => {
   }
 
   it('isDirty transitions — false → true after save → false after sync', async () => {
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [TaskDef],
-      localAdapter: createMemoryBlobAdapter(),
-      cloudAdapter: createMemoryBlobAdapter(),
+      localAdapter: new MemoryBlobAdapter(),
+      cloudAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
     }));
 
@@ -54,10 +53,10 @@ describe('Dirty tracking integration', () => {
   });
 
   it('isDirty$ observable — emits true on save, false on sync', async () => {
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [TaskDef],
-      localAdapter: createMemoryBlobAdapter(),
-      cloudAdapter: createMemoryBlobAdapter(),
+      localAdapter: new MemoryBlobAdapter(),
+      cloudAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
     }));
 

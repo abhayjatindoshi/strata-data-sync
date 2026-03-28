@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
+import { MemoryBlobAdapter } from '@strata/adapter';
 import { TENANTS_KEY, STRATA_MARKER_KEY } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
-import { loadTenantList, saveTenantList, createTenantManager } from '@strata/tenant';
+import { loadTenantList, saveTenantList, TenantManager } from '@strata/tenant';
 
 describe('tenant list persistence', () => {
   it('loadTenantList returns empty array when no blob', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const list = await loadTenantList(adapter);
     expect(list).toEqual([]);
   });
 
   it('save and load round-trip', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const now = new Date('2026-03-23T12:00:00Z');
     const tenants: Tenant[] = [
       { id: 't1', name: 'Tenant 1', meta: { folder: 'abc' }, createdAt: now, updatedAt: now },
@@ -25,7 +25,7 @@ describe('tenant list persistence', () => {
   });
 
   it('stores under __tenants key', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const now = new Date();
     await saveTenantList(adapter, [
       { id: 't1', name: 'T', meta: {}, createdAt: now, updatedAt: now },
@@ -38,8 +38,8 @@ describe('tenant list persistence', () => {
 describe('TenantManager', () => {
   describe('list', () => {
     it('returns empty array initially', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       const list = await tm.list();
       expect(list).toEqual([]);
     });
@@ -47,8 +47,8 @@ describe('TenantManager', () => {
 
   describe('create', () => {
     it('creates tenant with provided ID', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       const tenant = await tm.create({ name: 'My App', meta: { bucket: 'x' }, id: 'custom-id' });
       expect(tenant.id).toBe('custom-id');
       expect(tenant.name).toBe('My App');
@@ -56,15 +56,15 @@ describe('TenantManager', () => {
     });
 
     it('generates ID when not provided', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       const tenant = await tm.create({ name: 'My App', meta: { bucket: 'x' } });
       expect(tenant.id).toHaveLength(8);
     });
 
     it('derives ID from meta when deriveTenantId is configured', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter, {
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter, {
         deriveTenantId: (meta) => (meta as { folderId: string }).folderId.substring(0, 4),
       });
       const tenant = await tm.create({ name: 'Shared', meta: { folderId: 'abcdefgh' } });
@@ -72,8 +72,8 @@ describe('TenantManager', () => {
     });
 
     it('writes __strata marker blob', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       const created = await tm.create({ name: 'T', meta: { folder: 'f1' } });
       const marker = await adapter.read(created, STRATA_MARKER_KEY);
       expect(marker).not.toBeNull();
@@ -83,8 +83,8 @@ describe('TenantManager', () => {
     });
 
     it('persists tenant to list', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await tm.create({ name: 'T', meta: {}, id: 'abc' });
       const list = await tm.list();
       expect(list).toHaveLength(1);
@@ -94,22 +94,22 @@ describe('TenantManager', () => {
 
   describe('load', () => {
     it('sets active tenant', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await tm.create({ name: 'T1', meta: {}, id: 't1' });
       await tm.load('t1');
       expect(tm.activeTenant$.getValue()!.id).toBe('t1');
     });
 
     it('throws for unknown tenant ID', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await expect(tm.load('unknown')).rejects.toThrow('Tenant not found: unknown');
     });
 
     it('notifies subscribers', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await tm.create({ name: 'T1', meta: {}, id: 't1' });
 
       const values: (string | undefined)[] = [];
@@ -122,12 +122,12 @@ describe('TenantManager', () => {
 
   describe('setup', () => {
     it('reads marker blob and adds tenant', async () => {
-      const adapter = createMemoryBlobAdapter();
+      const adapter = new MemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'shared-id', name: 'Shared', meta: { folder: 'shared' }, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
-      const tm = createTenantManager(adapter, { deriveTenantId: () => 'shared-id' });
+      const tm = new TenantManager(adapter, { deriveTenantId: () => 'shared-id' });
       const tenant = await tm.setup({ meta: { folder: 'shared' }, name: 'Shared' });
       expect(tenant.name).toBe('Shared');
       const list = await tm.list();
@@ -135,20 +135,20 @@ describe('TenantManager', () => {
     });
 
     it('throws if no marker blob found', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await expect(tm.setup({ meta: { folder: 'empty' } })).rejects.toThrow(
         'No strata workspace found',
       );
     });
 
     it('returns existing tenant if already in list', async () => {
-      const adapter = createMemoryBlobAdapter();
+      const adapter = new MemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'derived-id', name: '', meta: { folder: 'f1' }, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
-      const tm = createTenantManager(adapter, {
+      const tm = new TenantManager(adapter, {
         deriveTenantId: () => 'derived-id',
       });
       const t1 = await tm.setup({ meta: { folder: 'f1' } });
@@ -159,12 +159,12 @@ describe('TenantManager', () => {
     });
 
     it('defaults name to Shared Workspace', async () => {
-      const adapter = createMemoryBlobAdapter();
+      const adapter = new MemoryBlobAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'default-id', name: '', meta: {}, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
-      const tm = createTenantManager(adapter, { deriveTenantId: () => 'default-id' });
+      const tm = new TenantManager(adapter, { deriveTenantId: () => 'default-id' });
       const tenant = await tm.setup({ meta: {} });
       expect(tenant.name).toBe('Shared Workspace');
     });
@@ -172,8 +172,8 @@ describe('TenantManager', () => {
 
   describe('delink', () => {
     it('removes tenant from list', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.delink('t1');
       const list = await tm.list();
@@ -181,8 +181,8 @@ describe('TenantManager', () => {
     });
 
     it('clears active tenant if delinked is active', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.load('t1');
       expect(tm.activeTenant$.getValue()?.id).toBe('t1');
@@ -191,8 +191,8 @@ describe('TenantManager', () => {
     });
 
     it('does not delete cloud data', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       const created = await tm.create({ name: 'T', meta: { f: '1' }, id: 't1' });
       await tm.delink('t1');
       // Marker blob should still exist
@@ -203,8 +203,8 @@ describe('TenantManager', () => {
 
   describe('delete', () => {
     it('removes tenant from list and deletes cloud data', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await tm.create({ name: 'T', meta: { f: '1' }, id: 't1' });
       await tm.delete('t1');
       const list = await tm.list();
@@ -212,8 +212,8 @@ describe('TenantManager', () => {
     });
 
     it('clears active tenant if deleted is active', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.load('t1');
       await tm.delete('t1');
@@ -221,8 +221,8 @@ describe('TenantManager', () => {
     });
 
     it('is a no-op for unknown tenant ID', async () => {
-      const adapter = createMemoryBlobAdapter();
-      const tm = createTenantManager(adapter);
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(adapter);
       await expect(tm.delete('unknown')).resolves.toBeUndefined();
     });
   });

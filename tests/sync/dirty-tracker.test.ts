@@ -1,27 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { createDirtyTracker } from '@strata/sync';
+import { DirtyTracker } from '@strata/sync';
 
-describe('createDirtyTracker', () => {
+describe('DirtyTracker', () => {
   it('starts not dirty', () => {
-    const tracker = createDirtyTracker();
+    const tracker = new DirtyTracker();
     expect(tracker.isDirty).toBe(false);
   });
 
   it('markDirty sets isDirty to true', () => {
-    const tracker = createDirtyTracker();
+    const tracker = new DirtyTracker();
     tracker.markDirty();
     expect(tracker.isDirty).toBe(true);
   });
 
   it('clearDirty sets isDirty to false', () => {
-    const tracker = createDirtyTracker();
+    const tracker = new DirtyTracker();
     tracker.markDirty();
     tracker.clearDirty();
     expect(tracker.isDirty).toBe(false);
   });
 
   it('isDirty$ emits initial false', () => {
-    const tracker = createDirtyTracker();
+    const tracker = new DirtyTracker();
     const values: boolean[] = [];
     const sub = tracker.isDirty$.subscribe(v => values.push(v));
 
@@ -30,7 +30,7 @@ describe('createDirtyTracker', () => {
   });
 
   it('isDirty$ emits on state change', () => {
-    const tracker = createDirtyTracker();
+    const tracker = new DirtyTracker();
     const values: boolean[] = [];
     const sub = tracker.isDirty$.subscribe(v => values.push(v));
 
@@ -42,7 +42,7 @@ describe('createDirtyTracker', () => {
   });
 
   it('isDirty$ uses distinctUntilChanged — no duplicate emissions', () => {
-    const tracker = createDirtyTracker();
+    const tracker = new DirtyTracker();
     const values: boolean[] = [];
     const sub = tracker.isDirty$.subscribe(v => values.push(v));
 

@@ -11,19 +11,19 @@ import {
 } from '@strata/adapter/encryption';
 import type { EntityDefinition } from '@strata/schema';
 import type { BlobMigration } from '@strata/schema/migration';
-import { createEventBus } from '@strata/reactive';
-import { createStore } from '@strata/store';
-import { createRepository, createSingletonRepository } from '@strata/repo';
+import { EventBus } from '@strata/reactive';
+import { Store } from '@strata/store';
+import { Repository, SingletonRepository } from '@strata/repo';
 import type { RepositoryType, SingletonRepositoryType } from '@strata/repo';
-import { createTenantManager } from '@strata/tenant';
+import { TenantManager } from '@strata/tenant';
 import type { TenantManagerType } from '@strata/tenant';
 import {
-  createSyncLock, createSyncEventEmitter, createDirtyTracker,
-  createSyncScheduler, syncNow,
-  syncBetween,
+  SyncEngine, DirtyTracker,
+  SyncScheduler,
 } from '@strata/sync';
 import type {
   SyncResult, SyncEventListener, SyncSchedulerType,
+  SyncEngineType,
 } from '@strata/sync';
 
 const log = debug('strata:core');
@@ -77,18 +77,17 @@ export class Strata {
   readonly isDirty$: Observable<boolean>;
 
   private readonly hlcRef: { current: Hlc };
-  private readonly eventBus: ReturnType<typeof createEventBus>;
-  private readonly store: ReturnType<typeof createStore>;
-  private readonly syncLock: ReturnType<typeof createSyncLock>;
-  private readonly syncEvents: ReturnType<typeof createSyncEventEmitter>;
-  private readonly dirtyTracker: ReturnType<typeof createDirtyTracker>;
+  private readonly eventBus: EventBus;
+  private readonly store: Store;
+  private readonly syncEngine: SyncEngineType;
+  private readonly dirtyTracker: DirtyTracker;
   private readonly entityNames: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly repoMap = new Map<string, RepositoryType<unknown> | SingletonRepositoryType<unknown>>();
   private readonly config: StrataConfig;
   private readonly localAdapter: BlobAdapter;
   private readonly storageAdapter: StorageAdapter | undefined;
-  private readonly dirtyFlushListener: () => void;
+  private readonly dirtyFlushListener: (event: { fromSync?: boolean }) => void;
 
   private syncScheduler: SyncSchedulerType | null = null;
   private disposed = false;
@@ -107,29 +106,33 @@ export class Strata {
     }
 
     this.hlcRef = { current: createHlc(config.deviceId) };
-    this.eventBus = createEventBus();
-    this.store = createStore();
-    this.syncLock = createSyncLock();
-    this.syncEvents = createSyncEventEmitter();
-    this.dirtyTracker = createDirtyTracker();
+    this.eventBus = new EventBus();
+    this.store = new Store();
+    this.syncEngine = new SyncEngine(
+      this.store, this.localAdapter, config.cloudAdapter,
+      config.entities.map(d => d.name), this.hlcRef, this.eventBus,
+    );
+    this.dirtyTracker = new DirtyTracker();
     this.entityNames = config.entities.map(d => d.name);
     this.isDirty$ = this.dirtyTracker.isDirty$;
 
     for (const def of config.entities) {
       if (def.keyStrategy.kind === 'singleton') {
-        this.repoMap.set(def.name, createSingletonRepository(def, this.store, this.hlcRef, this.eventBus));
+        this.repoMap.set(def.name, new SingletonRepository(def, this.store, this.hlcRef, this.eventBus));
       } else {
-        this.repoMap.set(def.name, createRepository(def, this.store, this.hlcRef, this.eventBus));
+        this.repoMap.set(def.name, new Repository(def, this.store, this.hlcRef, this.eventBus));
       }
     }
 
-    this.tenants = createTenantManager(this.localAdapter, {
+    this.tenants = new TenantManager(this.localAdapter, {
       entityTypes: this.entityNames,
       deriveTenantId: config.deriveTenantId,
     });
 
-    const dirtyFlushListener = () => {
-      this.dirtyTracker.markDirty();
+    const dirtyFlushListener = (event: { fromSync?: boolean }) => {
+      if (!event.fromSync) {
+        this.dirtyTracker.markDirty();
+      }
     };
     this.dirtyFlushListener = dirtyFlushListener;
     this.eventBus.on(dirtyFlushListener);
@@ -138,11 +141,11 @@ export class Strata {
   private async unloadCurrentTenant(): Promise<void> {
     this.syncScheduler?.stop();
     this.syncScheduler = null;
-    await this.syncLock.drain();
     const tenant = this.tenants.activeTenant$.getValue();
     if (tenant) {
-      await syncBetween(this.store, this.localAdapter, this.store, this.entityNames, tenant);
+      await this.syncEngine.sync('memory', 'local', tenant);
     }
+    await this.syncEngine.drain();
     this.store.clear();
     this.dirtyTracker.clearDirty();
   }
@@ -158,26 +161,21 @@ export class Strata {
 
     if (this.config.cloudAdapter) {
       try {
-        await syncBetween(
-          this.config.cloudAdapter, this.localAdapter,
-          this.store, this.entityNames, tenant,
-        );
+        await this.syncEngine.sync('cloud', 'local', tenant);
       } catch {
-        this.syncEvents.emit({ type: 'cloud-unreachable' });
-        await syncBetween(this.localAdapter, this.store, this.store, this.entityNames, tenant);
+        this.syncEngine.emit({ type: 'cloud-unreachable' });
       }
+      await this.syncEngine.sync('local', 'memory', tenant);
     } else {
-      await syncBetween(this.localAdapter, this.store, this.store, this.entityNames, tenant);
+      await this.syncEngine.sync('local', 'memory', tenant);
     }
 
     if (this.config.cloudAdapter) {
-      this.syncScheduler = createSyncScheduler(
-        this.syncLock, this.localAdapter, this.config.cloudAdapter,
-        this.store, this.entityNames, tenant, {
+      this.syncScheduler = new SyncScheduler(
+        this.syncEngine, tenant, true, {
           localFlushIntervalMs: this.config.options?.localFlushIntervalMs,
           cloudSyncIntervalMs: this.config.options?.cloudSyncIntervalMs,
           dirtyTracker: this.dirtyTracker,
-          syncEvents: this.syncEvents,
         },
       );
       this.syncScheduler.start();
@@ -206,27 +204,22 @@ export class Strata {
     if (!tenant) throw new Error('No tenant loaded');
     if (!this.config.cloudAdapter) throw new Error('No cloud adapter configured');
 
-    this.syncEvents.emit({ type: 'sync-started' });
-    try {
-      const result = await syncNow(
-        this.syncLock, this.localAdapter, this.config.cloudAdapter,
-        this.store, this.entityNames, tenant,
-      );
-      this.dirtyTracker.clearDirty();
-      this.syncEvents.emit({ type: 'sync-completed', result });
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      this.syncEvents.emit({ type: 'sync-failed', error });
-      throw error;
-    }
+    await this.syncEngine.sync('memory', 'local', tenant);
+    const { result } = await this.syncEngine.sync('local', 'cloud', tenant);
+    await this.syncEngine.sync('local', 'memory', tenant);
+    this.dirtyTracker.clearDirty();
+    return {
+      entitiesUpdated: result.changesForB.length,
+      conflictsResolved: result.changesForA.length,
+      partitionsSynced: result.changesForA.length + result.changesForB.length,
+    };
   }
 
   get isDirty(): boolean { return this.dirtyTracker.isDirty; }
 
-  onSyncEvent(listener: SyncEventListener): void { this.syncEvents.on(listener); }
+  onSyncEvent(listener: SyncEventListener): void { this.syncEngine.on(listener); }
 
-  offSyncEvent(listener: SyncEventListener): void { this.syncEvents.off(listener); }
+  offSyncEvent(listener: SyncEventListener): void { this.syncEngine.off(listener); }
 
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
     this.assertNotDisposed();
@@ -256,7 +249,7 @@ export class Strata {
       await this.unloadCurrentTenant();
       for (const r of this.repoMap.values()) r.dispose();
       this.eventBus.off(this.dirtyFlushListener);
-      this.syncLock.dispose();
+      this.syncEngine.dispose();
       log('strata disposed');
     })();
     return this.disposePromise;
@@ -264,10 +257,6 @@ export class Strata {
 }
 
 // ─── Factory ─────────────────────────────────────────────
-
-export function createStrata(config: StrataConfig): Strata {
-  return new Strata(config);
-}
 
 export async function createStrataAsync(config: StrataConfig): Promise<Strata> {
   if (config.localAdapter.kind === 'storage' && config.encryption) {

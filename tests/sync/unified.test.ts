@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
+import { MemoryBlobAdapter } from '@strata/adapter';
 import { serialize, saveAllIndexes } from '@strata/persistence';
-import { createStore } from '@strata/store';
+import { Store } from '@strata/store';
 import { syncBetween } from '@strata/sync';
 
 function makePartitionBlob(
@@ -17,9 +17,8 @@ function makePartitionBlob(
 
 describe('syncBetween', () => {
   it('copies A-only partitions to B', async () => {
-    const adapterA = createMemoryBlobAdapter();
-    const adapterB = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
 
     const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
@@ -27,20 +26,18 @@ describe('syncBetween', () => {
       task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
     });
 
-    const result = await syncBetween(adapterA, adapterB, store, ['task'], undefined);
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined);
 
-    expect(result.partitionsCopied).toBe(1);
-    expect(result.partitionsMerged).toBe(0);
-    expect(result.hydratedEntityNames).toEqual(['task']);
+    expect(result.changesForB.length).toBe(1);
+    expect(result.changesForB[0].key).toBe('task._');
 
     const blobOnB = await adapterB.read(undefined, 'task._');
     expect(blobOnB).not.toBeNull();
   });
 
   it('copies B-only partitions to A', async () => {
-    const adapterA = createMemoryBlobAdapter();
-    const adapterB = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
 
     const entity = { id: 'task._.b1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
     await adapterB.write(undefined, 'task._', makePartitionBlob('task', { 'task._.b1': entity }));
@@ -48,16 +45,19 @@ describe('syncBetween', () => {
       task: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
     });
 
-    const result = await syncBetween(adapterA, adapterB, store, ['task'], undefined);
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined);
 
-    expect(result.partitionsCopied).toBe(1);
-    expect(store.getEntity('task._', 'task._.b1')).toBeDefined();
+    expect(result.changesForA.length).toBe(1);
+    expect(result.changesForA[0].key).toBe('task._');
+    expect(result.changesForA[0].updatedIds).toContain('task._.b1');
+
+    const blobOnA = await adapterA.read(undefined, 'task._');
+    expect(blobOnA).not.toBeNull();
   });
 
   it('merges diverged partitions', async () => {
-    const adapterA = createMemoryBlobAdapter();
-    const adapterB = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
 
     const entityA = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     const entityB = { id: 'task._.b1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
@@ -72,30 +72,32 @@ describe('syncBetween', () => {
       task: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
     });
 
-    const result = await syncBetween(adapterA, adapterB, store, ['task'], undefined);
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined);
 
-    expect(result.partitionsMerged).toBe(1);
-    expect(store.getEntity('task._', 'task._.a1')).toBeDefined();
-    expect(store.getEntity('task._', 'task._.b1')).toBeDefined();
+    // Merged blob written to both
+    expect(result.changesForA.length).toBe(1);
+    expect(result.changesForB.length).toBe(1);
+
+    const blobA = await adapterA.read(undefined, 'task._');
+    const blobB = await adapterB.read(undefined, 'task._');
+    expect(blobA).toEqual(blobB);
   });
 
   it('returns empty result when no data on either side', async () => {
-    const adapterA = createMemoryBlobAdapter();
-    const adapterB = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
 
-    const result = await syncBetween(adapterA, adapterB, store, ['task'], undefined);
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined);
 
-    expect(result.partitionsCopied).toBe(0);
-    expect(result.partitionsMerged).toBe(0);
-    expect(result.conflictsResolved).toBe(0);
-    expect(result.hydratedEntityNames).toEqual(['task']);
+    expect(result.changesForA).toHaveLength(0);
+    expect(result.changesForB).toHaveLength(0);
+    expect(result.stale).toBe(false);
+    expect(result.maxHlc).toBeUndefined();
   });
 
   it('handles multiple entity types', async () => {
-    const adapterA = createMemoryBlobAdapter();
-    const adapterB = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
 
     const taskEntity = { id: 'task._.t1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     const noteEntity = { id: 'note._.n1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
@@ -110,16 +112,15 @@ describe('syncBetween', () => {
       note: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
     });
 
-    const result = await syncBetween(adapterA, adapterB, store, ['task', 'note'], undefined);
+    const result = await syncBetween(adapterA, adapterB, ['task', 'note'], undefined);
 
-    expect(result.partitionsCopied).toBe(2);
-    expect(result.hydratedEntityNames).toEqual(['task', 'note']);
+    expect(result.changesForB.length).toBe(1);
+    expect(result.changesForA.length).toBe(1);
   });
 
   it('updates indexes on both adapters after sync', async () => {
-    const adapterA = createMemoryBlobAdapter();
-    const adapterB = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
 
     const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
@@ -127,7 +128,7 @@ describe('syncBetween', () => {
       task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
     });
 
-    await syncBetween(adapterA, adapterB, store, ['task'], undefined);
+    await syncBetween(adapterA, adapterB, ['task'], undefined);
 
     const { loadAllIndexes } = await import('@strata/persistence');
     const indexesA = await loadAllIndexes(adapterA, undefined);
@@ -136,5 +137,22 @@ describe('syncBetween', () => {
     expect(indexesA['task']?.['_']).toBeDefined();
     expect(indexesB['task']?.['_']).toBeDefined();
     expect(indexesA['task']['_'].hash).toBe(indexesB['task']['_'].hash);
+  });
+
+  it('returns maxHlc from all processed entities', async () => {
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
+
+    const entity = { id: 'task._.a1', hlc: { timestamp: 5000, counter: 3, nodeId: 'n1' } };
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 5000 } },
+    });
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined);
+
+    expect(result.maxHlc).toBeDefined();
+    expect(result.maxHlc!.timestamp).toBe(5000);
+    expect(result.maxHlc!.counter).toBe(3);
   });
 });

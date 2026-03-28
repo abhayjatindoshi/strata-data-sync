@@ -1,15 +1,15 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { firstValueFrom, filter, timeout } from 'rxjs';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
   partitionBlobKey,
   saveAllIndexes,
   updatePartitionIndexEntry,
   loadAllIndexes,
 } from '@strata/index';
-import type { Strata, BlobAdapter, SyncEvent, Tenant } from '@strata/index';
+import type { BlobAdapter, SyncEvent, Tenant } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Note = { title: string; body: string; priority: number };
@@ -70,12 +70,12 @@ describe('Multi-tenant parallel sync integration', () => {
   it('two tenants — data stays isolated after switching and syncing', async () => {
     // MemoryBlobAdapter ignores meta, so each tenant needs its own cloud adapter
     // to simulate real isolation (e.g. separate buckets/containers).
-    const cloudA = createMemoryBlobAdapter();
-    const cloudB = createMemoryBlobAdapter();
-    const localAdapter = createMemoryBlobAdapter();
+    const cloudA = new MemoryBlobAdapter();
+    const cloudB = new MemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
 
     // Tenant A uses cloudA
-    const strataA = track(createStrata({
+    const strataA = track(new Strata({
       entities: [NoteDef, ProjectDef],
       localAdapter,
       cloudAdapter: cloudA,
@@ -96,7 +96,7 @@ describe('Multi-tenant parallel sync integration', () => {
     instances.length = 0;
 
     // Tenant B uses cloudB (a completely separate cloud store)
-    const strataB = track(createStrata({
+    const strataB = track(new Strata({
       entities: [NoteDef, ProjectDef],
       localAdapter,
       cloudAdapter: cloudB,
@@ -122,7 +122,7 @@ describe('Multi-tenant parallel sync integration', () => {
     instances.length = 0;
 
     // Re-load tenant A from its cloud — B's data must not appear
-    const strataA2 = track(createStrata({
+    const strataA2 = track(new Strata({
       entities: [NoteDef, ProjectDef],
       localAdapter,
       cloudAdapter: cloudA,
@@ -143,11 +143,11 @@ describe('Multi-tenant parallel sync integration', () => {
   });
 
   it('external cloud write detected on sync — new entities appear in store', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
-    const localAdapter = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
     const meta = { folder: 'shared' };
 
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [NoteDef],
       localAdapter,
       cloudAdapter: sharedCloud,
@@ -192,13 +192,13 @@ describe('Multi-tenant parallel sync integration', () => {
   });
 
   it('parallel local and cloud writes with conflict — HLC resolution after sync', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
-    const localA = createMemoryBlobAdapter();
-    const localB = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
+    const localA = new MemoryBlobAdapter();
+    const localB = new MemoryBlobAdapter();
     const meta = { folder: 'shared' };
 
     // Device A: create tenant and write initial data
-    const strataA = track(createStrata({
+    const strataA = track(new Strata({
       entities: [NoteDef],
       localAdapter: localA,
       cloudAdapter: sharedCloud,
@@ -212,7 +212,7 @@ describe('Multi-tenant parallel sync integration', () => {
     await strataA.sync();
 
     // Device B: load the same tenant, hydrate
-    const strataB = track(createStrata({
+    const strataB = track(new Strata({
       entities: [NoteDef],
       localAdapter: localB,
       cloudAdapter: sharedCloud,
@@ -243,12 +243,12 @@ describe('Multi-tenant parallel sync integration', () => {
   });
 
   it('switch tenant, external cloud mutation, re-load — sees fresh data', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
-    const localAdapter = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
     const metaA = { folder: 'ws-a' };
     const metaB = { folder: 'ws-b' };
 
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [NoteDef],
       localAdapter,
       cloudAdapter: sharedCloud,
@@ -299,11 +299,11 @@ describe('Multi-tenant parallel sync integration', () => {
   });
 
   it('auto-sync picks up external cloud changes via scheduler', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
-    const localAdapter = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
     const meta = { folder: 'shared' };
 
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [NoteDef],
       localAdapter,
       cloudAdapter: sharedCloud,
@@ -349,12 +349,12 @@ describe('Multi-tenant parallel sync integration', () => {
   });
 
   it('multi-entity types — parallel writes across note and project repos', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
-    const localA = createMemoryBlobAdapter();
-    const localB = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
+    const localA = new MemoryBlobAdapter();
+    const localB = new MemoryBlobAdapter();
     const meta = { folder: 'shared' };
 
-    const strataA = track(createStrata({
+    const strataA = track(new Strata({
       entities: [NoteDef, ProjectDef],
       localAdapter: localA,
       cloudAdapter: sharedCloud,
@@ -373,7 +373,7 @@ describe('Multi-tenant parallel sync integration', () => {
     await strataA.sync();
 
     // Device B hydrates and writes its own entities of both types
-    const strataB = track(createStrata({
+    const strataB = track(new Strata({
       entities: [NoteDef, ProjectDef],
       localAdapter: localB,
       cloudAdapter: sharedCloud,
@@ -407,12 +407,12 @@ describe('Multi-tenant parallel sync integration', () => {
   });
 
   it('three devices — convergence after sequential syncs', async () => {
-    const cloud = createMemoryBlobAdapter();
+    const cloud = new MemoryBlobAdapter();
     const meta = { folder: 'shared' };
 
     function makeDevice(id: string) {
-      const local = createMemoryBlobAdapter();
-      const s = track(createStrata({
+      const local = new MemoryBlobAdapter();
+      const s = track(new Strata({
         entities: [NoteDef],
         localAdapter: local,
         cloudAdapter: cloud,

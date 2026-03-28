@@ -34,7 +34,3 @@ export class MemoryBlobAdapter implements BlobAdapter {
     return keys;
   }
 }
-
-export function createMemoryBlobAdapter(): BlobAdapter {
-  return new MemoryBlobAdapter();
-}

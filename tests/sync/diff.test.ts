@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
-import type { Tenant } from '@strata/adapter';
 import type { PartitionIndex } from '@strata/persistence';
-import { saveAllIndexes } from '@strata/persistence';
-import { diffPartitions, loadAllIndexPairs } from '@strata/sync';
+import { diffPartitions } from '@strata/sync';
 
 describe('diffPartitions', () => {
   it('returns all unchanged when hashes match', () => {
@@ -98,38 +95,5 @@ describe('diffPartitions', () => {
     expect(result.localOnly).toHaveLength(0);
     expect(result.cloudOnly).toHaveLength(0);
     expect(result.unchanged).toHaveLength(0);
-  });
-});
-
-describe('loadAllIndexPairs', () => {
-  it('loads indexes from both local and cloud adapters', async () => {
-    const local = createMemoryBlobAdapter();
-    const cloud = createMemoryBlobAdapter();
-    const tenant: Tenant = { id: 'test', name: 'T', meta: { container: 'test' }, createdAt: new Date(), updatedAt: new Date() };
-
-    const localIndex: PartitionIndex = {
-      '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
-    };
-    const cloudIndex: PartitionIndex = {
-      '2026-02': { hash: 222, count: 20, updatedAt: 2000 },
-    };
-
-    await saveAllIndexes(local, tenant, { task: localIndex });
-    await saveAllIndexes(cloud, tenant, { task: cloudIndex });
-
-    const result = await loadAllIndexPairs(local, cloud, tenant);
-
-    expect(result.localIndexes['task']?.['2026-01']?.hash).toBe(111);
-    expect(result.cloudIndexes['task']?.['2026-02']?.hash).toBe(222);
-  });
-
-  it('returns empty indexes when no blobs exist', async () => {
-    const local = createMemoryBlobAdapter();
-    const cloud = createMemoryBlobAdapter();
-
-    const result = await loadAllIndexPairs(local, cloud, undefined);
-
-    expect(result.localIndexes).toEqual({});
-    expect(result.cloudIndexes).toEqual({});
   });
 });

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createStore } from '@strata/store';
+import { Store } from '@strata/store';
 import { createHlc } from '@strata/hlc';
-import { createEventBus } from '@strata/reactive';
+import { EventBus } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
-import { createRepository } from '@strata/repo';
+import { Repository } from '@strata/repo';
 
 type Task = {
   name: string;
@@ -13,10 +13,10 @@ const taskDef = defineEntity<Task>('task');
 
 describe('Repository delete tombstone integration', () => {
   it('delete records tombstone with entity HLC', () => {
-    const store = createStore();
+    const store = new Store();
     const hlc = { current: createHlc('device1') };
-    const eventBus = createEventBus();
-    const repo = createRepository(taskDef, store, hlc, eventBus);
+    const eventBus = new EventBus();
+    const repo = new Repository(taskDef, store, hlc, eventBus);
 
     const id = repo.save({ name: 'Test' } as Task);
     const savedEntity = repo.get(id)!;
@@ -31,10 +31,10 @@ describe('Repository delete tombstone integration', () => {
   });
 
   it('deleteMany records tombstones for all deleted entities', () => {
-    const store = createStore();
+    const store = new Store();
     const hlc = { current: createHlc('device1') };
-    const eventBus = createEventBus();
-    const repo = createRepository(taskDef, store, hlc, eventBus);
+    const eventBus = new EventBus();
+    const repo = new Repository(taskDef, store, hlc, eventBus);
 
     const id1 = repo.save({ name: 'Test1' } as Task);
     const id2 = repo.save({ name: 'Test2' } as Task);
@@ -48,10 +48,10 @@ describe('Repository delete tombstone integration', () => {
   });
 
   it('delete of non-existent entity does not create tombstone', () => {
-    const store = createStore();
+    const store = new Store();
     const hlc = { current: createHlc('device1') };
-    const eventBus = createEventBus();
-    const repo = createRepository(taskDef, store, hlc, eventBus);
+    const eventBus = new EventBus();
+    const repo = new Repository(taskDef, store, hlc, eventBus);
 
     repo.delete('task._.nonexistent');
 

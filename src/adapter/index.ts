@@ -1,6 +1,6 @@
 export type { BlobAdapter, Tenant, BlobTransform, StorageAdapter } from './types';
 export { TENANTS_KEY, STRATA_MARKER_KEY, partitionBlobKey } from './keys';
-export { MemoryBlobAdapter, createMemoryBlobAdapter } from './memory-blob-adapter';
+export { MemoryBlobAdapter } from './memory-blob-adapter';
 export { applyTransforms, reverseTransforms } from './transform';
 export { AdapterBridge } from './bridge';
 export type { AdapterBridgeOptions } from './bridge';

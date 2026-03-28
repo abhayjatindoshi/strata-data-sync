@@ -74,9 +74,9 @@ sequenceDiagram
 
     Note right of Signal: All observers pipe fires:<br/>map(() => readFromMap)<br/>distinctUntilChanged<br/>emit only if changed
 
-    par Async Flush (debounced 2s)
+    par Async Flush (periodic 2s interval)
         Store->>Store: mark partition dirty
-        Store->>Local: serialize + write blob (after 2s idle)
+        Store->>Local: serialize + write blob (at next interval tick)
         Store->>Store: update partition index
     end
 
@@ -125,7 +125,7 @@ sequenceDiagram
 
     App->>Strata: strata.dispose()
     Strata->>Sync: wait for in-flight sync
-    Strata->>Store: force flush all dirty to local (bypass debounce)
+    Strata->>Store: force flush all dirty to local (bypass interval)
     Store->>Local: write remaining blobs
     Strata->>Signal: complete all subjects
     Strata->>Strata: remove all event bus listeners

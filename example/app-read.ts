@@ -6,12 +6,12 @@ import {
   defineEntity,
   partitioned,
 } from 'strata-data-sync';
-import type { StorageAdapter, Tenant, Repository, SingletonRepository } from 'strata-data-sync';
+import type { StorageAdapter, Tenant } from 'strata-data-sync';
 
 // ─── File-system StorageAdapter (same as app-fs) ─────────
 
 class FsStorageAdapter implements StorageAdapter {
-  readonly kind = 'storage' as const;
+  readonly kind = 'storage';
   constructor(private readonly rootDir: string) {}
 
   private resolvePath(tenant: Tenant | undefined, key: string): string {
@@ -124,21 +124,21 @@ async function main(): Promise<void> {
 
   // Read tasks
   console.log('\n=== Tasks ===');
-  const tasks = strata.repo(taskDef) as Repository<Task>;
+  const tasks = strata.repo(taskDef);
   for (const t of tasks.query()) {
     console.log(`  - [${t.category}] ${t.title} (${t.done ? 'done' : 'todo'})`);
   }
 
   // Read notes
   console.log('\n=== Notes ===');
-  const notes = strata.repo(noteDef) as Repository<Note>;
+  const notes = strata.repo(noteDef);
   for (const n of notes.query()) {
     console.log(`  - ${n.body}`);
   }
 
   // Read settings
   console.log('\n=== Settings ===');
-  const settings = strata.repo(settingsDef) as SingletonRepository<Settings>;
+  const settings = strata.repo(settingsDef);
   const val = settings.get();
   if (val) {
     console.log(`  theme=${val.theme}, language=${val.language}`);

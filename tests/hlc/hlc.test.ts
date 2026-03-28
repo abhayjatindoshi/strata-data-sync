@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createHlc, tickLocal, tickRemote, compareHlc } from '@strata/hlc';
+import { createHlc, tick, compareHlc } from '@strata/hlc';
 
 describe('HLC', () => {
   describe('createHlc', () => {
@@ -11,11 +11,11 @@ describe('HLC', () => {
     });
   });
 
-  describe('tickLocal', () => {
+  describe('tick (local)', () => {
     it('advances timestamp to wall clock when clock is ahead', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
       const hlc = { timestamp: 500, counter: 3, nodeId: 'n1' };
-      const result = tickLocal(hlc);
+      const result = tick(hlc);
       expect(result.timestamp).toBe(1000);
       expect(result.counter).toBe(0);
       expect(result.nodeId).toBe('n1');
@@ -25,19 +25,19 @@ describe('HLC', () => {
     it('increments counter when wall clock is behind', () => {
       vi.spyOn(Date, 'now').mockReturnValue(500);
       const hlc = { timestamp: 1000, counter: 3, nodeId: 'n1' };
-      const result = tickLocal(hlc);
+      const result = tick(hlc);
       expect(result.timestamp).toBe(1000);
       expect(result.counter).toBe(4);
       vi.restoreAllMocks();
     });
   });
 
-  describe('tickRemote', () => {
+  describe('tick (remote)', () => {
     it('uses wall clock when ahead of both', () => {
       vi.spyOn(Date, 'now').mockReturnValue(2000);
       const local = { timestamp: 1000, counter: 5, nodeId: 'n1' };
       const remote = { timestamp: 1500, counter: 3, nodeId: 'n2' };
-      const result = tickRemote(local, remote);
+      const result = tick(local, remote);
       expect(result.timestamp).toBe(2000);
       expect(result.counter).toBe(0);
       expect(result.nodeId).toBe('n1');
@@ -48,7 +48,7 @@ describe('HLC', () => {
       vi.spyOn(Date, 'now').mockReturnValue(500);
       const local = { timestamp: 1000, counter: 3, nodeId: 'n1' };
       const remote = { timestamp: 1000, counter: 7, nodeId: 'n2' };
-      const result = tickRemote(local, remote);
+      const result = tick(local, remote);
       expect(result.timestamp).toBe(1000);
       expect(result.counter).toBe(8);
       expect(result.nodeId).toBe('n1');
@@ -59,7 +59,7 @@ describe('HLC', () => {
       vi.spyOn(Date, 'now').mockReturnValue(500);
       const local = { timestamp: 1500, counter: 3, nodeId: 'n1' };
       const remote = { timestamp: 1000, counter: 7, nodeId: 'n2' };
-      const result = tickRemote(local, remote);
+      const result = tick(local, remote);
       expect(result.timestamp).toBe(1500);
       expect(result.counter).toBe(4);
       expect(result.nodeId).toBe('n1');
@@ -70,7 +70,7 @@ describe('HLC', () => {
       vi.spyOn(Date, 'now').mockReturnValue(500);
       const local = { timestamp: 1000, counter: 3, nodeId: 'n1' };
       const remote = { timestamp: 1500, counter: 7, nodeId: 'n2' };
-      const result = tickRemote(local, remote);
+      const result = tick(local, remote);
       expect(result.timestamp).toBe(1500);
       expect(result.counter).toBe(8);
       expect(result.nodeId).toBe('n1');

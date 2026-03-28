@@ -1,28 +1,28 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   validateEntityDefinitions,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
   serialize,
 } from '@strata/index';
-import type { Strata, SyncEvent } from '@strata/index';
+import type { SyncEvent } from '@strata/index';
 import type { Repository, SingletonRepository } from '@strata/repo';
 
 type Task = { title: string; done: boolean };
 type Settings = { theme: string };
 
 function makeAdapter() {
-  return createMemoryBlobAdapter();
+  return new MemoryBlobAdapter();
 }
 
 function makeStrata(overrides?: {
-  cloudAdapter?: ReturnType<typeof createMemoryBlobAdapter>;
+  cloudAdapter?: ReturnType<typeof MemoryBlobAdapter>;
   entities?: ReturnType<typeof defineEntity>[];
-}): { strata: Strata; localAdapter: ReturnType<typeof createMemoryBlobAdapter> } {
+}): { strata: Strata; localAdapter: ReturnType<typeof MemoryBlobAdapter> } {
   const taskDef = defineEntity<Task>('task');
   const localAdapter = makeAdapter();
-  const strata = createStrata({
+  const strata = new Strata({
     entities: overrides?.entities ?? [taskDef],
     localAdapter,
     cloudAdapter: overrides?.cloudAdapter,
@@ -60,7 +60,7 @@ describe('validateEntityDefinitions', () => {
   });
 });
 
-describe('createStrata', () => {
+describe('Strata', () => {
   let strata: Strata;
 
   afterEach(async () => {
@@ -84,7 +84,7 @@ describe('createStrata', () => {
   describe('repo()', () => {
     it('returns repository for known entity definition', () => {
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -96,7 +96,7 @@ describe('createStrata', () => {
     it('throws for unknown entity definition', () => {
       const taskDef = defineEntity<Task>('task');
       const unknownDef = defineEntity<Settings>('settings');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -106,7 +106,7 @@ describe('createStrata', () => {
 
     it('returns Repository for non-singleton entities', () => {
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -122,7 +122,7 @@ describe('createStrata', () => {
       const settingsDef = defineEntity<Settings>('settings', {
         keyStrategy: 'singleton',
       });
-      strata = createStrata({
+      strata = new Strata({
         entities: [settingsDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -136,7 +136,7 @@ describe('createStrata', () => {
 
     it('allows CRUD operations through repo', () => {
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -162,7 +162,7 @@ describe('createStrata', () => {
       const settingsDef = defineEntity<Settings>('settings', {
         keyStrategy: 'singleton',
       });
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef, settingsDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -204,7 +204,7 @@ describe('createStrata', () => {
     it('stops previous sync scheduler when loading a new tenant', async () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -230,7 +230,7 @@ describe('createStrata', () => {
     it('hydrates from local on tenant load without cloud adapter', async () => {
       const localAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter,
         deviceId: 'dev',
@@ -252,7 +252,7 @@ describe('createStrata', () => {
       };
 
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter,
         cloudAdapter: failingCloudAdapter,
@@ -292,7 +292,7 @@ describe('createStrata', () => {
     it('succeeds with cloud adapter and loaded tenant', async () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -312,7 +312,7 @@ describe('createStrata', () => {
     it('emits sync-started and sync-completed events', async () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -336,7 +336,7 @@ describe('createStrata', () => {
     it('emits sync-failed event on sync error', async () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -369,7 +369,7 @@ describe('createStrata', () => {
 
     it('becomes dirty after save', async () => {
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -388,7 +388,7 @@ describe('createStrata', () => {
     it('clears after sync', async () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -421,7 +421,7 @@ describe('createStrata', () => {
     it('onSyncEvent/offSyncEvent manages listeners', async () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -464,7 +464,7 @@ describe('createStrata', () => {
 
     it('repo() throws after dispose', async () => {
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -495,7 +495,7 @@ describe('createStrata', () => {
     it('flushes dirty data on dispose', async () => {
       const taskDef = defineEntity<Task>('task');
       const localAdapter = makeAdapter();
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter,
         deviceId: 'dev',
@@ -518,7 +518,7 @@ describe('createStrata', () => {
 
     it('disposes all repositories', async () => {
       const taskDef = defineEntity<Task>('task');
-      strata = createStrata({
+      strata = new Strata({
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',

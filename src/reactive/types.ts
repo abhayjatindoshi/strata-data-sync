@@ -1,5 +1,6 @@
 export type EntityEvent = {
   readonly entityName: string;
+  readonly fromSync?: boolean;
 };
 
 export type EntityEventListener = (event: EntityEvent) => void;

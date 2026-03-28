@@ -1,11 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
   partitioned,
 } from '@strata/index';
-import type { Strata, BlobAdapter } from '@strata/index';
+import type { BlobAdapter } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Item = { name: string; category: string };
@@ -32,7 +32,7 @@ describe('Persistence advanced integration', () => {
   }
 
   it('transform pipeline end-to-end — custom adapter wrapping applied on flush and reversed on reload', async () => {
-    const rawAdapter = createMemoryBlobAdapter();
+    const rawAdapter = new MemoryBlobAdapter();
 
     // Create a wrapping adapter that adds an envelope around stored data
     const transformedAdapter: BlobAdapter = {
@@ -51,7 +51,7 @@ describe('Persistence advanced integration', () => {
     };
 
     // Phase 1: Save through transformed adapter
-    const strata1 = track(createStrata({
+    const strata1 = track(new Strata({
       entities: [ItemDef],
       localAdapter: transformedAdapter,
       deviceId: 'dev-1',
@@ -69,7 +69,7 @@ describe('Persistence advanced integration', () => {
     expect(rawBlob).toHaveProperty('__wrapped');
 
     // Phase 2: Reload through transformed adapter → data should be readable
-    const strata2 = track(createStrata({
+    const strata2 = track(new Strata({
       entities: [ItemDef],
       localAdapter: transformedAdapter,
       deviceId: 'dev-1',
@@ -84,9 +84,9 @@ describe('Persistence advanced integration', () => {
   });
 
   it('adapter list() discovers partition keys after flush', async () => {
-    const localAdapter = createMemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
 
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',

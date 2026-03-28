@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   createHlc,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
   defineEntity,
-  createEventBus,
+  EventBus,
 } from '@strata/index';
 
 describe('index barrel exports', () => {
@@ -12,7 +12,7 @@ describe('index barrel exports', () => {
   });
 
   it('exports adapter module', () => {
-    expect(createMemoryBlobAdapter).toBeDefined();
+    expect(MemoryBlobAdapter).toBeDefined();
   });
 
   it('exports schema module', () => {
@@ -20,6 +20,6 @@ describe('index barrel exports', () => {
   });
 
   it('exports reactive module', () => {
-    expect(createEventBus).toBeDefined();
+    expect(EventBus).toBeDefined();
   });
 });

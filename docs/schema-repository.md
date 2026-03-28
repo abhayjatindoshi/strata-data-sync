@@ -49,14 +49,14 @@ Three modes, no others:
 
 ```typescript
 type Repository<T> = {
-  get(id: string): T | undefined;
-  query(opts?: QueryOptions<T>): ReadonlyArray<T>;
+  get(id: string): (T & BaseEntity) | undefined;
+  query(opts?: QueryOptions<T>): ReadonlyArray<T & BaseEntity>;
   save(entity: T & Partial<BaseEntity>): string;
   saveMany(entities: ReadonlyArray<T & Partial<BaseEntity>>): ReadonlyArray<string>;
   delete(id: string): boolean;
   deleteMany(ids: ReadonlyArray<string>): void;
-  observe(id: string): Observable<T | undefined>;
-  observeQuery(opts?: QueryOptions<T>): Observable<ReadonlyArray<T>>;
+  observe(id: string): Observable<(T & BaseEntity) | undefined>;
+  observeQuery(opts?: QueryOptions<T>): Observable<ReadonlyArray<T & BaseEntity>>;
   dispose(): void;
 };
 ```
@@ -65,10 +65,10 @@ type Repository<T> = {
 
 ```typescript
 type SingletonRepository<T> = {
-  get(): T | undefined;
-  save(entity: T): void;
+  get(): (T & BaseEntity) | undefined;
+  save(entity: T & Partial<BaseEntity>): void;
   delete(): boolean;
-  observe(): Observable<T | undefined>;
+  observe(): Observable<(T & BaseEntity) | undefined>;
   dispose(): void;
 };
 ```
@@ -106,25 +106,37 @@ type QueryOptions<T> = {
 
 Framework applies: filter → sort → offset/limit. All sync, all in-memory.
 
-## Entity Migration
+### Query Helper Functions
 
-Entity definitions support versioned migrations for evolving entity shapes over time:
+The framework exports the individual query stages for advanced use:
+
+| Function | Purpose |
+|---|---|
+| `applyWhere(entities, where)` | Filters entities by partial field match |
+| `applyRange(entities, range)` | Filters by field range (`gt`, `gte`, `lt`, `lte`) |
+| `applyOrderBy(entities, orderBy)` | Sorts by one or more fields with direction |
+| `applyPagination(entities, offset, limit)` | Applies offset/limit slicing |
+
+### Batch Event Semantics
+
+- `saveMany()` performs all Map writes then emits a **single** change signal
+- `deleteMany()` emits a change signal only if **at least one** entity was actually deleted
+- Single `save()` / `delete()` each emit one signal immediately
+
+## Blob Migration
+
+Data migrations operate at the blob level via `BlobMigration`, not at the entity definition level:
 
 ```typescript
-const TaskDef = defineEntity<Task>('task', {
-  version: 2,
-  migrations: {
-    2: (old: unknown) => {
-      const prev = old as { title: string };
-      return { ...prev, priority: 'normal' };  // add default priority
-    },
-  },
-});
+type BlobMigration = {
+  readonly version: number;
+  readonly migrate: (blob: PartitionBlob) => PartitionBlob;
+};
 ```
 
-- `version` defaults to `1` if not specified
-- `migrations` is a record keyed by target version number
-- `migrateEntity(entity, storedVersion, targetVersion, migrations)` steps through sequential migration functions
+`migrateBlob(blob, migrations)` applies migrations sequentially by version number, skipping any with a version ≤ the blob's stored `__v` field.
+
+Blob migrations are passed via `StrataConfig.migrations` and applied when loading partition blobs from adapters.
 
 ## In-Memory Store
 

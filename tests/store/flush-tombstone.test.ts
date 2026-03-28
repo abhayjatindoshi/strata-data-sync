@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
-import { createStore } from '@strata/store';
+import { MemoryBlobAdapter } from '@strata/adapter';
+import { Store } from '@strata/store';
 import { loadPartitionFromAdapter } from '@strata/store/flush';
 import type { Hlc } from '@strata/hlc';
 
 describe('loadPartitionFromAdapter', () => {
   it('loads entities from blob into map', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapter = new MemoryBlobAdapter();
+    const store = new Store();
 
     const entity = { id: 'task._.a1', name: 'Test' };
     const blob = {
@@ -23,8 +23,8 @@ describe('loadPartitionFromAdapter', () => {
   });
 
   it('restores tombstones from blob deleted section', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapter = new MemoryBlobAdapter();
+    const store = new Store();
 
     const tombstoneHlc: Hlc = { timestamp: 999, counter: 0, nodeId: 'n1' };
     const blob = {
@@ -40,8 +40,8 @@ describe('loadPartitionFromAdapter', () => {
   });
 
   it('returns empty map when blob does not exist', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const store = createStore();
+    const adapter = new MemoryBlobAdapter();
+    const store = new Store();
 
     const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
 

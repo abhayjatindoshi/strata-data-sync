@@ -2,114 +2,287 @@ import debug from 'debug';
 import type { BlobAdapter, Tenant } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
+import { compareHlc } from '@strata/hlc';
+import type { AllIndexes, PartitionBlob } from '@strata/persistence';
 import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
-import type { EntityStore } from '@strata/store';
-import { loadPartitionFromAdapter } from '@strata/store';
+import { partitionHash, updatePartitionIndexEntry } from '@strata/persistence';
 import { diffPartitions } from './diff';
-import { syncCopyPhase } from './copy';
-import { syncMergePhase, updateIndexesAfterSync } from './sync-phase';
+import { mergePartition } from './merge';
+import type { SyncEntity, SyncEntityChange, SyncBetweenResult } from './types';
 
 const log = debug('strata:sync');
 
-export type SyncBetweenResult = {
-  readonly hydratedEntityNames: ReadonlyArray<string>;
-  readonly partitionsCopied: number;
-  readonly partitionsMerged: number;
-  readonly conflictsResolved: number;
+type SyncChange = {
+  readonly entityName: string;
+  readonly partitionKey: string;
+  readonly key: string;
+  readonly blob: PartitionBlob;
 };
 
-export async function syncBetween(
+type SyncPlan = {
+  readonly indexSnapshotA: AllIndexes;
+  readonly applyToA: ReadonlyArray<SyncChange>;
+  readonly applyToB: ReadonlyArray<SyncChange>;
+};
+
+// ─── Phase 1: Build plan ─────────────────────────────────
+
+async function buildPlan(
   adapterA: BlobAdapter,
   adapterB: BlobAdapter,
-  store: EntityStore,
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
-): Promise<SyncBetweenResult> {
+): Promise<SyncPlan> {
   const [indexesA, indexesB] = await Promise.all([
     loadAllIndexes(adapterA, tenant),
     loadAllIndexes(adapterB, tenant),
   ]);
 
-  const hydratedEntityNames: string[] = [];
-  let totalCopied = 0;
-  let totalMerged = 0;
-  let totalConflicts = 0;
-  let indexChanged = false;
+  const applyToA: SyncChange[] = [];
+  const applyToB: SyncChange[] = [];
 
   for (const entityName of entityNames) {
     const indexA = indexesA[entityName] ?? {};
     const indexB = indexesB[entityName] ?? {};
     const diff = diffPartitions(indexA, indexB);
 
-    const copiedKeys = await syncCopyPhase(
-      adapterA, adapterB, tenant, entityName, diff,
+    await planCopies(
+      adapterA, adapterB, tenant, entityName,
+      diff.localOnly, diff.cloudOnly, applyToA, applyToB,
     );
-    totalCopied += copiedKeys.length;
-
-    const mergedResults = await syncMergePhase(
-      adapterA, adapterB, tenant, entityName, diff.diverged,
+    await planMerges(
+      adapterA, adapterB, tenant, entityName,
+      diff.diverged, applyToA, applyToB,
     );
-    totalMerged += mergedResults.length;
-
-    for (const { partitionKey, entities, tombstones } of mergedResults) {
-      const entityKey = partitionBlobKey(entityName, partitionKey);
-      for (const [id, entity] of Object.entries(entities)) {
-        store.setEntity(entityKey, id, entity);
-      }
-      for (const [id, hlc] of Object.entries(tombstones)) {
-        store.deleteEntity(entityKey, id);
-        store.setTombstone(entityKey, id, hlc as Hlc);
-      }
-      store.clearDirty(entityKey);
-      totalConflicts += Object.keys(entities).length;
-    }
-
-    // Load B-only (newly copied) partitions into store
-    for (const partitionKey of diff.cloudOnly) {
-      const entityKey = partitionBlobKey(entityName, partitionKey);
-      await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(adapterA, tenant, store, entityName, partitionKey),
-      );
-    }
-
-    // Load A-only partitions into store (in case they aren't loaded yet)
-    for (const partitionKey of diff.localOnly) {
-      const entityKey = partitionBlobKey(entityName, partitionKey);
-      await store.loadPartition(entityKey, () =>
-        loadPartitionFromAdapter(adapterA, tenant, store, entityName, partitionKey),
-      );
-    }
-
-    const allSynced = [
-      ...copiedKeys,
-      ...mergedResults.map(r => r.partitionKey),
-    ];
-
-    if (allSynced.length > 0) {
-      const { updatedLocal, updatedCloud } = await updateIndexesAfterSync(
-        adapterA, tenant, entityName,
-        indexA, indexB, allSynced,
-      );
-      indexesA[entityName] = updatedLocal;
-      indexesB[entityName] = updatedCloud;
-      indexChanged = true;
-    }
-
-    hydratedEntityNames.push(entityName);
-    log('syncBetween processed %s: %d copied, %d merged', entityName, copiedKeys.length, mergedResults.length);
   }
 
-  if (indexChanged) {
-    await Promise.all([
-      saveAllIndexes(adapterA, tenant, indexesA),
-      saveAllIndexes(adapterB, tenant, indexesB),
+  return { indexSnapshotA: indexesA, applyToA, applyToB };
+}
+
+async function planCopies(
+  adapterA: BlobAdapter,
+  adapterB: BlobAdapter,
+  tenant: Tenant | undefined,
+  entityName: string,
+  aOnly: ReadonlyArray<string>,
+  bOnly: ReadonlyArray<string>,
+  applyToA: SyncChange[],
+  applyToB: SyncChange[],
+): Promise<void> {
+  for (const partitionKey of aOnly) {
+    const key = partitionBlobKey(entityName, partitionKey);
+    const blob = await adapterA.read(tenant, key);
+    if (blob) {
+      applyToB.push({ entityName, partitionKey, key, blob });
+    }
+  }
+  for (const partitionKey of bOnly) {
+    const key = partitionBlobKey(entityName, partitionKey);
+    const blob = await adapterB.read(tenant, key);
+    if (blob) {
+      applyToA.push({ entityName, partitionKey, key, blob });
+    }
+  }
+}
+
+async function planMerges(
+  adapterA: BlobAdapter,
+  adapterB: BlobAdapter,
+  tenant: Tenant | undefined,
+  entityName: string,
+  diverged: ReadonlyArray<string>,
+  applyToA: SyncChange[],
+  applyToB: SyncChange[],
+): Promise<void> {
+  for (const partitionKey of diverged) {
+    const key = partitionBlobKey(entityName, partitionKey);
+    const [blobA, blobB] = await Promise.all([
+      adapterA.read(tenant, key),
+      adapterB.read(tenant, key),
     ]);
+    if (!blobA || !blobB) {
+      log('skipping merge for %s: missing blob', key);
+      continue;
+    }
+    const merged = mergePartition(blobA, blobB, entityName);
+    const mergedBlob: PartitionBlob = {
+      [entityName]: merged.entities,
+      deleted: { [entityName]: merged.tombstones },
+    };
+    applyToB.push({ entityName, partitionKey, key, blob: mergedBlob });
+    applyToA.push({ entityName, partitionKey, key, blob: mergedBlob });
   }
+}
+
+// ─── Phase 2 & 3: Apply changes ─────────────────────────
+
+async function applyChanges(
+  adapter: BlobAdapter,
+  tenant: Tenant | undefined,
+  changes: ReadonlyArray<SyncChange>,
+): Promise<void> {
+  for (const change of changes) {
+    await adapter.write(tenant, change.key, change.blob);
+  }
+}
+
+async function isStale(
+  adapter: BlobAdapter,
+  tenant: Tenant | undefined,
+  snapshot: AllIndexes,
+): Promise<boolean> {
+  const current = await loadAllIndexes(adapter, tenant);
+  for (const entityName of Object.keys(snapshot)) {
+    const snapIndex = snapshot[entityName] ?? {};
+    const curIndex = current[entityName] ?? {};
+    const allKeys = new Set([
+      ...Object.keys(snapIndex), ...Object.keys(curIndex),
+    ]);
+    for (const key of allKeys) {
+      if (snapIndex[key]?.hash !== curIndex[key]?.hash) return true;
+    }
+  }
+  return false;
+}
+
+// ─── Index computation ───────────────────────────────────
+
+function computeIndexUpdates(
+  changes: ReadonlyArray<SyncChange>,
+): AllIndexes {
+  const updated: AllIndexes = {};
+  for (const { entityName, partitionKey, blob } of changes) {
+    const entities =
+      (blob[entityName] as Record<string, unknown> | undefined) ?? {};
+    const tombstones = blob.deleted[entityName] ?? {};
+    const hlcMap = buildHlcMap(entities, tombstones);
+    const hash = partitionHash(hlcMap);
+    updated[entityName] = updatePartitionIndexEntry(
+      updated[entityName] ?? {},
+      partitionKey, hash, hlcMap.size, Object.keys(tombstones).length,
+    );
+  }
+  return updated;
+}
+
+function mergeIndexes(existing: AllIndexes, updates: AllIndexes): AllIndexes {
+  const result = { ...existing };
+  for (const [entityName, partitions] of Object.entries(updates)) {
+    result[entityName] = { ...(result[entityName] ?? {}), ...partitions };
+  }
+  return result;
+}
+
+function deduplicateChanges(
+  changes: ReadonlyArray<SyncChange>,
+): ReadonlyArray<SyncChange> {
+  const seen = new Set<string>();
+  const deduped: SyncChange[] = [];
+  for (const change of changes) {
+    if (!seen.has(change.key)) {
+      seen.add(change.key);
+      deduped.push(change);
+    }
+  }
+  return deduped;
+}
+
+function buildHlcMap(
+  entities: Readonly<Record<string, unknown>>,
+  tombstones: Readonly<Record<string, Hlc>>,
+): Map<string, Hlc> {
+  const hlcMap = new Map<string, Hlc>();
+  for (const [id, entity] of Object.entries(entities)) {
+    hlcMap.set(id, (entity as SyncEntity).hlc);
+  }
+  for (const [id, hlc] of Object.entries(tombstones)) {
+    hlcMap.set(`\0${id}`, hlc);
+  }
+  return hlcMap;
+}
+
+// ─── Result builders ─────────────────────────────────────
+
+function toEntityChanges(
+  changes: ReadonlyArray<SyncChange>,
+): ReadonlyArray<SyncEntityChange> {
+  return changes.map(({ key, entityName, blob }) => {
+    const entities =
+      (blob[entityName] as Record<string, unknown> | undefined) ?? {};
+    const tombstones = blob.deleted[entityName] ?? {};
+    return {
+      key,
+      updatedIds: Object.keys(entities),
+      deletedIds: Object.keys(tombstones),
+    };
+  });
+}
+
+function findMaxHlc(
+  changes: ReadonlyArray<SyncChange>,
+): Hlc | undefined {
+  let max: Hlc | undefined;
+  for (const { entityName, blob } of changes) {
+    const entities =
+      (blob[entityName] as Record<string, unknown> | undefined) ?? {};
+    const tombstones = blob.deleted[entityName] ?? {};
+    for (const entity of Object.values(entities)) {
+      const hlc = (entity as SyncEntity).hlc;
+      if (!max || compareHlc(hlc, max) > 0) max = hlc;
+    }
+    for (const hlc of Object.values(tombstones)) {
+      if (!max || compareHlc(hlc, max) > 0) max = hlc;
+    }
+  }
+  return max;
+}
+
+// ─── Main ────────────────────────────────────────────────
+
+export async function syncBetween(
+  adapterA: BlobAdapter,
+  adapterB: BlobAdapter,
+  entityNames: ReadonlyArray<string>,
+  tenant: Tenant | undefined,
+): Promise<SyncBetweenResult> {
+  const plan = await buildPlan(adapterA, adapterB, entityNames, tenant);
+
+  if (plan.applyToB.length === 0 && plan.applyToA.length === 0) {
+    return { changesForA: [], changesForB: [], stale: false, maxHlc: undefined };
+  }
+
+  // Phase 2: write to B unconditionally
+  await applyChanges(adapterB, tenant, plan.applyToB);
+
+  // Phase 3: stale check, then write to A
+  const stale = await isStale(adapterA, tenant, plan.indexSnapshotA);
+  if (!stale && plan.applyToA.length > 0) {
+    await applyChanges(adapterA, tenant, plan.applyToA);
+  }
+
+  // Update indexes on both sides for all synced partitions
+  const allChanges = deduplicateChanges([...plan.applyToA, ...plan.applyToB]);
+  const indexUpdates = computeIndexUpdates(allChanges);
+  const [existingIdxA, existingIdxB] = await Promise.all([
+    loadAllIndexes(adapterA, tenant),
+    loadAllIndexes(adapterB, tenant),
+  ]);
+  await Promise.all([
+    saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdates)),
+    saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdates)),
+  ]);
+
+  const maxHlc = findMaxHlc(allChanges);
+
+  log(
+    'syncBetween complete: %d→B, %d→A, stale=%s',
+    plan.applyToB.length, stale ? 0 : plan.applyToA.length, stale,
+  );
 
   return {
-    hydratedEntityNames,
-    partitionsCopied: totalCopied,
-    partitionsMerged: totalMerged,
-    conflictsResolved: totalConflicts,
+    changesForA: stale ? [] : toEntityChanges(plan.applyToA),
+    changesForB: toEntityChanges(plan.applyToB),
+    stale,
+    maxHlc,
   };
 }

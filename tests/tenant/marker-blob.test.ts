@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
+import { MemoryBlobAdapter } from '@strata/adapter';
 import { STRATA_MARKER_KEY } from '@strata/adapter';
 import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/tenant';
 
 describe('writeMarkerBlob / readMarkerBlob', () => {
   it('round-trips marker blob', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const meta = { folder: 'test' };
     await writeMarkerBlob(adapter, meta, ['transaction', 'account']);
 
@@ -17,13 +17,13 @@ describe('writeMarkerBlob / readMarkerBlob', () => {
   });
 
   it('returns undefined for missing blob', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const result = await readMarkerBlob(adapter, { folder: 'missing' });
     expect(result).toBeUndefined();
   });
 
   it('persists entity types array correctly', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     await writeMarkerBlob(adapter, { bucket: 'x' }, ['user', 'post', 'comment']);
 
     const marker = await readMarkerBlob(adapter, { bucket: 'x' });
@@ -31,7 +31,7 @@ describe('writeMarkerBlob / readMarkerBlob', () => {
   });
 
   it('writes to __strata key', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     await writeMarkerBlob(adapter, { f: '1' }, []);
 
     const data = await adapter.read({ f: '1' }, STRATA_MARKER_KEY);
@@ -39,7 +39,7 @@ describe('writeMarkerBlob / readMarkerBlob', () => {
   });
 
   it('persists empty entity types array', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     await writeMarkerBlob(adapter, {}, []);
 
     const marker = await readMarkerBlob(adapter, {});

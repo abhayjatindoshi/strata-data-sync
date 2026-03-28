@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
 } from '@strata/index';
-import type { Strata, BlobAdapter } from '@strata/index';
+import type { BlobAdapter } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean };
@@ -27,9 +27,9 @@ describe('Lifecycle advanced integration', () => {
   }
 
   it('empty entity definitions throws', () => {
-    expect(() => createStrata({
+    expect(() => new Strata({
       entities: [],
-      localAdapter: createMemoryBlobAdapter(),
+      localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
     })).toThrow('At least one entity definition is required');
   });
@@ -37,17 +37,17 @@ describe('Lifecycle advanced integration', () => {
   it('duplicate entity names throws', () => {
     const TaskDef2 = defineEntity<Task>('task');
 
-    expect(() => createStrata({
+    expect(() => new Strata({
       entities: [TaskDef, TaskDef2],
-      localAdapter: createMemoryBlobAdapter(),
+      localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
     })).toThrow('Duplicate entity name: task');
   });
 
   it('data persists to local adapter on dispose', async () => {
-    const innerAdapter = createMemoryBlobAdapter();
+    const innerAdapter = new MemoryBlobAdapter();
 
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [TaskDef],
       localAdapter: innerAdapter,
       deviceId: 'dev-1',
@@ -72,11 +72,11 @@ describe('Lifecycle advanced integration', () => {
   });
 
   it('tenant load triggers hydrate from cloud automatically', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     // Device A: create, save, sync
-    const localA = createMemoryBlobAdapter();
-    const strataA = track(createStrata({
+    const localA = new MemoryBlobAdapter();
+    const strataA = track(new Strata({
       entities: [TaskDef],
       localAdapter: localA,
       cloudAdapter: sharedCloud,
@@ -93,8 +93,8 @@ describe('Lifecycle advanced integration', () => {
     await strataA.sync();
 
     // Device B: load tenant → auto-hydrate from cloud (no explicit sync needed)
-    const localB = createMemoryBlobAdapter();
-    const strataB = track(createStrata({
+    const localB = new MemoryBlobAdapter();
+    const strataB = track(new Strata({
       entities: [TaskDef],
       localAdapter: localB,
       cloudAdapter: sharedCloud,

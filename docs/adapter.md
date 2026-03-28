@@ -90,10 +90,22 @@ Transforms are composable. Multiple transforms are applied in order on write and
 
 ```typescript
 const bridge = new AdapterBridge(storage, appId, {
-  transforms: [compress(), encryptionTransform(encCtx)],
+  transforms: [gzipTransform(), encryptionTransform(encCtx)],
 });
-// Write: serialize → compress → encrypt → storage
-// Read:  storage → decrypt → decompress → deserialize
+// Write: serialize → gzip → encrypt → storage
+// Read:  storage → decrypt → gunzip → deserialize
+```
+
+### `gzipTransform()`
+
+Framework ships `gzipTransform()` using the Web Compression Streams API:
+
+```typescript
+import { gzipTransform } from 'strata-data-sync';
+
+const transform = gzipTransform();
+// transform.encode(data) — gzip compresses a Uint8Array
+// transform.decode(data) — gzip decompresses a Uint8Array
 ```
 
 ## Framework Responsibilities
@@ -105,7 +117,46 @@ The framework handles:
 
 ## Encryption
 
-Encryption is handled via a KEK/DEK envelope pattern using AES-256-GCM, exposed as a `BlobTransform`:
+Encryption is handled via a KEK/DEK envelope pattern using AES-256-GCM, exposed as a `BlobTransform`.
+
+### `EncryptionContext`
+
+```typescript
+type EncryptionContext = {
+  readonly dek: CryptoKey;
+  readonly salt: Uint8Array;
+  readonly encrypt: (data: Uint8Array) => Promise<Uint8Array>;
+  readonly decrypt: (data: Uint8Array) => Promise<Uint8Array>;
+};
+```
+
+### Low-Level Crypto Functions
+
+The framework exports the underlying cryptographic primitives from `crypto.ts`:
+
+| Function | Purpose |
+|---|---|
+| `deriveKek(password, salt, appId)` | Derives a Key Encryption Key from password via PBKDF2 |
+| `generateDek()` | Generates a random AES-256-GCM Data Encryption Key |
+| `wrapDek(dek, kek)` | Wraps (encrypts) the DEK with the KEK |
+| `unwrapDek(wrappedDek, kek)` | Unwraps (decrypts) the DEK with the KEK |
+| `encrypt(data, dek)` | Encrypts a `Uint8Array` with AES-256-GCM (prepends random IV) |
+| `decrypt(data, dek)` | Decrypts a `Uint8Array` (reads IV from prefix) |
+
+`InvalidEncryptionKeyError` is thrown when decryption fails due to a wrong password/key.
+
+### Key Storage
+
+Salt and DEK are stored as **separate keys** in the `StorageAdapter`:
+
+| Key | Contents |
+|---|---|
+| `appId/__strata_salt` | Raw 16-byte salt used for PBKDF2 key derivation |
+| `appId/__strata_dek` | AES-KW wrapped DEK (encrypted with the KEK) |
+
+There is no combined `EncryptionHeader` blob — salt and DEK are independent entries.
+
+### Usage
 
 ```typescript
 // Initialize (derives keys, bootstraps salt + wrapped DEK on first call)

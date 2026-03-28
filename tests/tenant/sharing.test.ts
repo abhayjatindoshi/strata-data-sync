@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
+import { MemoryBlobAdapter } from '@strata/adapter';
 import { STRATA_MARKER_KEY } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import {
-  createTenantManager,
+  TenantManager,
   writeMarkerBlob,
   saveTenantPrefs,
 } from '@strata/tenant';
@@ -14,11 +14,11 @@ function makeTenant(id: string, meta: Record<string, unknown>): Tenant {
 
 describe('Sharing flow', () => {
   it('setup reads marker blob and detects existing workspace', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const tempTenant = makeTenant('shared-id', { folder: 'shared' });
     await writeMarkerBlob(adapter, tempTenant, ['transaction']);
 
-    const tm = createTenantManager(adapter, { deriveTenantId: () => 'shared-id' });
+    const tm = new TenantManager(adapter, { deriveTenantId: () => 'shared-id' });
     const tenant = await tm.setup({ meta: { folder: 'shared' }, name: 'Project X' });
     expect(tenant).toBeDefined();
     expect(tenant.name).toBe('Project X');
@@ -29,15 +29,15 @@ describe('Sharing flow', () => {
       (meta as { folderId: string }).folderId.substring(0, 4);
 
     // User A creates
-    const adapterA = createMemoryBlobAdapter();
-    const tmA = createTenantManager(adapterA, { deriveTenantId: deriveFn });
+    const adapterA = new MemoryBlobAdapter();
+    const tmA = new TenantManager(adapterA, { deriveTenantId: deriveFn });
     const tenantA = await tmA.create({ name: 'Project X', meta: { folderId: 'abc12345' } });
 
     // User B sets up (separate adapter simulating separate device, marker blob must exist)
-    const adapterB = createMemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
     const tenantRefB = makeTenant('abc1', { folderId: 'abc12345' });
     await writeMarkerBlob(adapterB, tenantRefB, []);
-    const tmB = createTenantManager(adapterB, { deriveTenantId: deriveFn });
+    const tmB = new TenantManager(adapterB, { deriveTenantId: deriveFn });
     const tenantB = await tmB.setup({ meta: { folderId: 'abc12345' } });
 
     expect(tenantA.id).toBe('abc1');
@@ -46,13 +46,13 @@ describe('Sharing flow', () => {
   });
 
   it('merges tenant prefs into local list', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const tempTenant = makeTenant('prefs-id', { folder: 'shared' });
 
     await writeMarkerBlob(adapter, tempTenant, []);
     await saveTenantPrefs(adapter, tempTenant, { name: 'Team Project', icon: '🚀', color: '#ff0000' });
 
-    const tm = createTenantManager(adapter, { deriveTenantId: () => 'prefs-id' });
+    const tm = new TenantManager(adapter, { deriveTenantId: () => 'prefs-id' });
     const tenant = await tm.setup({ meta: { folder: 'shared' } });
 
     expect(tenant.name).toBe('Team Project');
@@ -61,21 +61,21 @@ describe('Sharing flow', () => {
   });
 
   it('prefs name takes precedence over opts.name', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const tempTenant = makeTenant('prefs-id2', { folder: 'shared' });
 
     await writeMarkerBlob(adapter, tempTenant, []);
     await saveTenantPrefs(adapter, tempTenant, { name: 'From Prefs' });
 
-    const tm = createTenantManager(adapter, { deriveTenantId: () => 'prefs-id2' });
+    const tm = new TenantManager(adapter, { deriveTenantId: () => 'prefs-id2' });
     const tenant = await tm.setup({ meta: { folder: 'shared' }, name: 'From Opts' });
 
     expect(tenant.name).toBe('From Prefs');
   });
 
   it('rejects location without valid marker blob', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const tm = createTenantManager(adapter, { deriveTenantId: () => 'no-data' });
+    const adapter = new MemoryBlobAdapter();
+    const tm = new TenantManager(adapter, { deriveTenantId: () => 'no-data' });
 
     await expect(tm.setup({ meta: { folder: 'empty' } })).rejects.toThrow(
       'No strata workspace found',
@@ -83,20 +83,20 @@ describe('Sharing flow', () => {
   });
 
   it('rejects location with incompatible marker blob version', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const tempTenant = makeTenant('bad-ver', {});
     const marker = { version: 99, createdAt: new Date(), entityTypes: [] };
     await adapter.write(tempTenant, STRATA_MARKER_KEY, { __system: { marker }, deleted: {} });
 
-    const tm = createTenantManager(adapter, { deriveTenantId: () => 'bad-ver' });
+    const tm = new TenantManager(adapter, { deriveTenantId: () => 'bad-ver' });
     await expect(tm.setup({ meta: {} })).rejects.toThrow(
       'Incompatible strata workspace version',
     );
   });
 
   it('create writes marker blob with entity types', async () => {
-    const adapter = createMemoryBlobAdapter();
-    const tm = createTenantManager(adapter, { entityTypes: ['transaction', 'account'] });
+    const adapter = new MemoryBlobAdapter();
+    const tm = new TenantManager(adapter, { entityTypes: ['transaction', 'account'] });
 
     const created = await tm.create({ name: 'My App', meta: { bucket: 'x' } });
 

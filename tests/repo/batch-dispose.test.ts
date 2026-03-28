@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createStore } from '@strata/store';
-import { createEventBus } from '@strata/reactive';
+import { Store } from '@strata/store';
+import { EventBus } from '@strata/reactive';
 import type { EntityEventBus } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
-import { createRepository } from '@strata/repo';
-import { createSingletonRepository } from '@strata/repo';
+import { Repository } from '@strata/repo';
+import { SingletonRepository } from '@strata/repo';
 import type { Hlc } from '@strata/hlc';
 
 type Item = { name: string; category: string; price: number };
@@ -19,9 +19,9 @@ const SettingsDef = defineEntity<Settings>('settings', { keyStrategy: 'singleton
 
 describe('Batch writes', () => {
   it('saveMany emits exactly one signal, not N', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let signalCount = 0;
     const sub = repo.observeQuery().subscribe(() => {
@@ -42,9 +42,9 @@ describe('Batch writes', () => {
   });
 
   it('deleteMany emits exactly one signal', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const id1 = repo.save({ name: 'A', category: 'c', price: 1 });
     const id2 = repo.save({ name: 'B', category: 'c', price: 2 });
@@ -65,9 +65,9 @@ describe('Batch writes', () => {
   });
 
   it('observers re-scan once per saveMany batch', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const results: number[] = [];
     const sub = repo.observeQuery().subscribe(entities => {
@@ -86,9 +86,9 @@ describe('Batch writes', () => {
   });
 
   it('individual save still emits immediately', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let emitCount = 0;
     const sub = repo.observeQuery().subscribe(() => {
@@ -108,9 +108,9 @@ describe('Batch writes', () => {
   });
 
   it('individual delete still emits immediately', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const id = repo.save({ name: 'A', category: 'c', price: 1 });
 
@@ -129,9 +129,9 @@ describe('Batch writes', () => {
   });
 
   it('deleteMany with no actual deletions does not signal', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let signalCount = 0;
     const sub = repo.observeQuery().subscribe(() => {
@@ -147,9 +147,9 @@ describe('Batch writes', () => {
   });
 
   it('saveMany returns all generated IDs', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const ids = repo.saveMany([
       { name: 'A', category: 'c', price: 1 },
@@ -164,9 +164,9 @@ describe('Batch writes', () => {
 
 describe('Dispose', () => {
   it('dispose() completes active Observable subscriptions', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let completed = false;
     const sub = repo.observe('item._.nonexistent').subscribe({
@@ -179,27 +179,27 @@ describe('Dispose', () => {
   });
 
   it('disposed Repository rejects save', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
     expect(() => repo.save({ name: 'A', category: 'c', price: 1 })).toThrow('Repository is disposed');
   });
 
   it('disposed Repository rejects saveMany', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
     expect(() => repo.saveMany([{ name: 'A', category: 'c', price: 1 }])).toThrow('Repository is disposed');
   });
 
   it('disposed Repository rejects delete', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'A', category: 'c', price: 1 });
     repo.dispose();
 
@@ -207,35 +207,35 @@ describe('Dispose', () => {
   });
 
   it('disposed Repository rejects deleteMany', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
     expect(() => repo.deleteMany(['item._.x'])).toThrow('Repository is disposed');
   });
 
   it('disposed Repository rejects observe', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
     expect(() => repo.observe('item._.x')).toThrow('Repository is disposed');
   });
 
   it('disposed Repository rejects observeQuery', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
     expect(() => repo.observeQuery()).toThrow('Repository is disposed');
   });
 
   it('event bus listener is removed after dispose', () => {
-    const store = createStore();
-    const innerBus = createEventBus();
+    const store = new Store();
+    const innerBus = new EventBus();
     const offCalls: unknown[] = [];
     const bus: EntityEventBus = {
       on: (l) => innerBus.on(l),
@@ -243,23 +243,23 @@ describe('Dispose', () => {
       emit: (e) => innerBus.emit(e),
     };
 
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
     expect(offCalls).toHaveLength(1);
   });
 
   it('dispose is idempotent', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createRepository(ItemDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
     expect(() => repo.dispose()).not.toThrow();
   });
 
   it('SingletonRepository dispose delegates correctly', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createSingletonRepository(SettingsDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), bus);
 
     let completed = false;
     repo.observe().subscribe({ complete: () => { completed = true; } });
@@ -269,9 +269,9 @@ describe('Dispose', () => {
   });
 
   it('disposed SingletonRepository rejects save', () => {
-    const store = createStore();
-    const bus = createEventBus();
-    const repo = createSingletonRepository(SettingsDef, store, makeHlcRef(), bus);
+    const store = new Store();
+    const bus = new EventBus();
+    const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), bus);
     repo.dispose();
 
     expect(() => repo.save({ theme: 'dark', language: 'en' })).toThrow('Repository is disposed');

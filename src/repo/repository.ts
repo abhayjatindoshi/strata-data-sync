@@ -2,7 +2,7 @@ import debug from 'debug';
 import { Subject } from 'rxjs';
 import { startWith, map, distinctUntilChanged } from 'rxjs/operators';
 import type { Hlc } from '@strata/hlc';
-import { tickLocal } from '@strata/hlc';
+import { tick } from '@strata/hlc';
 import type { EntityDefinition, BaseEntity } from '@strata/schema';
 import { generateId, formatEntityId } from '@strata/schema';
 import type { EntityEventBus, EntityEventListener } from '@strata/reactive';
@@ -85,7 +85,7 @@ export class Repository<T> {
 
     const existing = this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;
 
-    this.hlc.current = tickLocal(this.hlc.current);
+    this.hlc.current = tick(this.hlc.current);
     const now = new Date();
 
     const entity = {
@@ -219,13 +219,4 @@ export class Repository<T> {
     this.eventBus.off(this.listener);
     log('disposed %s repository', this.definition.name);
   }
-}
-
-export function createRepository<T>(
-  definition: EntityDefinition<T>,
-  store: EntityStore,
-  hlc: { current: Hlc },
-  eventBus: EntityEventBus,
-): RepositoryType<T> {
-  return new Repository(definition, store, hlc, eventBus);
 }

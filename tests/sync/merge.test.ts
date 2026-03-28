@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Hlc } from '@strata/hlc';
-import { mergePartition, diffEntityMaps } from '@strata/sync';
+import { mergePartition } from '@strata/sync';
 
 function makeBlob(
   entityName: string,
@@ -14,54 +14,6 @@ function makeBlob(
 }
 
 const entityName = 'task';
-
-describe('diffEntityMaps', () => {
-  it('identifies local-only entities', () => {
-    const result = diffEntityMaps({ a: {}, b: {} }, {}, {}, {});
-
-    expect(result.localOnly).toContain('a');
-    expect(result.localOnly).toContain('b');
-    expect(result.cloudOnly).toHaveLength(0);
-    expect(result.both).toHaveLength(0);
-  });
-
-  it('identifies cloud-only entities', () => {
-    const result = diffEntityMaps({}, {}, { c: {} }, {});
-
-    expect(result.cloudOnly).toContain('c');
-    expect(result.localOnly).toHaveLength(0);
-    expect(result.both).toHaveLength(0);
-  });
-
-  it('identifies entities present on both sides', () => {
-    const result = diffEntityMaps({ a: {} }, {}, { a: {} }, {});
-
-    expect(result.both).toContain('a');
-    expect(result.localOnly).toHaveLength(0);
-    expect(result.cloudOnly).toHaveLength(0);
-  });
-
-  it('accounts for tombstone presence on either side', () => {
-    const result = diffEntityMaps(
-      { a: {} },
-      { b: { timestamp: 1, counter: 0, nodeId: 'n' } },
-      {},
-      { a: { timestamp: 1, counter: 0, nodeId: 'n' } },
-    );
-
-    expect(result.both).toContain('a');
-    expect(result.localOnly).toContain('b');
-    expect(result.cloudOnly).toHaveLength(0);
-  });
-
-  it('returns all empty for empty inputs', () => {
-    const result = diffEntityMaps({}, {}, {}, {});
-
-    expect(result.localOnly).toHaveLength(0);
-    expect(result.cloudOnly).toHaveLength(0);
-    expect(result.both).toHaveLength(0);
-  });
-});
 
 describe('mergePartition', () => {
   it('includes local-only entities in merged result', () => {

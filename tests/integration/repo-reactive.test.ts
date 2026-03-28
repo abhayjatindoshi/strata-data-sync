@@ -1,11 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { firstValueFrom, take, toArray, skip } from 'rxjs';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import type { BaseEntity } from '@strata/schema';
 
@@ -23,9 +22,9 @@ describe('Repository + Reactive integration', () => {
   });
 
   function setup() {
-    strata = createStrata({
+    strata = new Strata({
       entities: [TaskDef],
-      localAdapter: createMemoryBlobAdapter(),
+      localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
     });
     return strata.repo(TaskDef) as Repository<Task>;

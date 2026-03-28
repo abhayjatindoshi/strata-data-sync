@@ -50,6 +50,22 @@ type TenantManager = {
 };
 ```
 
+### `TenantManagerOptions`
+
+```typescript
+type TenantManagerOptions = {
+  readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
+  readonly entityTypes?: ReadonlyArray<string>;
+};
+```
+
+- **`entityTypes`** — list of entity type names passed to `writeMarkerBlob()` on `create()`. Records which entity types exist in this workspace for `setup()` detection.
+- **`deriveTenantId`** — optional function for deterministic tenant IDs from meta (enables sharing).
+
+### Tenant List Caching
+
+`TenantManager` caches the tenant list in memory after the first `list()` call. The cache is invalidated (replaced) on any mutation (`create`, `delink`, `delete`). Calling `list()` after a mutation returns the updated cached list without re-reading from the adapter.
+
 | Method | What it does |
 |---|---|
 | `list()` | Returns all tenants from local storage (instant, offline) |
@@ -63,7 +79,7 @@ type TenantManager = {
 
 - **Not an entity** — TenantManager owns storage directly via `BlobAdapter` I/O. No repo dependency (avoids circular dependency — repo requires a loaded tenant).
 - **Stored as** `__tenants` blob with `meta = undefined` (app space).
-- **Local primary** — write to local adapter instantly. Sync to cloud in background.
+- **Local primary** — write to local adapter instantly. Cloud sync is available via `pushTenantList`/`pullTenantList` but must be invoked manually by the app.
 - **Multi-device merge** — merge by tenant ID with `updatedAt` comparison — newer wins for conflicts. Tenant list is append-mostly. Duplicates resolved by matching tenant ID.
 
 ## Tenant Lifecycle
@@ -110,18 +126,14 @@ User A shares folder with User B
       "version": 1,
       "createdAt": "2026-03-22T10:30:00.000Z",
       "entityTypes": ["transaction", "account"],
-      "indexes": {
-        "transaction": {
-          "2026-03": { "hash": 1928374, "count": 412, "deletedCount": 0, "updatedAt": 1711300000 }
-        }
-      }
+      "indexes": {}
     }
   },
   "deleted": {}
 }
 ```
 
-The `indexes` field contains all partition indexes for all entity types, eliminating the need for separate index blobs.
+The `indexes` field is initialized as an empty object and populated as partitions are synced.
 
 Used by `setup()` to detect whether a cloud location already has strata data.
 
@@ -147,3 +159,38 @@ Stored as a `PartitionBlob` with the prefs nested under `__prefs.prefs`:
 ```
 
 When `setup()` opens a shared location, it reads `__tenant_prefs` to populate the tenant's name, icon, and color in the local tenant list.
+
+### Updating Tenant Preferences
+
+```typescript
+import { saveTenantPrefs, loadTenantPrefs } from 'strata-data-sync';
+
+// Save preferences to the tenant's meta location
+await saveTenantPrefs(adapter, tenant, { name: 'New Name', icon: '📁', color: '#3b82f6' });
+
+// Load preferences from the tenant's meta location
+const prefs = await loadTenantPrefs(adapter, tenant);
+```
+
+### Tenant List Sync Functions
+
+For multi-device tenant list synchronization:
+
+| Function | Purpose |
+|---|---|
+| `mergeTenantLists(local, remote)` | Merges two tenant lists by ID, newer `updatedAt` wins conflicts |
+| `pushTenantList(adapter, tenant)` | Writes the local tenant list to the cloud adapter |
+| `pullTenantList(adapter, tenant)` | Reads the tenant list from the cloud adapter |
+
+These functions are exported but **not called automatically** by `TenantManager`. Apps must invoke them manually for cloud tenant list synchronization.
+
+### Marker Blob Validation
+
+```typescript
+import { validateMarkerBlob } from 'strata-data-sync';
+
+// Returns true if the marker blob version is compatible
+const isValid = validateMarkerBlob(markerData);
+```
+
+Used internally by `setup()` to verify version compatibility before importing a shared workspace.

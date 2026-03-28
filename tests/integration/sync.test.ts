@@ -1,10 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean; priority: number };
@@ -28,10 +27,10 @@ describe('Two-device sync integration', () => {
 
   async function createDevice(
     deviceId: string,
-    cloudAdapter: ReturnType<typeof createMemoryBlobAdapter>,
+    cloudAdapter: ReturnType<typeof MemoryBlobAdapter>,
   ) {
-    const localAdapter = createMemoryBlobAdapter();
-    const strata = track(createStrata({
+    const localAdapter = new MemoryBlobAdapter();
+    const strata = track(new Strata({
       entities: [TaskDef],
       localAdapter,
       cloudAdapter,
@@ -41,7 +40,7 @@ describe('Two-device sync integration', () => {
   }
 
   it('save on A → sync A → hydrate B → B has A data', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     // Device A: create tenant, save data, sync to cloud
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -74,7 +73,7 @@ describe('Two-device sync integration', () => {
   });
 
   it('concurrent edits → sync both → HLC conflict resolution (last writer wins)', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     // Device A setup
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -121,7 +120,7 @@ describe('Two-device sync integration', () => {
   });
 
   it('delete on A → sync → B sees deletion via tombstone', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     // Device A: create, save, sync
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -159,7 +158,7 @@ describe('Two-device sync integration', () => {
   });
 
   it('save on A, delete on B → sync → tombstone wins when B deleted later', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     // Device A: create entity, sync
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -199,7 +198,7 @@ describe('Two-device sync integration', () => {
   });
 
   it('bidirectional saves: A saves X, B saves Y → sync → both have X and Y', async () => {
-    const sharedCloud = createMemoryBlobAdapter();
+    const sharedCloud = new MemoryBlobAdapter();
 
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({

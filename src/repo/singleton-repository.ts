@@ -43,12 +43,3 @@ export class SingletonRepository<T> {
     this.repo.dispose();
   }
 }
-
-export function createSingletonRepository<T>(
-  definition: EntityDefinition<T>,
-  store: EntityStore,
-  hlc: { current: Hlc },
-  eventBus: EntityEventBus,
-): SingletonRepositoryType<T> {
-  return new SingletonRepository(definition, store, hlc, eventBus);
-}

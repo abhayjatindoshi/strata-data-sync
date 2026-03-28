@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createMemoryBlobAdapter } from '@strata/adapter';
+import { MemoryBlobAdapter } from '@strata/adapter';
 
 describe('MemoryBlobAdapter', () => {
   it('read/write round-trip', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const data = { hello: 'world' };
     await adapter.write(undefined, 'test-key', data);
     const result = await adapter.read(undefined, 'test-key');
@@ -11,13 +11,13 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('read returns null for missing key', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const result = await adapter.read(undefined, 'missing');
     expect(result).toBeNull();
   });
 
   it('write stores defensive copy (mutation isolation)', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const data = { a: 1, b: 2, c: 3 };
     await adapter.write(undefined, 'key', data);
     data.a = 99;
@@ -26,7 +26,7 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('read returns defensive copy', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     await adapter.write(undefined, 'key', { a: 1, b: 2, c: 3 });
     const result1 = await adapter.read(undefined, 'key') as { a: number };
     result1.a = 99;
@@ -35,18 +35,18 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('delete returns true when key exists', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     await adapter.write(undefined, 'key', { v: 1 });
     expect(await adapter.delete(undefined, 'key')).toBe(true);
   });
 
   it('delete returns false when key missing', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     expect(await adapter.delete(undefined, 'missing')).toBe(false);
   });
 
   it('list filters by prefix', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     await adapter.write(undefined, 'foo.a', { v: 1 });
     await adapter.write(undefined, 'foo.b', { v: 2 });
     await adapter.write(undefined, 'bar.c', { v: 3 });
@@ -55,7 +55,7 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('list returns empty for no matches', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     await adapter.write(undefined, 'foo', { v: 1 });
     expect(await adapter.list(undefined, 'bar')).toEqual([]);
   });

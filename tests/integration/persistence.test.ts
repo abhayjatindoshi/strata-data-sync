@@ -1,14 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
   partitioned,
   serialize,
   deserialize,
   partitionHash,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import type { Hlc } from '@strata/hlc';
 import type { BaseEntity } from '@strata/schema';
@@ -37,9 +36,9 @@ describe('Persistence round-trip integration', () => {
   }
 
   it('Date fields survive save → flush → reload cycle', async () => {
-    const localAdapter = createMemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
 
-    const strata1 = track(createStrata({
+    const strata1 = track(new Strata({
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',
@@ -54,7 +53,7 @@ describe('Persistence round-trip integration', () => {
     await strata1.dispose();
 
     // Reload
-    const strata2 = track(createStrata({
+    const strata2 = track(new Strata({
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',
@@ -75,9 +74,9 @@ describe('Persistence round-trip integration', () => {
   });
 
   it('multiple partition keys → flush → each partition blob written separately', async () => {
-    const localAdapter = createMemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
 
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',
@@ -158,9 +157,9 @@ describe('Persistence round-trip integration', () => {
   });
 
   it('entity version increments on re-save and persists', async () => {
-    const localAdapter = createMemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
 
-    const strata1 = track(createStrata({
+    const strata1 = track(new Strata({
       entities: [ItemDef],
       localAdapter,
       deviceId: 'dev-1',
@@ -180,7 +179,7 @@ describe('Persistence round-trip integration', () => {
 
     await strata1.dispose();
 
-    const strata2 = track(createStrata({
+    const strata2 = track(new Strata({
       entities: [ItemDef],
       localAdapter,
       deviceId: 'dev-1',
@@ -194,9 +193,9 @@ describe('Persistence round-trip integration', () => {
   });
 
   it('tombstones included in partition blob after delete', async () => {
-    const localAdapter = createMemoryBlobAdapter();
+    const localAdapter = new MemoryBlobAdapter();
 
-    const strata = track(createStrata({
+    const strata = track(new Strata({
       entities: [ItemDef],
       localAdapter,
       deviceId: 'dev-1',

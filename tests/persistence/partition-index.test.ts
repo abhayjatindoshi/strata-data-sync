@@ -1,16 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { loadAllIndexes, saveAllIndexes, updatePartitionIndexEntry } from '@strata/persistence';
-import { createMemoryBlobAdapter } from '@strata/adapter';
+import { MemoryBlobAdapter } from '@strata/adapter';
 
 describe('Partition Index', () => {
   it('loadAllIndexes returns empty object for missing blob', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const indexes = await loadAllIndexes(adapter, undefined);
     expect(indexes).toEqual({});
   });
 
   it('save and load round-trip', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const indexes = {
       transaction: {
         '2026-01': { hash: 12345, count: 10, updatedAt: 1711100000 },
@@ -23,7 +23,7 @@ describe('Partition Index', () => {
   });
 
   it('stores indexes inside __strata blob', async () => {
-    const adapter = createMemoryBlobAdapter();
+    const adapter = new MemoryBlobAdapter();
     const indexes = {
       transaction: { '2026-01': { hash: 1, count: 1, updatedAt: 1 } },
     };

@@ -1,11 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { firstValueFrom } from 'rxjs';
 import {
-  createStrata,
+  Strata,
   defineEntity,
-  createMemoryBlobAdapter,
+  MemoryBlobAdapter,
 } from '@strata/index';
-import type { Strata } from '@strata/index';
 import type { Repository, SingletonRepository } from '@strata/repo';
 import type { BaseEntity } from '@strata/schema';
 
@@ -30,9 +29,9 @@ describe('Repository advanced integration', () => {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function setup(entities: any[] = [TaskDef]) {
-    strata = createStrata({
+    strata = new Strata({
       entities,
-      localAdapter: createMemoryBlobAdapter(),
+      localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
     });
   }

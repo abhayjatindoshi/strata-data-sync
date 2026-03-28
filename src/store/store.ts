@@ -203,7 +203,3 @@ export class Store implements EntityStore {
     };
   }
 }
-
-export function createStore(): EntityStore {
-  return new Store();
-}

@@ -6,12 +6,12 @@ import {
   defineEntity,
   partitioned,
 } from 'strata-data-sync';
-import type { StorageAdapter, Tenant, Strata, Repository, SingletonRepository } from 'strata-data-sync';
+import type { StorageAdapter, Tenant, Strata } from 'strata-data-sync';
 
 // ─── File-system StorageAdapter ──────────────────────────
 
 class FsStorageAdapter implements StorageAdapter {
-  readonly kind = 'storage' as const;
+  readonly kind = 'storage';
   constructor(private readonly rootDir: string) {}
 
   private resolvePath(tenant: Tenant | undefined, key: string): string {
@@ -108,7 +108,7 @@ class KeyStrategyDemo {
 
   demoGlobalStrategy(): void {
     console.log('\n=== Global strategy (task) ===');
-    const repo = this.strata.repo(taskDef) as Repository<Task>;
+    const repo = this.strata.repo(taskDef);
     repo.save({ title: 'Ship v2', done: false, category: 'dev' });
     repo.save({ title: 'Write tests', done: true, category: 'dev' });
     const coffeeId = repo.save({ title: 'Buy coffee', done: false, category: 'personal' });
@@ -123,7 +123,7 @@ class KeyStrategyDemo {
 
   demoPartitionedStrategy(): void {
     console.log('\n=== Partitioned strategy (note) ===');
-    const repo = this.strata.repo(noteDef) as Repository<Note>;
+    const repo = this.strata.repo(noteDef);
     repo.save({ body: 'Alpha release next week' });
     const askId = repo.save({ body: 'Ask about deployment' });
     repo.save({ body: 'Book flight to NYC' });
@@ -140,7 +140,7 @@ class KeyStrategyDemo {
 
   demoSingletonStrategy(): void {
     console.log('\n=== Singleton strategy (settings) ===');
-    const repo = this.strata.repo(settingsDef) as SingletonRepository<Settings>;
+    const repo = this.strata.repo(settingsDef);
     repo.save({ theme: 'dark', language: 'en' });
 
     const settings = repo.get();
