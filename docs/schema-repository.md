@@ -130,11 +130,12 @@ Data migrations operate at the blob level via `BlobMigration`, not at the entity
 ```typescript
 type BlobMigration = {
   readonly version: number;
+  readonly entities?: ReadonlyArray<EntityDefinition<any>>;  // optional scope filter
   readonly migrate: (blob: PartitionBlob) => PartitionBlob;
 };
 ```
 
-`migrateBlob(blob, migrations)` applies migrations sequentially by version number, skipping any with a version ≤ the blob's stored `__v` field.
+`migrateBlob(blob, migrations, entityName?)` applies migrations sequentially by version number, skipping any with a version ≤ the blob's stored `__v` field. When `entityName` is provided, only migrations whose `entities` list includes that entity (or have no `entities` filter) are applied.
 
 Blob migrations are passed via `StrataConfig.migrations` and applied when loading partition blobs from adapters.
 

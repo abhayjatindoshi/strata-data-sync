@@ -6,7 +6,7 @@
 sequenceDiagram
     actor User
     participant App as App / UI
-    participant Strata as createStrata()
+    participant Strata as new Strata()
     participant Tenant as Tenant Manager
     participant Repo as Repository
     participant Store as In-Memory Store
@@ -17,7 +17,7 @@ sequenceDiagram
 
     Note over App,Sync: ═══ PHASE 1: INITIALIZATION ═══
 
-    App->>Strata: createStrata({ entities, adapters, deviceId })
+    App->>Strata: new Strata({ entities, adapters, deviceId })
     Strata->>Strata: validate entity defs, init HLC
     Strata->>Signal: create Subject<void> per entity type
     Strata->>Sync: create sync scheduler (idle)
@@ -30,8 +30,8 @@ sequenceDiagram
     Local-->>Tenant: tenant list blob (or null)
     Tenant-->>App: tenants[]
 
-    App->>Tenant: strata.tenants.load(tenantId)
-    Tenant->>Tenant: set active tenant, resolve meta
+    App->>Tenant: strata.loadTenant(tenantId, { password? })
+    Tenant->>Tenant: detect encryption, set active tenant, resolve meta
 
     Note over App,Sync: ═══ PHASE 3: HYDRATE (cloud → local → memory) ═══
 
@@ -154,16 +154,22 @@ type StrataConfig = {
   readonly localAdapter: BlobAdapter | StorageAdapter;
   readonly cloudAdapter?: BlobAdapter;
   readonly deviceId: string;
-  readonly encryption?: { readonly password: string };
   readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
+  readonly migrations?: ReadonlyArray<BlobMigration>;
   readonly options?: StrataOptions;
+};
+
+type StrataOptions = {
+  readonly cloudSyncIntervalMs?: number;   // default: 300000 (5 min)
+  readonly localFlushIntervalMs?: number;  // default: 2000 (2s)
+  readonly tombstoneRetentionMs?: number;
 };
 ```
 
-- **`appId`** — unique app identifier, used for key namespacing in `AdapterBridge`
+- **`appId`** — unique app identifier, used for encryption key derivation
 - **`localAdapter`** — accepts either `BlobAdapter` or `StorageAdapter`. If a `StorageAdapter` is passed, the framework auto-wraps it with `AdapterBridge`.
-- **`encryption`** — when provided with a `StorageAdapter`, `createStrataAsync` initializes encryption automatically
-- **`deriveTenantId`** — optional function to derive deterministic tenant IDs from `meta`. Useful for sharing (same cloud folder → same tenant ID across users). Adapter packages can ship helpers.
+- **`deriveTenantId`** — optional function to derive deterministic tenant IDs from `meta`
+- **`migrations`** — optional blob migrations, applied lazily during sync when blobs are read
 
 ## Sync Events
 

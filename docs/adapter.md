@@ -59,8 +59,8 @@ const { bucket, prefix, region } = tenant.meta as S3Meta;
 Wraps a `StorageAdapter` into a `BlobAdapter` with a composable transform pipeline:
 
 ```typescript
-const bridge = new AdapterBridge(storage, appId, {
-  transforms: [encryptionTransform(encCtx)],  // optional
+const bridge = new AdapterBridge(storage, {
+  transforms: [encryptionTransform],  // optional
 });
 ```
 
@@ -68,7 +68,8 @@ Responsibilities:
 - **Serialization**: `PartitionBlob` → JSON → `Uint8Array` (via `serialize()`) on write
 - **Deserialization**: `Uint8Array` → JSON → `PartitionBlob` (via `deserialize()`) on read
 - **Transform pipeline**: after serialization, applies `BlobTransform` chain (encryption, compression, etc.)
-- **Key namespacing**: prepends `appId/` to all keys so multiple Strata instances can share one storage backend
+
+Key scoping (e.g., per-app or per-tenant namespacing) is the `StorageAdapter` implementation's responsibility, not the bridge's.
 
 ### Pipeline
 
@@ -81,16 +82,16 @@ Read:  StorageAdapter.read() → transform[1].decode → transform[0].decode →
 
 ```typescript
 type BlobTransform = {
-  encode(data: Uint8Array): Promise<Uint8Array>;
-  decode(data: Uint8Array): Promise<Uint8Array>;
+  encode(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<Uint8Array>;
+  decode(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<Uint8Array>;
 };
 ```
 
 Transforms are composable. Multiple transforms are applied in order on write and reversed on read:
 
 ```typescript
-const bridge = new AdapterBridge(storage, appId, {
-  transforms: [gzipTransform(), encryptionTransform(encCtx)],
+const bridge = new AdapterBridge(storage, {
+  transforms: [gzipTransform(), encryptionService.toTransform()],
 });
 // Write: serialize → gzip → encrypt → storage
 // Read:  storage → decrypt → gunzip → deserialize
@@ -104,8 +105,8 @@ Framework ships `gzipTransform()` using the Web Compression Streams API:
 import { gzipTransform } from 'strata-data-sync';
 
 const transform = gzipTransform();
-// transform.encode(data) — gzip compresses a Uint8Array
-// transform.decode(data) — gzip decompresses a Uint8Array
+// transform.encode(tenant, key, data) — gzip compresses a Uint8Array
+// transform.decode(tenant, key, data) — gzip decompresses a Uint8Array
 ```
 
 ## Framework Responsibilities
@@ -122,12 +123,12 @@ Encryption is per-tenant, using a key hierarchy based on AES-256-GCM. Each encry
 ### Key Hierarchy
 
 ```
-password + appId + tenantId → PBKDF2 (100k iterations) → markerKey
-                                                              │
-                                              Encrypts/decrypts __strata blob
-                                              __strata contains raw DEK (base64)
-                                                              │
-                                              DEK encrypts all data blobs
+password + appId → PBKDF2 (100k iterations) → markerKey
+                                                    │
+                                    Encrypts/decrypts __strata blob
+                                    __strata contains raw DEK (base64)
+                                                    │
+                                    DEK encrypts all data blobs
 ```
 
 ### Per-Tenant Encryption
@@ -166,7 +167,7 @@ All encrypted files (including `__strata`) use this format. The `__tenants` file
 
 | Function | Purpose |
 |---|---|
-| `deriveKey(password, tenantId, appId)` | Derives an AES-256-GCM key via PBKDF2 |
+| `deriveKey(password, appId)` | Derives an AES-256-GCM key via PBKDF2 |
 | `generateDek()` | Generates a random AES-256-GCM Data Encryption Key |
 | `exportDek(dek)` | Exports DEK to base64 string |
 | `importDek(base64)` | Imports DEK from base64 string |
@@ -181,7 +182,7 @@ Stateful transform service that handles per-tenant encryption:
 
 ```typescript
 const service = new EncryptionTransformService();
-await service.setup(password, tenantId, appId);  // derives markerKey
+await service.setup(password, appId);              // derives markerKey
 service.setDek(dek);                              // set DEK after loading marker
 service.toTransform();                            // returns BlobTransform
 service.clear();                                  // clears all keys
@@ -221,7 +222,7 @@ await strata.changePassword('s3cret', 'new-s3cret');
 Framework ships a simple in-memory Map-backed adapter for testing:
 
 ```typescript
-const adapter = createMemoryBlobAdapter();
+const adapter = new MemoryBlobAdapter();
 // Stores blobs in Map<string, PartitionBlob>
 // read() returns stored blob or null
 // write() stores defensive clone

@@ -28,6 +28,7 @@ One blob per `entityName.partitionKey`:
 
 ```json
 {
+  "__v": 1,
   "transaction": {
     "transaction.2026-03.Xk9mB2qR": { "id": "...", "amount": 50, "hlc": { "timestamp": 1711100000, "counter": 0, "nodeId": "phone1" } },
     "transaction.2026-03.A1bC3dEf": { "id": "...", "amount": 100, "hlc": { ... } }
@@ -38,6 +39,9 @@ One blob per `entityName.partitionKey`:
     }
   }
 }
+```
+
+`__v` is an optional blob version number used for migration tracking. See `BlobMigration` in [schema-repository.md](schema-repository.md).
 ```
 
 ### Transform Pipeline
@@ -62,12 +66,12 @@ FNV-1a (32-bit, non-cryptographic). Fast, deterministic, cross-platform.
 Sorted entity `id:hlcTimestamp:hlcCounter:hlcNodeId` pairs — NOT the full blob:
 
 ```typescript
-function partitionHash(entities: Entity[]): number {
-  const ids = entities.map(e => e.id).sort();
+function partitionHash(entityMap: ReadonlyMap<string, Hlc>): number {
+  const ids = [...entityMap.keys()].sort();
   let hash = FNV_OFFSET;
   for (const id of ids) {
-    const e = entityMap.get(id)!;
-    hash = fnv1aAppend(hash, `${id}:${e.hlc.timestamp}:${e.hlc.counter}:${e.hlc.nodeId}`);
+    const hlc = entityMap.get(id)!;
+    hash = fnv1aAppend(hash, `${id}:${hlc.timestamp}:${hlc.counter}:${hlc.nodeId}`);
   }
   return hash;
 }
@@ -79,15 +83,25 @@ function partitionHash(entities: Entity[]): number {
 
 ### Partition Index
 
-All partition indexes are stored inside the `__strata` marker blob (not as separate blobs). One index per entity type:
+All partition indexes are stored inside the `__strata` marker blob under `__system.marker.indexes` (not as separate blobs). One index per entity type:
 
 ```json
 {
-  "transaction": {
-    "2026-01": { "hash": 3847291, "count": 847, "deletedCount": 12, "updatedAt": 1711100000 },
-    "2026-02": { "hash": 9182736, "count": 923, "deletedCount": 5, "updatedAt": 1711200000 },
-    "2026-03": { "hash": 1928374, "count": 412, "deletedCount": 0, "updatedAt": 1711300000 }
-  }
+  "__system": {
+    "marker": {
+      "version": 1,
+      "createdAt": "2026-03-28T00:00:00.000Z",
+      "entityTypes": ["transaction"],
+      "indexes": {
+        "transaction": {
+          "2026-01": { "hash": 3847291, "count": 847, "deletedCount": 12, "updatedAt": 1711100000000 },
+          "2026-02": { "hash": 9182736, "count": 923, "deletedCount": 5, "updatedAt": 1711200000000 },
+          "2026-03": { "hash": 1928374, "count": 412, "deletedCount": 0, "updatedAt": 1711300000000 }
+        }
+      }
+    }
+  },
+  "deleted": {}
 }
 ```
 
@@ -119,13 +133,14 @@ type Hlc = {
 
 ### Initial State
 
-`createHlc(nodeId)` returns `{ timestamp: 0, counter: 0, nodeId }`. The timestamp starts at `0`, not the current wall clock. The first call to `tickLocal()` advances it to `Date.now()`.
+`createHlc(nodeId)` returns `{ timestamp: 0, counter: 0, nodeId }`. The timestamp starts at `0`, not the current wall clock. The first call to `tick()` advances it to `Date.now()`.
 
 ### Usage
 
-- `tickLocal(hlc)` — called on every `save()`. Advances timestamp to `max(Date.now(), hlc.timestamp)` and resets or increments counter.
-- `tickRemote(local, remote)` — exported and available for apps but **not called by the framework** during sync. The framework only uses `compareHlc()` for conflict resolution. Apps may call `tickRemote()` to advance their local clock when receiving external data outside the sync engine.
-- `compareHlc(a, b)` — compares timestamp, then counter, then nodeId (string tiebreaker). Guarantees total deterministic ordering.
+- `tick(hlc)` — called on every `save()`. Advances timestamp to `max(Date.now(), hlc.timestamp)` and resets or increments counter. When called with a second argument `tick(local, remote)`, merges the remote HLC into the local clock.
+- `compareHlc(a, b)` — compares timestamp, then counter, then nodeId (string tiebreaker). Guarantees total deterministic ordering. Returns `-1 | 0 | 1`.
+
+The `tick()` function is called by the framework during sync (`syncBetween`) to advance the local HLC when remote data has a higher timestamp. Apps may also call `tick(local, remote)` to advance their local clock when receiving external data outside the sync engine.
 
 ### Post-Merge Semantics
 
@@ -165,7 +180,7 @@ function enqueue(source, target): Promise<void> {
 
 ### Sync Implementation — `syncBetween`
 
-All sync directions use a single generic function `syncBetween(adapterA, adapterB, entityNames, tenant)` that handles bidirectional merge between any two `BlobAdapter` endpoints (including the in-memory `Store`, which implements `BlobAdapter`):
+All sync directions use a single generic function `syncBetween(adapterA, adapterB, entityNames, tenant, migrations?)` that handles bidirectional merge between any two `BlobAdapter` endpoints (including the in-memory `Store`, which implements `BlobAdapter`). When `migrations` are provided, blobs are migrated lazily on read before merging.
 
 - **Phase 1 (Hydrate)**: `syncBetween(cloudAdapter, localAdapter, ...)` then `syncBetween(localAdapter, store, ...)`
 - **Phase 2 (Periodic)**: `syncBetween(store, localAdapter, ...)` + `syncBetween(localAdapter, cloudAdapter, ...)`

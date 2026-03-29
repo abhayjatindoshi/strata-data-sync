@@ -107,11 +107,17 @@ Single `save()` emits immediately and synchronously. No debounce. Behavior is ex
 Simple listener list:
 
 ```typescript
+type EntityEvent = {
+  readonly entityName: string;
+  readonly fromSync?: boolean;  // true when event originates from sync, not user write
+};
+
 type EntityEventListener = (event: EntityEvent) => void;
 
 type EntityEventBus = {
   on(listener: EntityEventListener): void;
   off(listener: EntityEventListener): void;
+  emit(event: EntityEvent): void;
 };
 ```
 

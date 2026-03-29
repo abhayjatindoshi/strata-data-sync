@@ -41,7 +41,7 @@ Two users sharing the same Drive folder → same derived tenant ID → sync conn
 ```typescript
 type TenantManager = {
   list(): Promise<ReadonlyArray<Tenant>>;
-  create(opts: { name: string; meta: Record<string, unknown>; id?: string }): Promise<Tenant>;
+  create(opts: { name: string; meta: Record<string, unknown>; id?: string; encryption?: { password: string } }): Promise<Tenant>;
   setup(opts: { meta: Record<string, unknown>; name?: string }): Promise<Tenant>;
   load(tenantId: string): Promise<void>;
   delink(tenantId: string): Promise<void>;
@@ -54,11 +54,13 @@ type TenantManager = {
 
 ```typescript
 type TenantManagerOptions = {
+  readonly appId?: string;
   readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
   readonly entityTypes?: ReadonlyArray<string>;
 };
 ```
 
+- **`appId`** — used for encryption key derivation when tenants opt in to encryption.
 - **`entityTypes`** — list of entity type names passed to `writeMarkerBlob()` on `create()`. Records which entity types exist in this workspace for `setup()` detection.
 - **`deriveTenantId`** — optional function for deterministic tenant IDs from meta (enables sharing).
 
@@ -126,7 +128,8 @@ User A shares folder with User B
       "version": 1,
       "createdAt": "2026-03-22T10:30:00.000Z",
       "entityTypes": ["transaction", "account"],
-      "indexes": {}
+      "indexes": {},
+      "dek": "<base64 DEK, only present for encrypted tenants>"
     }
   },
   "deleted": {}
@@ -134,6 +137,8 @@ User A shares folder with User B
 ```
 
 The `indexes` field is initialized as an empty object and populated as partitions are synced.
+
+The `dek` field contains the base64-encoded Data Encryption Key, present only for encrypted tenants. It is protected by the encrypted `__strata` blob itself (encrypted with the markerKey derived from the user's password).
 
 Used by `setup()` to detect whether a cloud location already has strata data.
 
@@ -179,8 +184,8 @@ For multi-device tenant list synchronization:
 | Function | Purpose |
 |---|---|
 | `mergeTenantLists(local, remote)` | Merges two tenant lists by ID, newer `updatedAt` wins conflicts |
-| `pushTenantList(adapter, tenant)` | Writes the local tenant list to the cloud adapter |
-| `pullTenantList(adapter, tenant)` | Reads the tenant list from the cloud adapter |
+| `pushTenantList(localAdapter, cloudAdapter)` | Writes the local tenant list to the cloud adapter |
+| `pullTenantList(localAdapter, cloudAdapter)` | Reads the tenant list from the cloud adapter |
 
 These functions are exported but **not called automatically** by `TenantManager`. Apps must invoke them manually for cloud tenant list synchronization.
 

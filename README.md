@@ -31,14 +31,14 @@ React bindings design is pending. All other components have finalized designs.
 
 ```mermaid
 flowchart TD
-    CEO["🎯 CEO\nKick off sprint cycle"]
-    SM["🗂 Scrum Master\nCreate sprint plan"]
-    VP["⚡ VP\nExecute tasks sequentially"]
-    DEV["👨‍💻 Developer\nImplement one task"]
-    REV["🔍 Reviewer\nCheck code vs design"]
-    TEST["🧪 Testing Lead\nRun unit tests, write missing ones"]
-    IT["🔗 Integration Tester\nWrite & run integration tests"]
-    DOC["📝 Documenter\nUpdate progress log & backlog"]
+    CEO["🎯 CEO<br>Kick off sprint cycle"]
+    SM["🗂 Scrum Master<br>Create sprint plan"]
+    VP["⚡ VP<br>Execute tasks sequentially"]
+    DEV["👨‍💻 Developer<br>Implement one task"]
+    REV["🔍 Reviewer<br>Check code vs design"]
+    TEST["🧪 Testing Lead<br>Run unit tests, write missing ones"]
+    IT["🔗 Integration Tester<br>Write & run integration tests"]
+    DOC["📝 Documenter<br>Update progress log & backlog"]
 
     CEO -->|"start sprint"| SM
     SM -->|"sprint plan ready"| VP
@@ -55,12 +55,12 @@ flowchart TD
     DOC -->|"sprint logged"| CEO
     CEO -->|"next sprint"| SM
 
-    style CEO fill:#FFEBEE,stroke:#B71C1C
-    style SM fill:#E3F2FD,stroke:#1565C0
-    style VP fill:#F3E5F5,stroke:#7B1FA2
-    style DEV fill:#EDE7F6,stroke:#4527A0
-    style REV fill:#FFF3E0,stroke:#E65100
-    style TEST fill:#E8F5E9,stroke:#2E7D32
-    style IT fill:#E8F5E9,stroke:#2E7D32
-    style DOC fill:#F5F5F5,stroke:#616161
+    style CEO fill:#FFEBEE,stroke:#B71C1C,color:#000
+    style SM fill:#E3F2FD,stroke:#1565C0,color:#000
+    style VP fill:#F3E5F5,stroke:#7B1FA2,color:#000
+    style DEV fill:#EDE7F6,stroke:#4527A0,color:#000
+    style REV fill:#FFF3E0,stroke:#E65100,color:#000
+    style TEST fill:#E8F5E9,stroke:#2E7D32,color:#000
+    style IT fill:#E8F5E9,stroke:#2E7D32,color:#000
+    style DOC fill:#F5F5F5,stroke:#616161,color:#000
 ```
