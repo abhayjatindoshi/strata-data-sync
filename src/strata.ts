@@ -173,16 +173,25 @@ export class Strata {
       if (rawBytes && rawBytes.length > 0 && rawBytes[0] !== 0x7B) {
         // Encrypted marker — password required
         if (!opts?.password) {
+          this.tenants.activeTenant$.next(undefined);
           throw new Error('Password required for encrypted tenant');
         }
-        await this.encryptionService.setup(opts.password, this.config.appId);
-        // Now the transform is configured with markerKey — read marker through bridge
-        const marker = await readMarkerBlob(this.localAdapter, tenant);
-        if (!marker?.dek) {
-          throw new Error('Encrypted marker missing DEK');
+        try {
+          await this.encryptionService.setup(opts.password, this.config.appId);
+          // Now the transform is configured with markerKey — read marker through bridge
+          const marker = await readMarkerBlob(this.localAdapter, tenant);
+          if (!marker?.dek) {
+            this.encryptionService.clear();
+            this.tenants.activeTenant$.next(undefined);
+            throw new Error('Encrypted marker missing DEK');
+          }
+          const dek = await importDek(marker.dek);
+          this.encryptionService.setDek(dek);
+        } catch (err) {
+          this.encryptionService.clear();
+          this.tenants.activeTenant$.next(undefined);
+          throw err;
         }
-        const dek = await importDek(marker.dek);
-        this.encryptionService.setDek(dek);
       }
     }
 
@@ -197,16 +206,14 @@ export class Strata {
       await this.syncEngine.sync('local', 'memory', tenant);
     }
 
-    if (this.config.cloudAdapter) {
-      this.syncScheduler = new SyncScheduler(
-        this.syncEngine, tenant, true, {
-          localFlushIntervalMs: this.config.options?.localFlushIntervalMs,
-          cloudSyncIntervalMs: this.config.options?.cloudSyncIntervalMs,
-          dirtyTracker: this.dirtyTracker,
-        },
-      );
-      this.syncScheduler.start();
-    }
+    this.syncScheduler = new SyncScheduler(
+      this.syncEngine, tenant, !!this.config.cloudAdapter, {
+        localFlushIntervalMs: this.config.options?.localFlushIntervalMs,
+        cloudSyncIntervalMs: this.config.options?.cloudSyncIntervalMs,
+        dirtyTracker: this.dirtyTracker,
+      },
+    );
+    this.syncScheduler.start();
 
     log('tenant %s loaded and hydrated', tenant.id);
   }
