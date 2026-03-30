@@ -4,6 +4,7 @@ import {
   validateEntityDefinitions,
   defineEntity,
   MemoryBlobAdapter,
+  MemoryStorageAdapter,
   serialize,
 } from '@strata/index';
 import type { SyncEvent } from '@strata/index';
@@ -530,6 +531,157 @@ describe('Strata', () => {
       expect(() => repo.save({ title: 'After', done: false })).toThrow(
         'Repository is disposed',
       );
+    });
+  });
+
+  describe('changePassword()', () => {
+    it('throws when localAdapter is not a StorageAdapter', async () => {
+      const taskDef = defineEntity<Task>('task');
+      strata = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: makeAdapter(), // BlobAdapter, not StorageAdapter
+        deviceId: 'dev',
+      });
+      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
+        'localAdapter must be a StorageAdapter for encryption',
+      );
+    });
+
+    it('throws when no tenant is loaded', async () => {
+      const taskDef = defineEntity<Task>('task');
+      strata = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: new MemoryStorageAdapter(),
+        deviceId: 'dev',
+      });
+      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
+        'No tenant loaded',
+      );
+    });
+
+    it('throws when current tenant is not encrypted', async () => {
+      const storage = new MemoryStorageAdapter();
+      const taskDef = defineEntity<Task>('task');
+      strata = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: storage,
+        deviceId: 'dev',
+      });
+      const tenant = await strata.tenants.create({ name: 'Plain', meta: {} });
+      await strata.loadTenant(tenant.id);
+      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
+        'Current tenant is not encrypted',
+      );
+    });
+
+    it('changes password on an encrypted tenant', async () => {
+      const storage = new MemoryStorageAdapter();
+      const taskDef = defineEntity<Task>('task');
+
+      // Phase 1: Create encrypted tenant with data
+      strata = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: storage,
+        deviceId: 'dev',
+      });
+      const tenant = await strata.tenants.create({
+        name: 'Encrypted',
+        meta: {},
+        encryption: { password: 'oldpass' },
+      });
+      await strata.loadTenant(tenant.id, { password: 'oldpass' });
+      const repo = strata.repo(taskDef) as Repository<Task>;
+      repo.save({ title: 'Secret', done: false });
+
+      // Change password
+      await strata.changePassword('oldpass', 'newpass');
+      await strata.dispose();
+
+      // Phase 2: Reload with new password
+      const strata2 = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: storage,
+        deviceId: 'dev',
+      });
+      await strata2.loadTenant(tenant.id, { password: 'newpass' });
+      const repo2 = strata2.repo(taskDef) as Repository<Task>;
+      const tasks = repo2.query();
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].title).toBe('Secret');
+      await strata2.dispose();
+    });
+
+    it('throws after dispose', async () => {
+      const taskDef = defineEntity<Task>('task');
+      strata = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: new MemoryStorageAdapter(),
+        deviceId: 'dev',
+      });
+      await strata.dispose();
+      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
+        'Strata instance is disposed',
+      );
+    });
+  });
+
+  describe('loadTenant() with no tenantId', () => {
+    it('unloads current tenant when called without tenantId', async () => {
+      const taskDef = defineEntity<Task>('task');
+      strata = new Strata({
+        entities: [taskDef],
+        localAdapter: makeAdapter(),
+        deviceId: 'dev',
+      });
+      const tenant = await strata.tenants.create({ name: 'T', meta: {} });
+      await strata.loadTenant(tenant.id);
+      expect(strata.tenants.activeTenant$.getValue()).toBeDefined();
+
+      await strata.loadTenant();
+      // After loading with no tenantId, no tenant should be active
+    });
+  });
+
+  describe('loadTenant() encryption error paths', () => {
+    it('clears encryption and resets tenant on wrong password (catch block)', async () => {
+      const storage = new MemoryStorageAdapter();
+      const taskDef = defineEntity<Task>('task');
+
+      // Phase 1: Create encrypted tenant
+      const strata1 = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: storage,
+        deviceId: 'dev',
+      });
+      const tenant = await strata1.tenants.create({
+        name: 'Encrypted',
+        meta: {},
+        encryption: { password: 'correctpass' },
+      });
+      await strata1.loadTenant(tenant.id, { password: 'correctpass' });
+      strata1.repo(taskDef).save({ title: 'secret', done: false });
+      await strata1.dispose();
+
+      // Phase 2: Try loading with wrong password — should hit catch block (lines 191-193)
+      strata = new Strata({
+        appId: 'test-app',
+        entities: [taskDef],
+        localAdapter: storage,
+        deviceId: 'dev',
+      });
+      await expect(
+        strata.loadTenant(tenant.id, { password: 'wrongpass' }),
+      ).rejects.toThrow();
+
+      // After error, active tenant should be cleared
+      expect(strata.tenants.activeTenant$.getValue()).toBeUndefined();
     });
   });
 });

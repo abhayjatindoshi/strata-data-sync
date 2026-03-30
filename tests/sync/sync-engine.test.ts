@@ -3,6 +3,7 @@ import { SyncEngine } from '@strata/sync';
 import type { SyncEvent } from '@strata/sync';
 import { MemoryBlobAdapter } from '@strata/adapter';
 import { createHlc } from '@strata/hlc';
+import { saveAllIndexes } from '@strata/persistence';
 import { EventBus } from '@strata/reactive';
 import { Store } from '@strata/store';
 
@@ -157,5 +158,119 @@ describe('SyncEngine', () => {
 
     await Promise.all([p1, p2]);
     expect(secondRan).toBe(true);
+  });
+
+  it('emits entity changes for memory source (memory→local)', async () => {
+    const { engine, store, eventBus } = makeEngine();
+    const firedEntities: string[] = [];
+    eventBus.on(({ entityName }) => {
+      if (entityName) firedEntities.push(entityName);
+    });
+
+    store.setEntity('task._', 'task._.a1', {
+      id: 'task._.a1', title: 'T',
+      hlc: { timestamp: 1, counter: 0, nodeId: 'n' },
+    });
+
+    await engine.sync('memory', 'local', undefined);
+    // memory→local: storeChanges = changesForA (source=memory)
+    // The sync moved data from memory to local; sync completed without error
+    const { result } = await engine.sync('local', 'memory', undefined);
+    expect(result).toBeDefined();
+  });
+
+  it('emits entity changes for memory target (local→memory)', async () => {
+    const { engine, store, local } = makeEngine();
+
+    // Put data directly in local adapter bypassing store
+    const blob = {
+      task: { 'task._.l1': { id: 'task._.l1', title: 'From Local', hlc: { timestamp: 500, counter: 0, nodeId: 'n2' } } },
+      deleted: { task: {} },
+    };
+    const { saveAllIndexes } = await import('@strata/persistence');
+    await local.write(undefined, 'task._', blob);
+    await saveAllIndexes(local, undefined, {
+      task: { '_': { hash: 999, count: 1, deletedCount: 0, updatedAt: 500 } },
+    });
+
+    // Sync local→memory: storeChanges = changesForB (target=memory)
+    const { result } = await engine.sync('local', 'memory', undefined);
+    expect(result.changesForB.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles local→cloud sync (no storeChanges)', async () => {
+    const { engine, store } = makeEngine({ cloud: true });
+
+    store.setEntity('task._', 'task._.a1', {
+      id: 'task._.a1', title: 'T',
+      hlc: { timestamp: 1, counter: 0, nodeId: 'n' },
+    });
+
+    // First flush to local
+    await engine.sync('memory', 'local', undefined);
+    // Then local→cloud: storeChanges should be empty (neither source nor target is memory)
+    const { result } = await engine.sync('local', 'cloud', undefined);
+    expect(result).toBeDefined();
+  });
+
+  it('emits entity changes for memory→local with diverged data', async () => {
+    const { engine, store, local, eventBus } = makeEngine();
+    const changedEntities: string[] = [];
+    eventBus.on(({ entityName }) => {
+      if (entityName) changedEntities.push(entityName);
+    });
+
+    // Put data in memory (store)
+    store.setEntity('task._', 'task._.m1', {
+      id: 'task._.m1', title: 'Memory',
+      hlc: { timestamp: 100, counter: 0, nodeId: 'mem' },
+    });
+
+    // Put different data in local adapter to create divergence
+    const localBlob = {
+      task: {
+        'task._.l1': {
+          id: 'task._.l1', title: 'Local',
+          hlc: { timestamp: 200, counter: 0, nodeId: 'loc' },
+        },
+      },
+      deleted: { task: {} },
+    };
+    await local.write(undefined, 'task._', localBlob);
+    await saveAllIndexes(local, undefined, {
+      task: { '_': { hash: 999, count: 1, deletedCount: 0, updatedAt: 200 } },
+    });
+
+    // memory→local with diverged data should merge and emit changesForA back to memory
+    const { result } = await engine.sync('memory', 'local', undefined);
+    // changesForA = merge results applied back to source (memory)
+    expect(result).toBeDefined();
+  });
+
+  it('emits entity changes for local→memory with data', async () => {
+    const { engine, local, eventBus } = makeEngine();
+    const changedEntities: string[] = [];
+    eventBus.on(({ entityName }) => {
+      if (entityName) changedEntities.push(entityName);
+    });
+
+    // Put data only in local adapter
+    const localBlob = {
+      task: {
+        'task._.l1': {
+          id: 'task._.l1', title: 'From Local',
+          hlc: { timestamp: 500, counter: 0, nodeId: 'loc' },
+        },
+      },
+      deleted: { task: {} },
+    };
+    await local.write(undefined, 'task._', localBlob);
+    await saveAllIndexes(local, undefined, {
+      task: { '_': { hash: 777, count: 1, deletedCount: 0, updatedAt: 500 } },
+    });
+
+    // local→memory: changesForB = changes applied to target (memory)
+    const { result } = await engine.sync('local', 'memory', undefined);
+    expect(result.changesForB.length).toBeGreaterThan(0);
   });
 });

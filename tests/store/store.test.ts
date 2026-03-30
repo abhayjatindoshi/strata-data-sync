@@ -121,4 +121,119 @@ describe('EntityStore', () => {
       expect(loader).not.toHaveBeenCalled();
     });
   });
+
+  describe('BlobAdapter interface', () => {
+    it('read returns null for key without dot separator', async () => {
+      const store = new Store();
+      const result = await store.read(undefined, 'nodot');
+      expect(result).toBeNull();
+    });
+
+    it('read returns partition blob for populated partition', async () => {
+      const store = new Store();
+      store.setEntity('task._', 'id1', { id: 'id1', title: 'Test' });
+      const blob = await store.read(undefined, 'task._');
+      expect(blob).not.toBeNull();
+      expect((blob as Record<string, unknown>)['task']).toBeDefined();
+    });
+
+    it('read returns null for empty partition with no tombstones', async () => {
+      const store = new Store();
+      const blob = await store.read(undefined, 'task._');
+      expect(blob).toBeNull();
+    });
+
+    it('read includes tombstones in blob', async () => {
+      const store = new Store();
+      const hlc = { timestamp: 1000, counter: 0, nodeId: 'n1' };
+      store.setTombstone('task._', 'id1', hlc);
+      const blob = await store.read(undefined, 'task._');
+      expect(blob).not.toBeNull();
+      const deleted = (blob as Record<string, unknown>)['deleted'] as Record<string, unknown>;
+      expect(deleted['task']).toBeDefined();
+    });
+
+    it('write stores partition blob data', async () => {
+      const store = new Store();
+      const blob = {
+        task: { id1: { id: 'id1', title: 'Written' } },
+        deleted: { task: {} },
+      };
+      await store.write(undefined, 'task._', blob);
+      expect(store.getEntity('task._', 'id1')).toEqual({ id: 'id1', title: 'Written' });
+    });
+
+    it('write ignores key without dot separator', async () => {
+      const store = new Store();
+      await store.write(undefined, 'nodot', { task: {} });
+      // No error, no side effects
+      expect(store.getPartition('nodot').size).toBe(0);
+    });
+
+    it('write stores marker blob with __strata key', async () => {
+      const store = new Store();
+      const markerBlob = { __system: { marker: { version: 1 } }, deleted: {} };
+      await store.write(undefined, '__strata', markerBlob);
+      const read = await store.read(undefined, '__strata');
+      expect(read).toBeDefined();
+    });
+
+    it('write stores tombstone data from blob', async () => {
+      const store = new Store();
+      const hlc = { timestamp: 2000, counter: 1, nodeId: 'n2' };
+      const blob = {
+        task: {},
+        deleted: { task: { id1: hlc } },
+      };
+      await store.write(undefined, 'task._', blob);
+      const tombstones = store.getTombstones('task._');
+      expect(tombstones.get('id1')).toEqual(hlc);
+    });
+
+    it('delete returns true when partition existed', async () => {
+      const store = new Store();
+      store.setEntity('task._', 'id1', { id: 'id1' });
+      const result = await store.delete(undefined, 'task._');
+      expect(result).toBe(true);
+    });
+
+    it('delete returns false when partition did not exist', async () => {
+      const store = new Store();
+      const result = await store.delete(undefined, 'task._');
+      expect(result).toBe(false);
+    });
+
+    it('delete removes partition and tombstones', async () => {
+      const store = new Store();
+      store.setEntity('task._', 'id1', { id: 'id1' });
+      store.setTombstone('task._', 'id2', { timestamp: 100, counter: 0, nodeId: 'n1' });
+      await store.delete(undefined, 'task._');
+      expect(store.getPartition('task._').size).toBe(0);
+      expect(store.getTombstones('task._').size).toBe(0);
+    });
+
+    it('delete returns true when only tombstones existed', async () => {
+      const store = new Store();
+      store.setTombstone('task._', 'id1', { timestamp: 100, counter: 0, nodeId: 'n1' });
+      const result = await store.delete(undefined, 'task._');
+      expect(result).toBe(true);
+    });
+
+    it('list returns keys matching prefix', async () => {
+      const store = new Store();
+      store.setEntity('task._', 'id1', {});
+      store.setEntity('task.2026-01', 'id2', {});
+      store.setEntity('note._', 'id3', {});
+      const keys = await store.list(undefined, 'task');
+      expect(keys).toHaveLength(2);
+      expect(keys).toContain('task._');
+      expect(keys).toContain('task.2026-01');
+    });
+
+    it('list returns empty for no matches', async () => {
+      const store = new Store();
+      const keys = await store.list(undefined, 'missing');
+      expect(keys).toEqual([]);
+    });
+  });
 });

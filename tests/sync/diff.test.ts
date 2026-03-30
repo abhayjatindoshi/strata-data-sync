@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { PartitionIndex } from '@strata/persistence';
+import { saveAllIndexes } from '@strata/persistence';
+import { MemoryBlobAdapter } from '@strata/adapter';
 import { diffPartitions } from '@strata/sync';
+import { loadAllIndexPairs } from '@strata/sync/diff';
 
 describe('diffPartitions', () => {
   it('returns all unchanged when hashes match', () => {
@@ -95,5 +98,34 @@ describe('diffPartitions', () => {
     expect(result.localOnly).toHaveLength(0);
     expect(result.cloudOnly).toHaveLength(0);
     expect(result.unchanged).toHaveLength(0);
+  });
+});
+
+describe('loadAllIndexPairs', () => {
+  it('loads indexes from both adapters in parallel', async () => {
+    const local = new MemoryBlobAdapter();
+    const cloud = new MemoryBlobAdapter();
+
+    await saveAllIndexes(local, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    });
+    await saveAllIndexes(cloud, undefined, {
+      task: { '_': { hash: 222, count: 2, deletedCount: 0, updatedAt: 2000 } },
+    });
+
+    const { localIndexes, cloudIndexes } = await loadAllIndexPairs(local, cloud, undefined);
+
+    expect(localIndexes['task']?.['_']?.hash).toBe(111);
+    expect(cloudIndexes['task']?.['_']?.hash).toBe(222);
+  });
+
+  it('returns empty indexes when adapters have no data', async () => {
+    const local = new MemoryBlobAdapter();
+    const cloud = new MemoryBlobAdapter();
+
+    const { localIndexes, cloudIndexes } = await loadAllIndexPairs(local, cloud, undefined);
+
+    expect(Object.keys(localIndexes)).toHaveLength(0);
+    expect(Object.keys(cloudIndexes)).toHaveLength(0);
   });
 });

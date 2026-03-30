@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
-import { serialize, saveAllIndexes } from '@strata/persistence';
+import { serialize, saveAllIndexes, loadAllIndexes } from '@strata/persistence';
 import { Store } from '@strata/store';
 import { syncBetween } from '@strata/sync';
 
@@ -154,5 +154,44 @@ describe('syncBetween', () => {
     expect(result.maxHlc).toBeDefined();
     expect(result.maxHlc!.timestamp).toBe(5000);
     expect(result.maxHlc!.counter).toBe(3);
+  });
+
+  it('detects stale state when adapterA is modified during sync', async () => {
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
+
+    // Setup both sides with diverged data so merge produces applyToA
+    const entityA = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    const entityB = { id: 'task._.b1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
+
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entityA }));
+    await adapterB.write(undefined, 'task._', makePartitionBlob('task', { 'task._.b1': entityB }));
+
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    });
+    await saveAllIndexes(adapterB, undefined, {
+      task: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
+    });
+
+    // Intercept adapterB.write — when B is written (phase 2), modify A's indexes to simulate concurrent change
+    const origWriteB = adapterB.write.bind(adapterB);
+    let intercepted = false;
+    adapterB.write = async (tenant, key, data) => {
+      await origWriteB(tenant, key, data);
+      if (!intercepted && key === 'task._') {
+        intercepted = true;
+        // Change A's index hash to simulate concurrent write to A
+        await saveAllIndexes(adapterA, undefined, {
+          task: { '_': { hash: 999, count: 5, deletedCount: 0, updatedAt: 9999 } },
+        });
+      }
+    };
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined);
+
+    // When stale, changesForA should be empty (skipped write-back)
+    expect(result.stale).toBe(true);
+    expect(result.changesForA).toHaveLength(0);
   });
 });
