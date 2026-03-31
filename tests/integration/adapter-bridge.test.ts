@@ -31,8 +31,8 @@ describe('AdapterBridge end-to-end integration', () => {
     const storage = new MemoryStorageAdapter();
     const bridge = new AdapterBridge(storage);
     const now = new Date();
-    const t1 = { id: 'tenant-1', name: 'T1', meta: {}, createdAt: now, updatedAt: now } as const;
-    const t2 = { id: 'tenant-2', name: 'T2', meta: {}, createdAt: now, updatedAt: now } as const;
+    const t1 = { id: 'tenant-1', name: 'T1', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
+    const t2 = { id: 'tenant-2', name: 'T2', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
 
     const blob1: PartitionBlob = { task: { x: { val: 1 } }, deleted: {} };
     const blob2: PartitionBlob = { task: { x: { val: 2 } }, deleted: {} };

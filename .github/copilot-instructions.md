@@ -4,7 +4,7 @@
 
 Strata is an offline-first, reactive data framework for TypeScript/JavaScript applications. It handles schema definition, identity generation, partitioned storage, multi-tier persistence (in-memory → local → cloud), automatic synchronization, HLC-based conflict resolution, and reactive UI bindings via RxJS.
 
-See [README.md](../README.md) for the full architecture specification.
+See [architecture.md](../docs/design/architecture.md) for the full architecture specification.
 
 ## Code Style
 

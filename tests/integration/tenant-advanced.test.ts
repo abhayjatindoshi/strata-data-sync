@@ -8,7 +8,9 @@ import {
   pushTenantList,
   pullTenantList,
   loadTenantList,
+  resolveOptions,
 } from '@strata/index';
+import type { Tenant } from '@strata/index';
 
 type Task = { title: string; done: boolean };
 
@@ -31,22 +33,19 @@ describe('Tenant advanced integration', () => {
 
   it('tenant preferences sync — save prefs on A, load on B via shared cloud', async () => {
     const sharedCloud = new MemoryBlobAdapter();
-    const meta = { folder: 'shared' };
+    const now = new Date();
+    const tenant: Tenant = { id: 'prefs-test', name: 'Test', encrypted: false, meta: { folder: 'shared' }, createdAt: now, updatedAt: now };
 
     // Device A saves prefs to cloud
-    await saveTenantPrefs(sharedCloud, meta, {
+    await saveTenantPrefs(sharedCloud, tenant, {
       name: 'My Workspace',
-      icon: '🚀',
-      color: '#FF0000',
     });
 
     // Device B loads prefs from cloud
-    const loaded = await loadTenantPrefs(sharedCloud, meta);
+    const loaded = await loadTenantPrefs(sharedCloud, tenant);
 
     expect(loaded).toBeDefined();
     expect(loaded!.name).toBe('My Workspace');
-    expect(loaded!.icon).toBe('🚀');
-    expect(loaded!.color).toBe('#FF0000');
   });
 
   it('tenant list multi-device merge — A creates X, B creates Y, both end up with both', async () => {
@@ -56,6 +55,7 @@ describe('Tenant advanced integration', () => {
 
     // Device A creates tenant X
     const strataA = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: localA,
       deviceId: 'dev-A',
@@ -64,27 +64,30 @@ describe('Tenant advanced integration', () => {
 
     // Device B creates tenant Y
     const strataB = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: localB,
       deviceId: 'dev-B',
     }));
     await strataB.tenants.create({ name: 'Tenant Y', meta: { b: 'y' } });
 
+    const opts = resolveOptions();
+
     // A pushes → cloud = [X]
-    await pushTenantList(localA, sharedCloud);
+    await pushTenantList(localA, sharedCloud, opts);
 
     // B pulls → B merges local [Y] with cloud [X] → B has [X, Y]
-    await pullTenantList(localB, sharedCloud);
+    await pullTenantList(localB, sharedCloud, opts);
 
     // B pushes → cloud = [X, Y]
-    await pushTenantList(localB, sharedCloud);
+    await pushTenantList(localB, sharedCloud, opts);
 
     // A pulls → A merges local [X] with cloud [X, Y] → A has [X, Y]
-    await pullTenantList(localA, sharedCloud);
+    await pullTenantList(localA, sharedCloud, opts);
 
     // Both should have both tenants
-    const listA = await loadTenantList(localA);
-    const listB = await loadTenantList(localB);
+    const listA = await loadTenantList(localA, opts);
+    const listB = await loadTenantList(localB, opts);
 
     expect(listA).toHaveLength(2);
     expect(listB).toHaveLength(2);

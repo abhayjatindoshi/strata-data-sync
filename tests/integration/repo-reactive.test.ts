@@ -23,6 +23,7 @@ describe('Repository + Reactive integration', () => {
 
   function setup() {
     strata = new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',

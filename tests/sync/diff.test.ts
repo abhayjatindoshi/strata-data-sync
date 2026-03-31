@@ -4,16 +4,17 @@ import { saveAllIndexes } from '@strata/persistence';
 import { MemoryBlobAdapter } from '@strata/adapter';
 import { diffPartitions } from '@strata/sync';
 import { loadAllIndexPairs } from '@strata/sync/diff';
+import { DEFAULT_OPTIONS } from '../helpers';
 
 describe('diffPartitions', () => {
   it('returns all unchanged when hashes match', () => {
     const local: PartitionIndex = {
-      '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
-      '2026-02': { hash: 222, count: 20, updatedAt: 2000 },
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
+      '2026-02': { hash: 222, count: 20, deletedCount: 0, updatedAt: 2000 },
     };
     const cloud: PartitionIndex = {
-      '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
-      '2026-02': { hash: 222, count: 20, updatedAt: 2000 },
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
+      '2026-02': { hash: 222, count: 20, deletedCount: 0, updatedAt: 2000 },
     };
 
     const result = diffPartitions(local, cloud);
@@ -27,8 +28,8 @@ describe('diffPartitions', () => {
 
   it('identifies all local-only partitions', () => {
     const local: PartitionIndex = {
-      '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
-      '2026-02': { hash: 222, count: 20, updatedAt: 2000 },
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
+      '2026-02': { hash: 222, count: 20, deletedCount: 0, updatedAt: 2000 },
     };
     const cloud: PartitionIndex = {};
 
@@ -44,7 +45,7 @@ describe('diffPartitions', () => {
   it('identifies all cloud-only partitions', () => {
     const local: PartitionIndex = {};
     const cloud: PartitionIndex = {
-      '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
     };
 
     const result = diffPartitions(local, cloud);
@@ -57,14 +58,14 @@ describe('diffPartitions', () => {
 
   it('categorizes mixed partitions correctly', () => {
     const local: PartitionIndex = {
-      '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
-      '2026-02': { hash: 222, count: 20, updatedAt: 2000 },
-      '2026-03': { hash: 333, count: 30, updatedAt: 3000 },
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
+      '2026-02': { hash: 222, count: 20, deletedCount: 0, updatedAt: 2000 },
+      '2026-03': { hash: 333, count: 30, deletedCount: 0, updatedAt: 3000 },
     };
     const cloud: PartitionIndex = {
-      '2026-02': { hash: 222, count: 20, updatedAt: 2000 },
-      '2026-03': { hash: 999, count: 30, updatedAt: 4000 },
-      '2026-04': { hash: 444, count: 40, updatedAt: 5000 },
+      '2026-02': { hash: 222, count: 20, deletedCount: 0, updatedAt: 2000 },
+      '2026-03': { hash: 999, count: 30, deletedCount: 0, updatedAt: 4000 },
+      '2026-04': { hash: 444, count: 40, deletedCount: 0, updatedAt: 5000 },
     };
 
     const result = diffPartitions(local, cloud);
@@ -86,10 +87,10 @@ describe('diffPartitions', () => {
 
   it('identifies single diverged partition with hash mismatch', () => {
     const local: PartitionIndex = {
-      '2026-01': { hash: 111, count: 10, updatedAt: 1000 },
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
     };
     const cloud: PartitionIndex = {
-      '2026-01': { hash: 999, count: 10, updatedAt: 2000 },
+      '2026-01': { hash: 999, count: 10, deletedCount: 0, updatedAt: 2000 },
     };
 
     const result = diffPartitions(local, cloud);
@@ -108,12 +109,12 @@ describe('loadAllIndexPairs', () => {
 
     await saveAllIndexes(local, undefined, {
       task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
-    });
+    }, DEFAULT_OPTIONS);
     await saveAllIndexes(cloud, undefined, {
       task: { '_': { hash: 222, count: 2, deletedCount: 0, updatedAt: 2000 } },
-    });
+    }, DEFAULT_OPTIONS);
 
-    const { localIndexes, cloudIndexes } = await loadAllIndexPairs(local, cloud, undefined);
+    const { localIndexes, cloudIndexes } = await loadAllIndexPairs(local, cloud, undefined, DEFAULT_OPTIONS);
 
     expect(localIndexes['task']?.['_']?.hash).toBe(111);
     expect(cloudIndexes['task']?.['_']?.hash).toBe(222);
@@ -123,7 +124,7 @@ describe('loadAllIndexPairs', () => {
     const local = new MemoryBlobAdapter();
     const cloud = new MemoryBlobAdapter();
 
-    const { localIndexes, cloudIndexes } = await loadAllIndexPairs(local, cloud, undefined);
+    const { localIndexes, cloudIndexes } = await loadAllIndexPairs(local, cloud, undefined, DEFAULT_OPTIONS);
 
     expect(Object.keys(localIndexes)).toHaveLength(0);
     expect(Object.keys(cloudIndexes)).toHaveLength(0);

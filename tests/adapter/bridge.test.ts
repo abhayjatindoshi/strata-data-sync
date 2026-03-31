@@ -97,13 +97,13 @@ describe('AdapterBridge', () => {
   it('handles tenant-scoped reads and writes', async () => {
     const { bridge } = createBridge();
     const now = new Date();
-    const tenant = { id: 'tenant-1', name: 'Tenant 1', meta: {}, createdAt: now, updatedAt: now } as const;
+    const tenant = { id: 'tenant-1', name: 'Tenant 1', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
     await bridge.write(tenant, 'task.global', sampleBlob);
     const result = await bridge.read(tenant, 'task.global');
     expect(result).toEqual(sampleBlob);
 
     // Different tenant should not find the key
-    const otherTenant = { id: 'tenant-2', name: 'Tenant 2', meta: {}, createdAt: now, updatedAt: now } as const;
+    const otherTenant = { id: 'tenant-2', name: 'Tenant 2', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
     const missing = await bridge.read(otherTenant, 'task.global');
     expect(missing).toBeNull();
   });

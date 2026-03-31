@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 import { EventBus } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
 import { Repository } from '@strata/repo';
@@ -16,7 +17,7 @@ const ItemDef = defineEntity<Item>('item');
 
 describe('Repository.observe', () => {
   it('emits current value on subscribe', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
@@ -27,7 +28,7 @@ describe('Repository.observe', () => {
   });
 
   it('emits undefined for non-existent entity', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
@@ -36,7 +37,7 @@ describe('Repository.observe', () => {
   });
 
   it('emits updated value when entity changes', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
@@ -56,7 +57,7 @@ describe('Repository.observe', () => {
   });
 
   it('suppresses emission when version unchanged', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
@@ -76,7 +77,7 @@ describe('Repository.observe', () => {
   });
 
   it('emits undefined after entity is deleted', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
@@ -96,7 +97,7 @@ describe('Repository.observe', () => {
 
 describe('Repository.observeQuery', () => {
   it('emits current results on subscribe', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.save({ name: 'A', category: 'cat1', price: 10 });
@@ -107,7 +108,7 @@ describe('Repository.observeQuery', () => {
   });
 
   it('emits updated results when entities change', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
@@ -124,7 +125,7 @@ describe('Repository.observeQuery', () => {
   });
 
   it('applies query filter options', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.save({ name: 'A', category: 'cat1', price: 10 });
@@ -138,7 +139,7 @@ describe('Repository.observeQuery', () => {
   });
 
   it('suppresses emission when results unchanged', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.save({ name: 'A', category: 'cat1', price: 10 });
@@ -158,7 +159,7 @@ describe('Repository.observeQuery', () => {
 
 describe('entityComparator', () => {
   it('treats two undefined values as equal', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
@@ -177,7 +178,7 @@ describe('entityComparator', () => {
 
 describe('resultsChanged', () => {
   it('detects length changes', async () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const bus = new EventBus();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 

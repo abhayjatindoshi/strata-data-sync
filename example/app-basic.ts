@@ -17,7 +17,7 @@ async function main() {
 
   // Create and load a tenant (required before any data operations)
   const tenant = await strata.tenants.create({ name: 'My Workspace', meta: {} });
-  await strata.loadTenant(tenant.id);
+  await strata.tenants.open(tenant.id);
 
   const tasks = strata.repo(taskDef);
 

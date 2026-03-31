@@ -16,6 +16,7 @@ const TaskDef = defineEntity<Task>('task');
 
 function createFailingAdapter(): BlobAdapter {
   return {
+    kind: 'blob',
     async read() { throw new Error('Cloud unreachable'); },
     async write() { throw new Error('Cloud unreachable'); },
     async delete() { throw new Error('Cloud unreachable'); },
@@ -44,6 +45,7 @@ describe('Sync advanced integration', () => {
     const events: SyncEvent[] = [];
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter,
       cloudAdapter: failingCloud,
@@ -58,7 +60,7 @@ describe('Sync advanced integration', () => {
     });
 
     // Load tenant — cloud hydrate will fail, should fall back to local
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     // Should have emitted cloud-unreachable
     expect(events.some(e => e.type === 'cloud-unreachable')).toBe(true);
@@ -74,6 +76,7 @@ describe('Sync advanced integration', () => {
     const localAdapter = new MemoryBlobAdapter();
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter,
       cloudAdapter: sharedCloud,
@@ -84,7 +87,7 @@ describe('Sync advanced integration', () => {
       name: 'Test',
       meta: { folder: 'shared' },
     });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     repo.save({ title: 'Item', done: false, priority: 1 });
@@ -155,6 +158,7 @@ describe('Sync advanced integration', () => {
     // Device A
     const localA = new MemoryBlobAdapter();
     const strataA = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: localA,
       cloudAdapter: sharedCloud,
@@ -164,7 +168,7 @@ describe('Sync advanced integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false, priority: 1 });
@@ -173,6 +177,7 @@ describe('Sync advanced integration', () => {
     // Device B — hydrate from cloud via tenant load
     const localB = new MemoryBlobAdapter();
     const strataB = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: localB,
       cloudAdapter: sharedCloud,
@@ -183,7 +188,7 @@ describe('Sync advanced integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     // B's observe should emit the entity from A
     const repoB = strataB.repo(TaskDef) as Repository<Task>;

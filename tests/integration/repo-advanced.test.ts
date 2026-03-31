@@ -30,6 +30,7 @@ describe('Repository advanced integration', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function setup(entities: any[] = [TaskDef]) {
     strata = new Strata({
+      appId: 'test',
       entities,
       localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',

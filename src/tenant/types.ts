@@ -1,13 +1,19 @@
 import type { BehaviorSubject } from 'rxjs';
-import type { ResolvedStrataOptions } from '../options';
 
 export type Tenant = {
   readonly id: string;
   readonly name: string;
+  readonly encrypted: boolean;
   readonly meta: Readonly<Record<string, unknown>>;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };
+
+export type ProbeResult =
+  | { readonly exists: false }
+  | { readonly exists: true; readonly encrypted: false; readonly tenantId: string }
+  | { readonly exists: true; readonly encrypted: true; readonly tenantId: string };
+
 export type CreateTenantOptions = {
   readonly name: string;
   readonly meta: Record<string, unknown>;
@@ -15,23 +21,19 @@ export type CreateTenantOptions = {
   readonly encryption?: { readonly password: string };
 };
 
-export type SetupTenantOptions = {
+export type JoinTenantOptions = {
   readonly meta: Record<string, unknown>;
   readonly name?: string;
 };
 
-export type TenantManagerOptions = ResolvedStrataOptions & {
-  readonly appId?: string;
-  readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
-  readonly entityTypes?: readonly string[];
-};
-
 export type TenantManager = {
   list(): Promise<ReadonlyArray<Tenant>>;
+  probe(ref: { meta: Record<string, unknown> }): Promise<ProbeResult>;
   create(opts: CreateTenantOptions): Promise<Tenant>;
-  setup(opts: SetupTenantOptions): Promise<Tenant>;
-  load(tenantId: string): Promise<void>;
-  delink(tenantId: string): Promise<void>;
-  delete(tenantId: string): Promise<void>;
+  join(opts: JoinTenantOptions): Promise<Tenant>;
+  remove(tenantId: string, opts?: { purge?: boolean }): Promise<void>;
+  open(tenantId: string, opts?: { password?: string }): Promise<void>;
+  close(): Promise<void>;
+  changePassword(oldPassword: string, newPassword: string): Promise<void>;
   readonly activeTenant$: BehaviorSubject<Tenant | undefined>;
 };

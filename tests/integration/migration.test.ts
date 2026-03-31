@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 import { loadPartitionFromAdapter } from '@strata/store/flush';
 import type { Hlc } from '@strata/hlc';
 import type { BlobMigration } from '@strata/schema/migration';
@@ -8,7 +9,7 @@ import type { BlobMigration } from '@strata/schema/migration';
 describe('Schema migration integration', () => {
   it('migrates v1 blob to v2 on load', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const hlc = { timestamp: 1, counter: 0, nodeId: 'a' } as Hlc;
     await adapter.write(undefined, 'item.global', {
@@ -42,7 +43,7 @@ describe('Schema migration integration', () => {
 
   it('applies sequential blob migrations v1→v2→v3', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const hlc = { timestamp: 1, counter: 0, nodeId: 'a' } as Hlc;
     await adapter.write(undefined, 'item.global', {
@@ -87,7 +88,7 @@ describe('Schema migration integration', () => {
 
   it('no-op when blob version matches', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const hlc = { timestamp: 1, counter: 0, nodeId: 'a' } as Hlc;
     await adapter.write(undefined, 'item.global', {
@@ -113,7 +114,7 @@ describe('Schema migration integration', () => {
 
   it('works without migrations (backward compatible)', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const hlc = { timestamp: 1, counter: 0, nodeId: 'a' } as Hlc;
     await adapter.write(undefined, 'item.global', {
@@ -131,7 +132,7 @@ describe('Schema migration integration', () => {
 
   it('blob __v is set after migration', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const hlc = { timestamp: 1, counter: 0, nodeId: 'a' } as Hlc;
     await adapter.write(undefined, 'item.global', {

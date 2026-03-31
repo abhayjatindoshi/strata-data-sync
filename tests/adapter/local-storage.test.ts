@@ -22,6 +22,7 @@ describe('LocalStorageAdapter', () => {
   const tenant: Tenant = {
     id: 'tenant-1',
     name: 'Test Tenant',
+    encrypted: false,
     meta: {},
     createdAt: new Date(),
     updatedAt: new Date(),

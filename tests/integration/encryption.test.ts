@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { MemoryStorageAdapter, InvalidEncryptionKeyError } from '@strata/adapter';
-import { Strata, defineEntity } from '@strata/index';
+import { MemoryStorageAdapter, InvalidEncryptionKeyError, AdapterBridge, EncryptionTransformService } from '@strata/adapter';
+import { Strata, defineEntity, resolveOptions } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean };
@@ -23,10 +23,14 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
   }
 
   function createStrata(storage?: MemoryStorageAdapter): Strata {
+    const s = storage ?? new MemoryStorageAdapter();
+    const encService = new EncryptionTransformService(resolveOptions());
+    const adapter = new AdapterBridge(s, { transforms: [encService.toTransform()] });
     return track(new Strata({
       appId,
       entities: [TaskDef],
-      localAdapter: storage ?? new MemoryStorageAdapter(),
+      localAdapter: adapter,
+      encryptionService: encService,
       deviceId: 'dev-1',
     }));
   }
@@ -41,14 +45,14 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
       meta: {},
       encryption: { password: 'secret' },
     });
-    await strata1.loadTenant(tenant.id, { password: 'secret' });
+    await strata1.tenants.open(tenant.id, { password: 'secret' });
     const repo1 = strata1.repo(TaskDef) as Repository<Task>;
     repo1.save({ title: 'Encrypted task', done: false });
     await strata1.dispose();
 
     // Phase 2: reload with same password
     const strata2 = createStrata(storage);
-    await strata2.loadTenant(tenant.id, { password: 'secret' });
+    await strata2.tenants.open(tenant.id, { password: 'secret' });
     const repo2 = strata2.repo(TaskDef) as Repository<Task>;
     const tasks = repo2.query();
     expect(tasks.length).toBe(1);
@@ -67,7 +71,7 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
 
     const strata2 = createStrata(storage);
     // Wrong password should throw
-    await expect(strata2.loadTenant('Encrypted', { password: 'wrong' }))
+    await expect(strata2.tenants.open('Encrypted', { password: 'wrong' }))
       .rejects.toThrow();
   });
 
@@ -82,7 +86,7 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
     await strata1.dispose();
 
     const strata2 = createStrata(storage);
-    await expect(strata2.loadTenant(tenant.id))
+    await expect(strata2.tenants.open(tenant.id))
       .rejects.toThrow('Password required for encrypted tenant');
   });
 
@@ -93,13 +97,13 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
       name: 'Plain',
       meta: {},
     });
-    await strata1.loadTenant(tenant.id);
+    await strata1.tenants.open(tenant.id);
     const repo = strata1.repo(TaskDef) as Repository<Task>;
     repo.save({ title: 'Plain task', done: false });
     await strata1.dispose();
 
     const strata2 = createStrata(storage);
-    await strata2.loadTenant(tenant.id);
+    await strata2.tenants.open(tenant.id);
     const repo2 = strata2.repo(TaskDef) as Repository<Task>;
     expect(repo2.query().length).toBe(1);
   });
@@ -119,15 +123,15 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
     });
 
     // Load encrypted tenant
-    await strata.loadTenant(encTenant.id, { password: 'secret' });
+    await strata.tenants.open(encTenant.id, { password: 'secret' });
     strata.repo(TaskDef).save({ title: 'Secret data', done: false });
 
     // Switch to plain tenant
-    await strata.loadTenant(plainTenant.id);
+    await strata.tenants.open(plainTenant.id);
     strata.repo(TaskDef).save({ title: 'Public data', done: false });
 
     // Switch back to encrypted
-    await strata.loadTenant(encTenant.id, { password: 'secret' });
+    await strata.tenants.open(encTenant.id, { password: 'secret' });
     const tasks = strata.repo(TaskDef).query();
     expect(tasks.length).toBe(1);
     expect(tasks[0].title).toBe('Secret data');

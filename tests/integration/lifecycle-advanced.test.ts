@@ -28,6 +28,7 @@ describe('Lifecycle advanced integration', () => {
 
   it('empty entity definitions throws', () => {
     expect(() => new Strata({
+      appId: 'test',
       entities: [],
       localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
@@ -38,6 +39,7 @@ describe('Lifecycle advanced integration', () => {
     const TaskDef2 = defineEntity<Task>('task');
 
     expect(() => new Strata({
+      appId: 'test',
       entities: [TaskDef, TaskDef2],
       localAdapter: new MemoryBlobAdapter(),
       deviceId: 'dev-1',
@@ -48,6 +50,7 @@ describe('Lifecycle advanced integration', () => {
     const innerAdapter = new MemoryBlobAdapter();
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: innerAdapter,
       deviceId: 'dev-1',
@@ -57,7 +60,7 @@ describe('Lifecycle advanced integration', () => {
       name: 'Test',
       meta: { b: 1 },
     });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     for (let i = 0; i < 5; i++) {
@@ -77,6 +80,7 @@ describe('Lifecycle advanced integration', () => {
     // Device A: create, save, sync
     const localA = new MemoryBlobAdapter();
     const strataA = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: localA,
       cloudAdapter: sharedCloud,
@@ -86,7 +90,7 @@ describe('Lifecycle advanced integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false });
@@ -95,6 +99,7 @@ describe('Lifecycle advanced integration', () => {
     // Device B: load tenant → auto-hydrate from cloud (no explicit sync needed)
     const localB = new MemoryBlobAdapter();
     const strataB = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: localB,
       cloudAdapter: sharedCloud,
@@ -105,7 +110,7 @@ describe('Lifecycle advanced integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     const entity = repoB.get(id);

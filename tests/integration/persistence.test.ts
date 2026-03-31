@@ -39,12 +39,13 @@ describe('Persistence round-trip integration', () => {
     const localAdapter = new MemoryBlobAdapter();
 
     const strata1 = track(new Strata({
+      appId: 'test',
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata1.loadTenant(tenant.id);
+    await strata1.tenants.open(tenant.id);
 
     const repo1 = strata1.repo(TransactionDef) as Repository<Transaction>;
     const targetDate = new Date('2026-06-15T10:30:00.000Z');
@@ -54,11 +55,12 @@ describe('Persistence round-trip integration', () => {
 
     // Reload
     const strata2 = track(new Strata({
+      appId: 'test',
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.loadTenant(tenant.id);
+    await strata2.tenants.open(tenant.id);
 
     const repo2 = strata2.repo(TransactionDef) as Repository<Transaction>;
     const loaded = repo2.get(id);
@@ -77,12 +79,13 @@ describe('Persistence round-trip integration', () => {
     const localAdapter = new MemoryBlobAdapter();
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     const repo = strata.repo(TransactionDef) as Repository<Transaction>;
     repo.save({ amount: 100, date: new Date(), accountId: 'checking' });
@@ -160,12 +163,13 @@ describe('Persistence round-trip integration', () => {
     const localAdapter = new MemoryBlobAdapter();
 
     const strata1 = track(new Strata({
+      appId: 'test',
       entities: [ItemDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata1.loadTenant(tenant.id);
+    await strata1.tenants.open(tenant.id);
 
     const repo1 = strata1.repo(ItemDef) as Repository<Item>;
     const id = repo1.save({ name: 'Widget', category: 'A' });
@@ -180,11 +184,12 @@ describe('Persistence round-trip integration', () => {
     await strata1.dispose();
 
     const strata2 = track(new Strata({
+      appId: 'test',
       entities: [ItemDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.loadTenant(tenant.id);
+    await strata2.tenants.open(tenant.id);
 
     const repo2 = strata2.repo(ItemDef) as Repository<Item>;
     const loaded = repo2.get(id);
@@ -196,12 +201,13 @@ describe('Persistence round-trip integration', () => {
     const localAdapter = new MemoryBlobAdapter();
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [ItemDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     const repo = strata.repo(ItemDef) as Repository<Item>;
     const id = repo.save({ name: 'To Delete', category: 'temp' });

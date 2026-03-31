@@ -30,7 +30,7 @@ async function main() {
   });
 
   const tenant = await db.tenants.create({ name: 'demo', meta: {} });
-  await db.loadTenant(tenant.id);
+  await db.tenants.open(tenant.id);
 
   // ── Global key strategy ──────────────────────────────
   console.log('=== GLOBAL KEY STRATEGY ===');

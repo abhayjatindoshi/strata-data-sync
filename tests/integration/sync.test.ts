@@ -27,10 +27,11 @@ describe('Two-device sync integration', () => {
 
   async function createDevice(
     deviceId: string,
-    cloudAdapter: ReturnType<typeof MemoryBlobAdapter>,
+    cloudAdapter: InstanceType<typeof MemoryBlobAdapter>,
   ) {
     const localAdapter = new MemoryBlobAdapter();
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter,
       cloudAdapter,
@@ -48,7 +49,7 @@ describe('Two-device sync integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false, priority: 1 });
@@ -61,7 +62,7 @@ describe('Two-device sync integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     const fromB = repoB.get(id);
@@ -81,7 +82,7 @@ describe('Two-device sync integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'Original', done: false, priority: 1 });
@@ -94,7 +95,7 @@ describe('Two-device sync integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     expect(repoB.get(id)).toBeDefined();
@@ -128,7 +129,7 @@ describe('Two-device sync integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'Will delete', done: false, priority: 1 });
@@ -141,7 +142,7 @@ describe('Two-device sync integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     expect(repoB.get(id)).toBeDefined();
@@ -166,7 +167,7 @@ describe('Two-device sync integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'Contested', done: false, priority: 1 });
@@ -179,7 +180,7 @@ describe('Two-device sync integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     expect(repoB.get(id)).toBeDefined();
@@ -205,7 +206,7 @@ describe('Two-device sync integration', () => {
       name: 'Shared',
       meta: { folder: 'shared' },
     });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
     await strataB.tenants.create({
@@ -213,7 +214,7 @@ describe('Two-device sync integration', () => {
       meta: { folder: 'shared' },
       id: tenant.id,
     });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const repoB = strataB.repo(TaskDef) as Repository<Task>;

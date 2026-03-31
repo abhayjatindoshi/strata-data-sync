@@ -6,14 +6,15 @@ import { createHlc } from '@strata/hlc';
 import { saveAllIndexes } from '@strata/persistence';
 import { EventBus } from '@strata/reactive';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 
 function makeEngine(opts?: { cloud?: boolean }) {
-  const store = new Store();
+  const store = new Store(DEFAULT_OPTIONS);
   const local = new MemoryBlobAdapter();
   const cloud = opts?.cloud ? new MemoryBlobAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };
   const eventBus = new EventBus();
-  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus);
+  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, undefined, DEFAULT_OPTIONS);
   return { engine, store, local, cloud, hlcRef, eventBus };
 }
 
@@ -191,7 +192,7 @@ describe('SyncEngine', () => {
     await local.write(undefined, 'task._', blob);
     await saveAllIndexes(local, undefined, {
       task: { '_': { hash: 999, count: 1, deletedCount: 0, updatedAt: 500 } },
-    });
+    }, DEFAULT_OPTIONS);
 
     // Sync local→memory: storeChanges = changesForB (target=memory)
     const { result } = await engine.sync('local', 'memory', undefined);
@@ -239,7 +240,7 @@ describe('SyncEngine', () => {
     await local.write(undefined, 'task._', localBlob);
     await saveAllIndexes(local, undefined, {
       task: { '_': { hash: 999, count: 1, deletedCount: 0, updatedAt: 200 } },
-    });
+    }, DEFAULT_OPTIONS);
 
     // memory→local with diverged data should merge and emit changesForA back to memory
     const { result } = await engine.sync('memory', 'local', undefined);
@@ -267,7 +268,7 @@ describe('SyncEngine', () => {
     await local.write(undefined, 'task._', localBlob);
     await saveAllIndexes(local, undefined, {
       task: { '_': { hash: 777, count: 1, deletedCount: 0, updatedAt: 500 } },
-    });
+    }, DEFAULT_OPTIONS);
 
     // local→memory: changesForB = changes applied to target (memory)
     const { result } = await engine.sync('local', 'memory', undefined);

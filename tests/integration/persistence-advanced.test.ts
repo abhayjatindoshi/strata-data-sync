@@ -6,6 +6,7 @@ import {
   partitioned,
 } from '@strata/index';
 import type { BlobAdapter } from '@strata/index';
+import type { PartitionBlob } from '@strata/persistence';
 import type { Repository } from '@strata/repo';
 
 type Item = { name: string; category: string };
@@ -40,11 +41,11 @@ describe('Persistence advanced integration', () => {
       async read(cm, key) {
         const data = await rawAdapter.read(cm, key);
         if (!data) return null;
-        const envelope = data as { __wrapped: unknown };
+        const envelope = data as unknown as { __wrapped: PartitionBlob };
         return envelope.__wrapped;
       },
       async write(cm, key, data) {
-        await rawAdapter.write(cm, key, { __wrapped: data });
+        await rawAdapter.write(cm, key, { __wrapped: data } as unknown as PartitionBlob);
       },
       async delete(cm, key) { return rawAdapter.delete(cm, key); },
       async list(cm, prefix) { return rawAdapter.list(cm, prefix); },
@@ -52,12 +53,13 @@ describe('Persistence advanced integration', () => {
 
     // Phase 1: Save through transformed adapter
     const strata1 = track(new Strata({
+      appId: 'test',
       entities: [ItemDef],
       localAdapter: transformedAdapter,
       deviceId: 'dev-1',
     }));
     const tenant = await strata1.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata1.loadTenant(tenant.id);
+    await strata1.tenants.open(tenant.id);
 
     const repo1 = strata1.repo(ItemDef) as Repository<Item>;
     const id = repo1.save({ name: 'Secret', category: 'classified' });
@@ -70,11 +72,12 @@ describe('Persistence advanced integration', () => {
 
     // Phase 2: Reload through transformed adapter → data should be readable
     const strata2 = track(new Strata({
+      appId: 'test',
       entities: [ItemDef],
       localAdapter: transformedAdapter,
       deviceId: 'dev-1',
     }));
-    await strata2.loadTenant(tenant.id);
+    await strata2.tenants.open(tenant.id);
 
     const repo2 = strata2.repo(ItemDef) as Repository<Item>;
     const loaded = repo2.get(id);
@@ -87,12 +90,13 @@ describe('Persistence advanced integration', () => {
     const localAdapter = new MemoryBlobAdapter();
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TransactionDef],
       localAdapter,
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'W', meta: { b: 1 } });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     const repo = strata.repo(TransactionDef) as Repository<Transaction>;
     repo.save({ amount: 100, date: new Date(), accountId: 'checking' });

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 import { EventBus } from '@strata/reactive';
 import { defineEntity, partitioned } from '@strata/schema';
 import { Repository } from '@strata/repo';
@@ -24,14 +25,14 @@ const DerivedDef = defineEntity<{ provider: string; token: string }>('auth', {
 describe('Repository', () => {
   describe('get', () => {
     it('returns undefined for missing entity', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       expect(repo.get('item._.nonexistent')).toBeUndefined();
     });
 
     it('returns saved entity by ID', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ name: 'Widget', category: 'tools', price: 10 });
       const entity = repo.get(id);
@@ -45,7 +46,7 @@ describe('Repository', () => {
   describe('save', () => {
     it('generates an ID and returns it', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ name: 'A', category: 'c', price: 1 });
       expect(id).toMatch(/^item\._\..{8}$/);
@@ -54,7 +55,7 @@ describe('Repository', () => {
 
     it('stamps BaseEntity fields', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ name: 'A', category: 'c', price: 1 });
       const entity = repo.get(id)!;
@@ -68,7 +69,7 @@ describe('Repository', () => {
 
     it('increments version on update', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ name: 'A', category: 'c', price: 1 });
       repo.save({ id, name: 'A Updated', category: 'c', price: 2 });
@@ -80,7 +81,7 @@ describe('Repository', () => {
 
     it('preserves createdAt on update', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ name: 'A', category: 'c', price: 1 });
       const original = repo.get(id)!;
@@ -92,7 +93,7 @@ describe('Repository', () => {
 
     it('uses partitioned key strategy for partition key', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(PartitionedDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ name: 'Wrench', category: 'tools', price: 15 });
       expect(id).toMatch(/^product\.tools\..{8}$/);
@@ -101,7 +102,7 @@ describe('Repository', () => {
 
     it('uses deriveId for deterministic IDs', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(DerivedDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ provider: 'google', token: 'abc' });
       expect(id).toBe('auth._.google');
@@ -113,7 +114,7 @@ describe('Repository', () => {
       const bus = new EventBus();
       const listener = vi.fn();
       bus.on(listener);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
       repo.save({ name: 'A', category: 'c', price: 1 });
       expect(listener).toHaveBeenCalledWith({ entityName: 'item' });
@@ -124,7 +125,7 @@ describe('Repository', () => {
   describe('saveMany', () => {
     it('returns array of IDs', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const ids = repo.saveMany([
         { name: 'A', category: 'c', price: 1 },
@@ -140,7 +141,7 @@ describe('Repository', () => {
   describe('delete', () => {
     it('removes entity and returns true', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const id = repo.save({ name: 'A', category: 'c', price: 1 });
       expect(repo.delete(id)).toBe(true);
@@ -149,7 +150,7 @@ describe('Repository', () => {
     });
 
     it('returns false for missing entity', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       expect(repo.delete('item._.missing')).toBe(false);
     });
@@ -159,7 +160,7 @@ describe('Repository', () => {
       const bus = new EventBus();
       const listener = vi.fn();
       bus.on(listener);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
       const id = repo.save({ name: 'A', category: 'c', price: 1 });
       listener.mockClear();
@@ -172,7 +173,7 @@ describe('Repository', () => {
   describe('deleteMany', () => {
     it('removes multiple entities', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       const id1 = repo.save({ name: 'A', category: 'c', price: 1 });
       const id2 = repo.save({ name: 'B', category: 'c', price: 2 });
@@ -186,7 +187,7 @@ describe('Repository', () => {
   describe('query', () => {
     it('returns all entities when no options', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'A', category: 'c', price: 1 });
       repo.save({ name: 'B', category: 'c', price: 2 });
@@ -197,7 +198,7 @@ describe('Repository', () => {
 
     it('filters by where clause', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'A', category: 'tools', price: 1 });
       repo.save({ name: 'B', category: 'toys', price: 2 });
@@ -209,7 +210,7 @@ describe('Repository', () => {
 
     it('filters by range', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'Cheap', category: 'c', price: 5 });
       repo.save({ name: 'Mid', category: 'c', price: 50 });
@@ -222,7 +223,7 @@ describe('Repository', () => {
 
     it('sorts by orderBy', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'B', category: 'c', price: 20 });
       repo.save({ name: 'A', category: 'c', price: 10 });
@@ -234,7 +235,7 @@ describe('Repository', () => {
 
     it('sorts descending', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'A', category: 'c', price: 10 });
       repo.save({ name: 'B', category: 'c', price: 20 });
@@ -245,7 +246,7 @@ describe('Repository', () => {
 
     it('paginates with offset and limit', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'A', category: 'c', price: 10 });
       repo.save({ name: 'B', category: 'c', price: 20 });
@@ -262,7 +263,7 @@ describe('Repository', () => {
 
     it('collects entities across partitions', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(PartitionedDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'Wrench', category: 'tools', price: 15 });
       repo.save({ name: 'Doll', category: 'toys', price: 10 });
@@ -273,7 +274,7 @@ describe('Repository', () => {
 
     it('applies full pipeline: where → range → orderBy → pagination', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus());
       repo.save({ name: 'A', category: 'tools', price: 5 });
       repo.save({ name: 'B', category: 'tools', price: 15 });

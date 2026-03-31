@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 import { loadPartitionFromAdapter } from '@strata/store/flush';
 import type { Hlc } from '@strata/hlc';
 
 describe('loadPartitionFromAdapter', () => {
   it('loads entities from blob into map', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const entity = { id: 'task._.a1', name: 'Test' };
     const blob = {
@@ -24,7 +25,7 @@ describe('loadPartitionFromAdapter', () => {
 
   it('restores tombstones from blob deleted section', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const tombstoneHlc: Hlc = { timestamp: 999, counter: 0, nodeId: 'n1' };
     const blob = {
@@ -41,7 +42,7 @@ describe('loadPartitionFromAdapter', () => {
 
   it('returns empty map when blob does not exist', async () => {
     const adapter = new MemoryBlobAdapter();
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
 
     const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
 

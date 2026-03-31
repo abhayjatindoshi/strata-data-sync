@@ -19,7 +19,7 @@ async function main() {
   });
 
   const tenant = await strata1.tenants.create({ name: 'Demo', meta: {} });
-  await strata1.loadTenant(tenant.id);
+  await strata1.tenants.open(tenant.id);
 
   const tasks1 = strata1.repo(taskDefV0);
   tasks1.save({ title: 'Buy groceries', done: false });
@@ -62,7 +62,7 @@ async function main() {
     migrations: [migration],
   });
 
-  await strata2.loadTenant(tenant.id);
+  await strata2.tenants.open(tenant.id);
 
   const tasks2 = strata2.repo(taskDefV1);
   console.log('Tasks after migration (v1, with priority):');

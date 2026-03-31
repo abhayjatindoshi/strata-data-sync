@@ -1,15 +1,20 @@
+import { DEFAULT_OPTIONS } from '../helpers';
 import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
-import { STRATA_MARKER_KEY } from '@strata/adapter';
+import type { Tenant } from '@strata/adapter';
 import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/tenant';
+
+function makeTenant(id: string, meta: Record<string, unknown>): Tenant {
+  return { id, name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };
+}
 
 describe('writeMarkerBlob / readMarkerBlob', () => {
   it('round-trips marker blob', async () => {
     const adapter = new MemoryBlobAdapter();
-    const meta = { folder: 'test' };
-    await writeMarkerBlob(adapter, meta, ['transaction', 'account']);
+    const tenant = makeTenant('t1', { folder: 'test' });
+    await writeMarkerBlob(adapter, tenant, ['transaction', 'account'], DEFAULT_OPTIONS);
 
-    const marker = await readMarkerBlob(adapter, meta);
+    const marker = await readMarkerBlob(adapter, tenant, DEFAULT_OPTIONS);
     expect(marker).toBeDefined();
     expect(marker!.version).toBe(1);
     expect(marker!.createdAt).toBeInstanceOf(Date);
@@ -18,31 +23,35 @@ describe('writeMarkerBlob / readMarkerBlob', () => {
 
   it('returns undefined for missing blob', async () => {
     const adapter = new MemoryBlobAdapter();
-    const result = await readMarkerBlob(adapter, { folder: 'missing' });
+    const tenant = makeTenant('missing', { folder: 'missing' });
+    const result = await readMarkerBlob(adapter, tenant, DEFAULT_OPTIONS);
     expect(result).toBeUndefined();
   });
 
   it('persists entity types array correctly', async () => {
     const adapter = new MemoryBlobAdapter();
-    await writeMarkerBlob(adapter, { bucket: 'x' }, ['user', 'post', 'comment']);
+    const tenant = makeTenant('t2', { bucket: 'x' });
+    await writeMarkerBlob(adapter, tenant, ['user', 'post', 'comment'], DEFAULT_OPTIONS);
 
-    const marker = await readMarkerBlob(adapter, { bucket: 'x' });
+    const marker = await readMarkerBlob(adapter, tenant, DEFAULT_OPTIONS);
     expect(marker!.entityTypes).toEqual(['user', 'post', 'comment']);
   });
 
   it('writes to __strata key', async () => {
     const adapter = new MemoryBlobAdapter();
-    await writeMarkerBlob(adapter, { f: '1' }, []);
+    const tenant = makeTenant('t3', { f: '1' });
+    await writeMarkerBlob(adapter, tenant, [], DEFAULT_OPTIONS);
 
-    const data = await adapter.read({ f: '1' }, STRATA_MARKER_KEY);
+    const data = await adapter.read(tenant, DEFAULT_OPTIONS.markerKey);
     expect(data).not.toBeNull();
   });
 
   it('persists empty entity types array', async () => {
     const adapter = new MemoryBlobAdapter();
-    await writeMarkerBlob(adapter, {}, []);
+    const tenant = makeTenant('t4', {});
+    await writeMarkerBlob(adapter, tenant, [], DEFAULT_OPTIONS);
 
-    const marker = await readMarkerBlob(adapter, {});
+    const marker = await readMarkerBlob(adapter, tenant, DEFAULT_OPTIONS);
     expect(marker!.entityTypes).toEqual([]);
   });
 });

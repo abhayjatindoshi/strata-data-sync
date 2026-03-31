@@ -1,3 +1,4 @@
+import { DEFAULT_OPTIONS } from '../helpers';
 import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
 import { mergeTenantLists, pushTenantList, pullTenantList } from '@strata/tenant';
@@ -8,6 +9,7 @@ import type { Tenant } from '@strata/tenant';
 function makeTenant(overrides: Partial<Tenant> & { id: string; name: string }): Tenant {
   const now = new Date('2026-03-23T12:00:00Z');
   return {
+    encrypted: false,
     meta: {},
     createdAt: now,
     updatedAt: now,
@@ -62,11 +64,11 @@ describe('pushTenantList', () => {
     const now = new Date();
     await saveTenantList(localAdapter, [
       makeTenant({ id: 't1', name: 'Test', updatedAt: now }),
-    ]);
+    ], DEFAULT_OPTIONS);
 
-    await pushTenantList(localAdapter, cloudAdapter);
+    await pushTenantList(localAdapter, cloudAdapter, DEFAULT_OPTIONS);
 
-    const cloudList = await loadTenantList(cloudAdapter);
+    const cloudList = await loadTenantList(cloudAdapter, DEFAULT_OPTIONS);
     expect(cloudList).toHaveLength(1);
     expect(cloudList[0].id).toBe('t1');
   });
@@ -75,9 +77,9 @@ describe('pushTenantList', () => {
     const localAdapter = new MemoryBlobAdapter();
     const cloudAdapter = new MemoryBlobAdapter();
 
-    await pushTenantList(localAdapter, cloudAdapter);
+    await pushTenantList(localAdapter, cloudAdapter, DEFAULT_OPTIONS);
 
-    const cloudList = await loadTenantList(cloudAdapter);
+    const cloudList = await loadTenantList(cloudAdapter, DEFAULT_OPTIONS);
     expect(cloudList).toHaveLength(0);
   });
 });
@@ -88,14 +90,14 @@ describe('pullTenantList', () => {
     const cloudAdapter = new MemoryBlobAdapter();
     await saveTenantList(localAdapter, [
       makeTenant({ id: 't1', name: 'Local' }),
-    ]);
+    ], DEFAULT_OPTIONS);
     await saveTenantList(cloudAdapter, [
       makeTenant({ id: 't2', name: 'Cloud' }),
-    ]);
+    ], DEFAULT_OPTIONS);
 
-    await pullTenantList(localAdapter, cloudAdapter);
+    await pullTenantList(localAdapter, cloudAdapter, DEFAULT_OPTIONS);
 
-    const localList = await loadTenantList(localAdapter);
+    const localList = await loadTenantList(localAdapter, DEFAULT_OPTIONS);
     expect(localList).toHaveLength(2);
     expect(localList.map(t => t.id).sort()).toEqual(['t1', 't2']);
   });
@@ -105,14 +107,14 @@ describe('pullTenantList', () => {
     const cloudAdapter = new MemoryBlobAdapter();
     await saveTenantList(localAdapter, [
       makeTenant({ id: 't1', name: 'OldLocal', updatedAt: new Date('2026-01-01') }),
-    ]);
+    ], DEFAULT_OPTIONS);
     await saveTenantList(cloudAdapter, [
       makeTenant({ id: 't1', name: 'NewCloud', updatedAt: new Date('2026-03-23') }),
-    ]);
+    ], DEFAULT_OPTIONS);
 
-    await pullTenantList(localAdapter, cloudAdapter);
+    await pullTenantList(localAdapter, cloudAdapter, DEFAULT_OPTIONS);
 
-    const localList = await loadTenantList(localAdapter);
+    const localList = await loadTenantList(localAdapter, DEFAULT_OPTIONS);
     expect(localList).toHaveLength(1);
     expect(localList[0].name).toBe('NewCloud');
   });
@@ -121,33 +123,30 @@ describe('pullTenantList', () => {
 describe('saveTenantPrefs', () => {
   it('saves and loads prefs round-trip', async () => {
     const adapter = new MemoryBlobAdapter();
-    const meta = { folder: 'test-folder' };
+    const tenant = makeTenant({ id: 'prefs-t1', name: 'Test', meta: { folder: 'test-folder' } });
 
-    await saveTenantPrefs(adapter, meta, { name: 'My Tenant', icon: 'star', color: '#ff0000' });
-    const prefs = await loadTenantPrefs(adapter, meta);
+    await saveTenantPrefs(adapter, tenant, { name: 'My Tenant' });
+    const prefs = await loadTenantPrefs(adapter, tenant);
 
     expect(prefs).toBeDefined();
     expect(prefs!.name).toBe('My Tenant');
-    expect(prefs!.icon).toBe('star');
-    expect(prefs!.color).toBe('#ff0000');
   });
 });
 
 describe('loadTenantPrefs', () => {
   it('returns undefined when no prefs blob exists', async () => {
     const adapter = new MemoryBlobAdapter();
-    const prefs = await loadTenantPrefs(adapter, { folder: 'nonexistent' });
+    const tenant = makeTenant({ id: 'none', name: 'None', meta: { folder: 'nonexistent' } });
+    const prefs = await loadTenantPrefs(adapter, tenant);
     expect(prefs).toBeUndefined();
   });
 
   it('loads prefs without optional fields', async () => {
     const adapter = new MemoryBlobAdapter();
-    const meta = { folder: 'test' };
-    await saveTenantPrefs(adapter, meta, { name: 'Plain' });
-    const prefs = await loadTenantPrefs(adapter, meta);
+    const tenant = makeTenant({ id: 'plain-t', name: 'Plain', meta: { folder: 'test' } });
+    await saveTenantPrefs(adapter, tenant, { name: 'Plain' });
+    const prefs = await loadTenantPrefs(adapter, tenant);
     expect(prefs).toBeDefined();
     expect(prefs!.name).toBe('Plain');
-    expect(prefs!.icon).toBeUndefined();
-    expect(prefs!.color).toBeUndefined();
   });
 });

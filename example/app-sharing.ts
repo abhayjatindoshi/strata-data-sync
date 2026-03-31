@@ -43,7 +43,7 @@ async function main() {
   });
   console.log(`  Tenant created: ${tenantA.id}`);
 
-  await strataA.loadTenant(tenantA.id);
+  await strataA.tenants.open(tenantA.id);
 
   const tasks = strataA.repo(TaskDef);
   tasks.save({ title: 'Design the schema', done: true });
@@ -54,9 +54,8 @@ async function main() {
   // Save tenant prefs to the shared cloud so User B can pick them up
   await saveTenantPrefs(sharedCloud, tenantA, {
     name: 'Project X',
-    icon: '📁',
   });
-  console.log('  Saved tenant prefs (name: "Project X", icon: 📁)');
+  console.log('  Saved tenant prefs (name: "Project X")');
 
   // Sync to cloud
   const syncResult = await strataA.sync();
@@ -78,13 +77,13 @@ async function main() {
     deriveTenantId,
   });
 
-  // setup() detects the existing workspace via the marker blob
-  const tenantB = await strataB.tenants.setup({
+  // join() detects the existing workspace via the marker blob
+  const tenantB = await strataB.tenants.join({
     meta: { folderId: 'abc123' },
   });
-  console.log(`  Setup detected tenant: ${tenantB.id} (name: "${tenantB.name}")`);
+  console.log(`  Join detected tenant: ${tenantB.id} (name: "${tenantB.name}")`);
 
-  await strataB.loadTenant(tenantB.id);
+  await strataB.tenants.open(tenantB.id);
 
   const tasksB = strataB.repo(TaskDef);
   const allTasks = tasksB.query();

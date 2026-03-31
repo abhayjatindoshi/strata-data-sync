@@ -7,9 +7,10 @@ import type { PartitionBlob } from '@strata/persistence';
 
 describe('EncryptionTransformService', () => {
   const appId = 'test-app';
+  const defaultOpts = { tenantKey: '__tenants', markerKey: '__strata' };
 
   it('passthrough when not configured', async () => {
-    const svc = new EncryptionTransformService();
+    const svc = new EncryptionTransformService(defaultOpts);
     const transform = svc.toTransform();
     const data = new Uint8Array([1, 2, 3]);
     const encoded = await transform.encode(undefined, 'task.global', data);
@@ -19,7 +20,7 @@ describe('EncryptionTransformService', () => {
   });
 
   it('always passes through __tenants key', async () => {
-    const svc = new EncryptionTransformService();
+    const svc = new EncryptionTransformService(defaultOpts);
     await svc.setup('password', appId);
     const transform = svc.toTransform();
     const data = new Uint8Array([1, 2, 3]);
@@ -28,7 +29,7 @@ describe('EncryptionTransformService', () => {
   });
 
   it('encrypts/decrypts __strata with markerKey', async () => {
-    const svc = new EncryptionTransformService();
+    const svc = new EncryptionTransformService(defaultOpts);
     await svc.setup('password', appId);
     const transform = svc.toTransform();
     const data = new TextEncoder().encode('marker data');
@@ -40,19 +41,19 @@ describe('EncryptionTransformService', () => {
   });
 
   it('wrong password fails to decrypt __strata', async () => {
-    const svc1 = new EncryptionTransformService();
+    const svc1 = new EncryptionTransformService(defaultOpts);
     await svc1.setup('correct', appId);
     const data = new TextEncoder().encode('secret');
     const encrypted = await svc1.toTransform().encode(undefined, '__strata', data);
 
-    const svc2 = new EncryptionTransformService();
+    const svc2 = new EncryptionTransformService(defaultOpts);
     await svc2.setup('wrong', appId);
     await expect(svc2.toTransform().decode(undefined, '__strata', encrypted))
       .rejects.toThrow(InvalidEncryptionKeyError);
   });
 
   it('encrypts/decrypts data blobs with DEK', async () => {
-    const svc = new EncryptionTransformService();
+    const svc = new EncryptionTransformService(defaultOpts);
     await svc.setup('password', appId);
     const { dek } = await createEncryptedMarkerDek();
     svc.setDek(dek);
@@ -65,7 +66,7 @@ describe('EncryptionTransformService', () => {
   });
 
   it('clear resets state', async () => {
-    const svc = new EncryptionTransformService();
+    const svc = new EncryptionTransformService(defaultOpts);
     await svc.setup('password', appId);
     expect(svc.isConfigured).toBe(true);
     svc.clear();

@@ -57,8 +57,8 @@ describe('MemoryStorageAdapter', () => {
   it('tenant isolation', async () => {
     const adapter = new MemoryStorageAdapter();
     const now = new Date();
-    const t1 = { id: 't1', name: 'T1', meta: {}, createdAt: now, updatedAt: now } as const;
-    const t2 = { id: 't2', name: 'T2', meta: {}, createdAt: now, updatedAt: now } as const;
+    const t1 = { id: 't1', name: 'T1', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
+    const t2 = { id: 't2', name: 'T2', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
     await adapter.write(t1, 'key', new Uint8Array([1]));
     await adapter.write(t2, 'key', new Uint8Array([2]));
     const r1 = await adapter.read(t1, 'key');

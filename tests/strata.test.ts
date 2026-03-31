@@ -5,6 +5,9 @@ import {
   defineEntity,
   MemoryBlobAdapter,
   MemoryStorageAdapter,
+  AdapterBridge,
+  EncryptionTransformService,
+  resolveOptions,
   serialize,
 } from '@strata/index';
 import type { SyncEvent } from '@strata/index';
@@ -18,12 +21,13 @@ function makeAdapter() {
 }
 
 function makeStrata(overrides?: {
-  cloudAdapter?: ReturnType<typeof MemoryBlobAdapter>;
+  cloudAdapter?: MemoryBlobAdapter;
   entities?: ReturnType<typeof defineEntity>[];
-}): { strata: Strata; localAdapter: ReturnType<typeof MemoryBlobAdapter> } {
+}): { strata: Strata; localAdapter: MemoryBlobAdapter } {
   const taskDef = defineEntity<Task>('task');
   const localAdapter = makeAdapter();
   const strata = new Strata({
+    appId: 'test',
     entities: overrides?.entities ?? [taskDef],
     localAdapter,
     cloudAdapter: overrides?.cloudAdapter,
@@ -86,6 +90,7 @@ describe('Strata', () => {
     it('returns repository for known entity definition', () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -98,6 +103,7 @@ describe('Strata', () => {
       const taskDef = defineEntity<Task>('task');
       const unknownDef = defineEntity<Settings>('settings');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -108,6 +114,7 @@ describe('Strata', () => {
     it('returns Repository for non-singleton entities', () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -124,6 +131,7 @@ describe('Strata', () => {
         keyStrategy: 'singleton',
       });
       strata = new Strata({
+        appId: 'test',
         entities: [settingsDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -138,6 +146,7 @@ describe('Strata', () => {
     it('allows CRUD operations through repo', () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -164,6 +173,7 @@ describe('Strata', () => {
         keyStrategy: 'singleton',
       });
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef, settingsDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -185,10 +195,10 @@ describe('Strata', () => {
       ({ strata } = makeStrata());
       expect(strata.tenants.list).toBeTypeOf('function');
       expect(strata.tenants.create).toBeTypeOf('function');
-      expect(strata.tenants.load).toBeTypeOf('function');
-      expect(strata.tenants.setup).toBeTypeOf('function');
-      expect(strata.tenants.delink).toBeTypeOf('function');
-      expect(strata.tenants.delete).toBeTypeOf('function');
+      expect(strata.tenants.open).toBeTypeOf('function');
+      expect(strata.tenants.join).toBeTypeOf('function');
+      expect(strata.tenants.remove).toBeTypeOf('function');
+      expect(strata.tenants.changePassword).toBeTypeOf('function');
       expect(strata.tenants.activeTenant$).toBeDefined();
     });
 
@@ -198,7 +208,7 @@ describe('Strata', () => {
         name: 'Test Workspace',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()?.id).toBe(tenant.id);
     });
 
@@ -206,6 +216,7 @@ describe('Strata', () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -221,9 +232,9 @@ describe('Strata', () => {
         meta: { bucket: 't2' },
       });
 
-      await strata.loadTenant(t1.id);
+      await strata.tenants.open(t1.id);
       // Load a second tenant — should stop the first scheduler
-      await strata.loadTenant(t2.id);
+      await strata.tenants.open(t2.id);
 
       expect(strata.tenants.activeTenant$.getValue()?.id).toBe(t2.id);
     });
@@ -232,6 +243,7 @@ describe('Strata', () => {
       const localAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter,
         deviceId: 'dev',
@@ -240,7 +252,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()?.name).toBe('Test');
     });
 
@@ -254,6 +266,7 @@ describe('Strata', () => {
 
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter,
         cloudAdapter: failingCloudAdapter,
@@ -267,7 +280,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
 
       expect(events.some(e => e.type === 'cloud-unreachable')).toBe(true);
     });
@@ -286,7 +299,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
       await expect(strata.sync()).rejects.toThrow('No cloud adapter configured');
     });
 
@@ -294,6 +307,7 @@ describe('Strata', () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -303,7 +317,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
 
       const result = await strata.sync();
       expect(result).toBeDefined();
@@ -314,6 +328,7 @@ describe('Strata', () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -326,7 +341,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
       await strata.sync();
 
       const types = events.map(e => e.type);
@@ -338,6 +353,7 @@ describe('Strata', () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -350,7 +366,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
 
       // Sabotage cloud adapter to cause sync failure
       cloudAdapter.read = () => {
@@ -371,6 +387,7 @@ describe('Strata', () => {
     it('becomes dirty after save', async () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -379,7 +396,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
 
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Test', done: false });
@@ -390,6 +407,7 @@ describe('Strata', () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -400,7 +418,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
 
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Test', done: false });
@@ -423,6 +441,7 @@ describe('Strata', () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         cloudAdapter,
@@ -436,7 +455,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
       await strata.sync();
       expect(events.length).toBeGreaterThan(0);
 
@@ -466,6 +485,7 @@ describe('Strata', () => {
     it('repo() throws after dispose', async () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -481,15 +501,15 @@ describe('Strata', () => {
       await expect(strata.sync()).rejects.toThrow('Strata instance is disposed');
     });
 
-    it('loadTenant() rejects after dispose', async () => {
+    it('open() rejects after dispose', async () => {
       ({ strata } = makeStrata());
       const tenant = await strata.tenants.create({
         name: 'Test',
         meta: { bucket: 'test' },
       });
       await strata.dispose();
-      await expect(strata.loadTenant(tenant.id)).rejects.toThrow(
-        'Strata instance is disposed',
+      await expect(strata.tenants.open(tenant.id)).rejects.toThrow(
+        'SyncEngine is disposed',
       );
     });
 
@@ -497,6 +517,7 @@ describe('Strata', () => {
       const taskDef = defineEntity<Task>('task');
       const localAdapter = makeAdapter();
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter,
         deviceId: 'dev',
@@ -505,7 +526,7 @@ describe('Strata', () => {
         name: 'Test',
         meta: { bucket: 'test' },
       });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
 
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Flush Test', done: false });
@@ -520,6 +541,7 @@ describe('Strata', () => {
     it('disposes all repositories', async () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
@@ -535,7 +557,7 @@ describe('Strata', () => {
   });
 
   describe('changePassword()', () => {
-    it('throws when localAdapter is not a StorageAdapter', async () => {
+    it('throws when no tenant is loaded (blob adapter)', async () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
         appId: 'test-app',
@@ -543,20 +565,22 @@ describe('Strata', () => {
         localAdapter: makeAdapter(), // BlobAdapter, not StorageAdapter
         deviceId: 'dev',
       });
-      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
-        'localAdapter must be a StorageAdapter for encryption',
-      );
+      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow();
     });
 
     it('throws when no tenant is loaded', async () => {
       const taskDef = defineEntity<Task>('task');
+      const storage = new MemoryStorageAdapter();
+      const encService = new EncryptionTransformService(resolveOptions());
+      const adapter = new AdapterBridge(storage, { transforms: [encService.toTransform()] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: new MemoryStorageAdapter(),
+        localAdapter: adapter,
+        encryptionService: encService,
         deviceId: 'dev',
       });
-      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
+      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow(
         'No tenant loaded',
       );
     });
@@ -564,15 +588,18 @@ describe('Strata', () => {
     it('throws when current tenant is not encrypted', async () => {
       const storage = new MemoryStorageAdapter();
       const taskDef = defineEntity<Task>('task');
+      const encService = new EncryptionTransformService(resolveOptions());
+      const adapter = new AdapterBridge(storage, { transforms: [encService.toTransform()] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: storage,
+        localAdapter: adapter,
+        encryptionService: encService,
         deviceId: 'dev',
       });
       const tenant = await strata.tenants.create({ name: 'Plain', meta: {} });
-      await strata.loadTenant(tenant.id);
-      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
+      await strata.tenants.open(tenant.id);
+      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow(
         'Current tenant is not encrypted',
       );
     });
@@ -582,10 +609,13 @@ describe('Strata', () => {
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant with data
+      const encService1 = new EncryptionTransformService(resolveOptions());
+      const adapter1 = new AdapterBridge(storage, { transforms: [encService1.toTransform()] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: storage,
+        localAdapter: adapter1,
+        encryptionService: encService1,
         deviceId: 'dev',
       });
       const tenant = await strata.tenants.create({
@@ -593,22 +623,25 @@ describe('Strata', () => {
         meta: {},
         encryption: { password: 'oldpass' },
       });
-      await strata.loadTenant(tenant.id, { password: 'oldpass' });
+      await strata.tenants.open(tenant.id, { password: 'oldpass' });
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Secret', done: false });
 
       // Change password
-      await strata.changePassword('oldpass', 'newpass');
+      await strata.tenants.changePassword('oldpass', 'newpass');
       await strata.dispose();
 
       // Phase 2: Reload with new password
+      const encService2 = new EncryptionTransformService(resolveOptions());
+      const adapter2 = new AdapterBridge(storage, { transforms: [encService2.toTransform()] });
       const strata2 = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: storage,
+        localAdapter: adapter2,
+        encryptionService: encService2,
         deviceId: 'dev',
       });
-      await strata2.loadTenant(tenant.id, { password: 'newpass' });
+      await strata2.tenants.open(tenant.id, { password: 'newpass' });
       const repo2 = strata2.repo(taskDef) as Repository<Task>;
       const tasks = repo2.query();
       expect(tasks).toHaveLength(1);
@@ -618,46 +651,54 @@ describe('Strata', () => {
 
     it('throws after dispose', async () => {
       const taskDef = defineEntity<Task>('task');
+      const storage = new MemoryStorageAdapter();
+      const encService = new EncryptionTransformService(resolveOptions());
+      const adapter = new AdapterBridge(storage, { transforms: [encService.toTransform()] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: new MemoryStorageAdapter(),
+        localAdapter: adapter,
+        encryptionService: encService,
         deviceId: 'dev',
       });
       await strata.dispose();
-      await expect(strata.changePassword('old', 'new')).rejects.toThrow(
-        'Strata instance is disposed',
+      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow(
+        'No tenant loaded',
       );
     });
   });
 
-  describe('loadTenant() with no tenantId', () => {
-    it('unloads current tenant when called without tenantId', async () => {
+  describe('close()', () => {
+    it('unloads current tenant when called', async () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
+        appId: 'test',
         entities: [taskDef],
         localAdapter: makeAdapter(),
         deviceId: 'dev',
       });
       const tenant = await strata.tenants.create({ name: 'T', meta: {} });
-      await strata.loadTenant(tenant.id);
+      await strata.tenants.open(tenant.id);
       expect(strata.tenants.activeTenant$.getValue()).toBeDefined();
 
-      await strata.loadTenant();
-      // After loading with no tenantId, no tenant should be active
+      await strata.tenants.close();
+      // After close, no tenant should be active
     });
   });
 
-  describe('loadTenant() encryption error paths', () => {
+  describe('open() encryption error paths', () => {
     it('clears encryption and resets tenant on wrong password (catch block)', async () => {
       const storage = new MemoryStorageAdapter();
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant
+      const encService1 = new EncryptionTransformService(resolveOptions());
+      const adapter1 = new AdapterBridge(storage, { transforms: [encService1.toTransform()] });
       const strata1 = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: storage,
+        localAdapter: adapter1,
+        encryptionService: encService1,
         deviceId: 'dev',
       });
       const tenant = await strata1.tenants.create({
@@ -665,19 +706,22 @@ describe('Strata', () => {
         meta: {},
         encryption: { password: 'correctpass' },
       });
-      await strata1.loadTenant(tenant.id, { password: 'correctpass' });
+      await strata1.tenants.open(tenant.id, { password: 'correctpass' });
       strata1.repo(taskDef).save({ title: 'secret', done: false });
       await strata1.dispose();
 
-      // Phase 2: Try loading with wrong password — should hit catch block (lines 191-193)
+      // Phase 2: Try loading with wrong password — should hit catch block
+      const encService2 = new EncryptionTransformService(resolveOptions());
+      const adapter2 = new AdapterBridge(storage, { transforms: [encService2.toTransform()] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: storage,
+        localAdapter: adapter2,
+        encryptionService: encService2,
         deviceId: 'dev',
       });
       await expect(
-        strata.loadTenant(tenant.id, { password: 'wrongpass' }),
+        strata.tenants.open(tenant.id, { password: 'wrongpass' }),
       ).rejects.toThrow();
 
       // After error, active tenant should be cleared

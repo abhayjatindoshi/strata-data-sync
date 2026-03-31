@@ -8,6 +8,7 @@ import {
   saveAllIndexes,
   updatePartitionIndexEntry,
   loadAllIndexes,
+  resolveOptions,
 } from '@strata/index';
 import type { BlobAdapter, SyncEvent, Tenant } from '@strata/index';
 import type { Repository } from '@strata/repo';
@@ -40,12 +41,12 @@ describe('Multi-tenant parallel sync integration', () => {
     entityName: string,
     partitionKey: string,
     entities: Record<string, unknown>,
-    tombstones: Record<string, unknown> = {},
+    tombstones: Record<string, Record<string, unknown>> = {},
   ): Promise<void> {
     const blob = {
       [entityName]: entities,
       deleted: { [entityName]: tombstones },
-    };
+    } as import('@strata/persistence').PartitionBlob;
     const key = partitionBlobKey(entityName, partitionKey);
     await adapter.write(tenant, key, blob);
   }
@@ -60,11 +61,11 @@ describe('Multi-tenant parallel sync integration', () => {
   ): Promise<void> {
     await writeExternalPartition(adapter, tenant, entityName, partitionKey, entities);
 
-    const indexes = await loadAllIndexes(adapter, tenant);
+    const indexes = await loadAllIndexes(adapter, tenant, resolveOptions());
     let idx = indexes[entityName] ?? {};
     idx = updatePartitionIndexEntry(idx, partitionKey, Date.now(), Object.keys(entities).length, 0);
     indexes[entityName] = idx;
-    await saveAllIndexes(adapter, tenant, indexes);
+    await saveAllIndexes(adapter, tenant, indexes, resolveOptions());
   }
 
   it('two tenants — data stays isolated after switching and syncing', async () => {
@@ -76,6 +77,7 @@ describe('Multi-tenant parallel sync integration', () => {
 
     // Tenant A uses cloudA
     const strataA = track(new Strata({
+      appId: 'test',
       entities: [NoteDef, ProjectDef],
       localAdapter,
       cloudAdapter: cloudA,
@@ -86,7 +88,7 @@ describe('Multi-tenant parallel sync integration', () => {
       name: 'Workspace A',
       meta: { folder: 'ws-a' },
     });
-    await strataA.loadTenant(tenantA.id);
+    await strataA.tenants.open(tenantA.id);
 
     const noteRepoA = strataA.repo(NoteDef) as Repository<Note>;
     const idA1 = noteRepoA.save({ title: 'Note in A', body: 'body-a', priority: 1 });
@@ -97,6 +99,7 @@ describe('Multi-tenant parallel sync integration', () => {
 
     // Tenant B uses cloudB (a completely separate cloud store)
     const strataB = track(new Strata({
+      appId: 'test',
       entities: [NoteDef, ProjectDef],
       localAdapter,
       cloudAdapter: cloudB,
@@ -107,7 +110,7 @@ describe('Multi-tenant parallel sync integration', () => {
       name: 'Workspace B',
       meta: { folder: 'ws-b' },
     });
-    await strataB.loadTenant(tenantB.id);
+    await strataB.tenants.open(tenantB.id);
 
     const noteRepoB = strataB.repo(NoteDef) as Repository<Note>;
     const idB1 = noteRepoB.save({ title: 'Note in B', body: 'body-b', priority: 10 });
@@ -123,6 +126,7 @@ describe('Multi-tenant parallel sync integration', () => {
 
     // Re-load tenant A from its cloud — B's data must not appear
     const strataA2 = track(new Strata({
+      appId: 'test',
       entities: [NoteDef, ProjectDef],
       localAdapter,
       cloudAdapter: cloudA,
@@ -134,7 +138,7 @@ describe('Multi-tenant parallel sync integration', () => {
       meta: { folder: 'ws-a' },
       id: tenantA.id,
     });
-    await strataA2.loadTenant(tenantA.id);
+    await strataA2.tenants.open(tenantA.id);
 
     const noteRepoA2 = strataA2.repo(NoteDef) as Repository<Note>;
     expect(noteRepoA2.get(idB1)).toBeUndefined();
@@ -148,13 +152,14 @@ describe('Multi-tenant parallel sync integration', () => {
     const meta = { folder: 'shared' };
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [NoteDef],
       localAdapter,
       cloudAdapter: sharedCloud,
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'Shared', meta });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     // Device 1 saves a note
     const noteRepo = strata.repo(NoteDef) as Repository<Note>;
@@ -199,13 +204,14 @@ describe('Multi-tenant parallel sync integration', () => {
 
     // Device A: create tenant and write initial data
     const strataA = track(new Strata({
+      appId: 'test',
       entities: [NoteDef],
       localAdapter: localA,
       cloudAdapter: sharedCloud,
       deviceId: 'device-A',
     }));
     const tenant = await strataA.tenants.create({ name: 'Shared', meta });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     const repoA = strataA.repo(NoteDef) as Repository<Note>;
     const sharedId = repoA.save({ title: 'Original', body: 'v0', priority: 1 });
@@ -213,13 +219,14 @@ describe('Multi-tenant parallel sync integration', () => {
 
     // Device B: load the same tenant, hydrate
     const strataB = track(new Strata({
+      appId: 'test',
       entities: [NoteDef],
       localAdapter: localB,
       cloudAdapter: sharedCloud,
       deviceId: 'device-B',
     }));
     await strataB.tenants.create({ name: 'Shared', meta, id: tenant.id });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const repoB = strataB.repo(NoteDef) as Repository<Note>;
     expect(repoB.get(sharedId)!.title).toBe('Original');
@@ -249,6 +256,7 @@ describe('Multi-tenant parallel sync integration', () => {
     const metaB = { folder: 'ws-b' };
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [NoteDef],
       localAdapter,
       cloudAdapter: sharedCloud,
@@ -259,13 +267,13 @@ describe('Multi-tenant parallel sync integration', () => {
     const tenantB = await strata.tenants.create({ name: 'B', meta: metaB });
 
     // Work in tenant A
-    await strata.loadTenant(tenantA.id);
+    await strata.tenants.open(tenantA.id);
     const noteRepo = strata.repo(NoteDef) as Repository<Note>;
     noteRepo.save({ title: 'A note', body: 'a', priority: 1 });
     await strata.sync();
 
     // Switch to tenant B
-    await strata.loadTenant(tenantB.id);
+    await strata.tenants.open(tenantB.id);
     const noteRepoB = strata.repo(NoteDef) as Repository<Note>;
     noteRepoB.save({ title: 'B note', body: 'b', priority: 2 });
     await strata.sync();
@@ -287,7 +295,7 @@ describe('Multi-tenant parallel sync integration', () => {
     });
 
     // Switch back to tenant A — re-load triggers cloud hydration
-    await strata.loadTenant(tenantA.id);
+    await strata.tenants.open(tenantA.id);
     const noteRepoA2 = strata.repo(NoteDef) as Repository<Note>;
 
     // Should see both the original note and the externally injected one
@@ -304,6 +312,7 @@ describe('Multi-tenant parallel sync integration', () => {
     const meta = { folder: 'shared' };
 
     const strata = track(new Strata({
+      appId: 'test',
       entities: [NoteDef],
       localAdapter,
       cloudAdapter: sharedCloud,
@@ -315,7 +324,7 @@ describe('Multi-tenant parallel sync integration', () => {
     }));
 
     const tenant = await strata.tenants.create({ name: 'Shared', meta });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     const noteRepo = strata.repo(NoteDef) as Repository<Note>;
     noteRepo.save({ title: 'Local', body: 'local', priority: 1 });
@@ -355,13 +364,14 @@ describe('Multi-tenant parallel sync integration', () => {
     const meta = { folder: 'shared' };
 
     const strataA = track(new Strata({
+      appId: 'test',
       entities: [NoteDef, ProjectDef],
       localAdapter: localA,
       cloudAdapter: sharedCloud,
       deviceId: 'device-A',
     }));
     const tenant = await strataA.tenants.create({ name: 'Multi', meta });
-    await strataA.loadTenant(tenant.id);
+    await strataA.tenants.open(tenant.id);
 
     // Device A writes notes
     const noteRepoA = strataA.repo(NoteDef) as Repository<Note>;
@@ -374,13 +384,14 @@ describe('Multi-tenant parallel sync integration', () => {
 
     // Device B hydrates and writes its own entities of both types
     const strataB = track(new Strata({
+      appId: 'test',
       entities: [NoteDef, ProjectDef],
       localAdapter: localB,
       cloudAdapter: sharedCloud,
       deviceId: 'device-B',
     }));
     await strataB.tenants.create({ name: 'Multi', meta, id: tenant.id });
-    await strataB.loadTenant(tenant.id);
+    await strataB.tenants.open(tenant.id);
 
     const noteRepoB = strataB.repo(NoteDef) as Repository<Note>;
     const projectRepoB = strataB.repo(ProjectDef) as Repository<Project>;
@@ -413,6 +424,7 @@ describe('Multi-tenant parallel sync integration', () => {
     function makeDevice(id: string) {
       const local = new MemoryBlobAdapter();
       const s = track(new Strata({
+        appId: 'test',
         entities: [NoteDef],
         localAdapter: local,
         cloudAdapter: cloud,
@@ -423,7 +435,7 @@ describe('Multi-tenant parallel sync integration', () => {
 
     const s1 = makeDevice('dev-1');
     const tenant = await s1.tenants.create({ name: 'Trio', meta });
-    await s1.loadTenant(tenant.id);
+    await s1.tenants.open(tenant.id);
 
     const r1 = s1.repo(NoteDef) as Repository<Note>;
     r1.save({ title: 'From 1', body: 'b1', priority: 1 });
@@ -432,7 +444,7 @@ describe('Multi-tenant parallel sync integration', () => {
     // Dev 2 joins
     const s2 = makeDevice('dev-2');
     await s2.tenants.create({ name: 'Trio', meta, id: tenant.id });
-    await s2.loadTenant(tenant.id);
+    await s2.tenants.open(tenant.id);
     const r2 = s2.repo(NoteDef) as Repository<Note>;
     r2.save({ title: 'From 2', body: 'b2', priority: 2 });
     await s2.sync();
@@ -440,7 +452,7 @@ describe('Multi-tenant parallel sync integration', () => {
     // Dev 3 joins
     const s3 = makeDevice('dev-3');
     await s3.tenants.create({ name: 'Trio', meta, id: tenant.id });
-    await s3.loadTenant(tenant.id);
+    await s3.tenants.open(tenant.id);
     const r3 = s3.repo(NoteDef) as Repository<Note>;
     r3.save({ title: 'From 3', body: 'b3', priority: 3 });
     await s3.sync();

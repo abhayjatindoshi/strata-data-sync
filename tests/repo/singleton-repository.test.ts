@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { firstValueFrom } from 'rxjs';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 import { EventBus } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
 import { SingletonRepository } from '@strata/repo';
@@ -17,13 +18,13 @@ const SettingsDef = defineEntity<Settings>('settings', { keyStrategy: 'singleton
 describe('SingletonRepository', () => {
   describe('get', () => {
     it('returns undefined when no entity saved', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), new EventBus());
       expect(repo.get()).toBeUndefined();
     });
 
     it('returns saved entity', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), new EventBus());
       repo.save({ theme: 'dark', language: 'en' });
       const entity = repo.get();
@@ -35,7 +36,7 @@ describe('SingletonRepository', () => {
 
   describe('save', () => {
     it('stamps BaseEntity fields', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), new EventBus());
       repo.save({ theme: 'dark', language: 'en' });
       const entity = repo.get();
@@ -46,7 +47,7 @@ describe('SingletonRepository', () => {
     });
 
     it('increments version on subsequent saves', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), new EventBus());
       repo.save({ theme: 'dark', language: 'en' });
       repo.save({ theme: 'light', language: 'en' });
@@ -56,7 +57,7 @@ describe('SingletonRepository', () => {
     });
 
     it('uses deterministic ID (entityName._.entityName)', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), new EventBus());
       repo.save({ theme: 'dark', language: 'en' });
       const entity = repo.get();
@@ -66,13 +67,13 @@ describe('SingletonRepository', () => {
 
   describe('delete', () => {
     it('returns false when nothing to delete', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), new EventBus());
       expect(repo.delete()).toBe(false);
     });
 
     it('returns true and removes entity', () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), new EventBus());
       repo.save({ theme: 'dark', language: 'en' });
       expect(repo.delete()).toBe(true);
@@ -82,7 +83,7 @@ describe('SingletonRepository', () => {
 
   describe('observe', () => {
     it('emits current value on subscribe', async () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const bus = new EventBus();
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), bus);
       repo.save({ theme: 'dark', language: 'en' });
@@ -93,7 +94,7 @@ describe('SingletonRepository', () => {
     });
 
     it('emits undefined when no entity saved', async () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const bus = new EventBus();
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), bus);
 
@@ -102,7 +103,7 @@ describe('SingletonRepository', () => {
     });
 
     it('emits updated value on save', async () => {
-      const store = new Store();
+      const store = new Store(DEFAULT_OPTIONS);
       const bus = new EventBus();
       const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), bus);
 

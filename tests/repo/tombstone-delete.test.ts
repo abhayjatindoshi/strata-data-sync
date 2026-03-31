@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 import { createHlc } from '@strata/hlc';
 import { EventBus } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
@@ -13,7 +14,7 @@ const taskDef = defineEntity<Task>('task');
 
 describe('Repository delete tombstone integration', () => {
   it('delete records tombstone with entity HLC', () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const hlc = { current: createHlc('device1') };
     const eventBus = new EventBus();
     const repo = new Repository(taskDef, store, hlc, eventBus);
@@ -31,7 +32,7 @@ describe('Repository delete tombstone integration', () => {
   });
 
   it('deleteMany records tombstones for all deleted entities', () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const hlc = { current: createHlc('device1') };
     const eventBus = new EventBus();
     const repo = new Repository(taskDef, store, hlc, eventBus);
@@ -48,7 +49,7 @@ describe('Repository delete tombstone integration', () => {
   });
 
   it('delete of non-existent entity does not create tombstone', () => {
-    const store = new Store();
+    const store = new Store(DEFAULT_OPTIONS);
     const hlc = { current: createHlc('device1') };
     const eventBus = new EventBus();
     const repo = new Repository(taskDef, store, hlc, eventBus);

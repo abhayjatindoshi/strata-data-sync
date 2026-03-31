@@ -37,7 +37,7 @@ async function main() {
   const tenant = await device1.tenants.create({ name: 'My Workspace', meta: {} });
   console.log(`Tenant created: ${tenant.id}`);
 
-  await device1.loadTenant(tenant.id);
+  await device1.tenants.open(tenant.id);
 
   const tasks1 = device1.repo(taskDef);
   tasks1.save({ title: 'Buy groceries', done: false });
@@ -52,7 +52,7 @@ async function main() {
   // ── Step 2: Device 2 joins the same tenant ────────────
   console.log('\n=== Step 2: Device 2 loads same tenant (pulls from cloud) ===');
   await device2.tenants.create({ name: 'My Workspace', meta: {}, id: tenant.id });
-  await device2.loadTenant(tenant.id);
+  await device2.tenants.open(tenant.id);
 
   const tasks2 = device2.repo(taskDef);
   console.log('Device 2 tasks after load:', tasks2.query().map(t => t.title));

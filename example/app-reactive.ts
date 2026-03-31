@@ -9,13 +9,14 @@ const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 
 async function main() {
   const strata = new Strata({
+    appId: 'reactive-demo',
     entities: [TaskDef],
     localAdapter: new MemoryBlobAdapter(),
     deviceId: 'device-1',
   });
 
   const tenant = await strata.tenants.create({ name: 'Demo', meta: {} });
-  await strata.loadTenant(tenant.id);
+  await strata.tenants.open(tenant.id);
 
   const repo = strata.repo(TaskDef);
   const subs: Subscription[] = [];

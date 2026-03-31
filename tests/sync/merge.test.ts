@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { Hlc } from '@strata/hlc';
+import type { PartitionBlob } from '@strata/persistence';
 import { mergePartition } from '@strata/sync';
 
 function makeBlob(
   entityName: string,
   entities: Record<string, unknown>,
   tombstones: Record<string, Hlc> = {},
-): Record<string, unknown> {
+): PartitionBlob {
   return {
     [entityName]: entities,
     deleted: { [entityName]: tombstones },

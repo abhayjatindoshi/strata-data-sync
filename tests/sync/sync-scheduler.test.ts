@@ -4,6 +4,7 @@ import { createHlc } from '@strata/hlc';
 import { EventBus } from '@strata/reactive';
 import { saveAllIndexes } from '@strata/persistence';
 import { Store } from '@strata/store';
+import { DEFAULT_OPTIONS } from '../helpers';
 import { SyncEngine, SyncScheduler } from '@strata/sync';
 
 function makePartitionBlob(entityName: string, entities: Record<string, unknown>, tombstones: Record<string, unknown> = {}): Record<string, unknown> {
@@ -14,7 +15,7 @@ function makePartitionBlob(entityName: string, entities: Record<string, unknown>
 }
 
 function makeEngine(opts?: { cloud?: boolean }) {
-  const store = new Store();
+  const store = new Store(DEFAULT_OPTIONS);
   const local = new MemoryBlobAdapter();
   const cloud = opts?.cloud !== false ? new MemoryBlobAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };

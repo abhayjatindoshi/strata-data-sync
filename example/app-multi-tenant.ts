@@ -5,6 +5,7 @@ const TaskDef = defineEntity<Task>('task');
 
 async function main() {
   const strata = new Strata({
+    appId: 'multi-tenant-demo',
     entities: [TaskDef],
     localAdapter: new MemoryBlobAdapter(),
     deviceId: 'device-1',
@@ -12,8 +13,8 @@ async function main() {
 
   // ── 1. Create two tenants ──────────────────────────────
   console.log('=== Creating Tenants ===');
-  const work = await strata.tenants.create({ name: 'Work' });
-  const personal = await strata.tenants.create({ name: 'Personal' });
+  const work = await strata.tenants.create({ name: 'Work', meta: {} });
+  const personal = await strata.tenants.create({ name: 'Personal', meta: {} });
   console.log(`Created: "${work.name}" (${work.id})`);
   console.log(`Created: "${personal.name}" (${personal.id})`);
 
@@ -26,7 +27,7 @@ async function main() {
 
   // ── 3. Load Work tenant & save work tasks ──────────────
   console.log('\n=== Loading Work Tenant ===');
-  await strata.loadTenant(work.id);
+  await strata.tenants.open(work.id);
   console.log(`Active tenant: ${strata.tenants.activeTenant$.getValue()?.name}`);
 
   const taskRepo = strata.repo(TaskDef);
@@ -37,7 +38,7 @@ async function main() {
 
   // ── 4. Load Personal tenant & save personal tasks ──────
   console.log('\n=== Loading Personal Tenant ===');
-  await strata.loadTenant(personal.id);
+  await strata.tenants.open(personal.id);
   console.log(`Active tenant: ${strata.tenants.activeTenant$.getValue()?.name}`);
 
   taskRepo.save({ title: 'Buy groceries', done: false });
@@ -54,7 +55,7 @@ async function main() {
 
   // ── 6. Switch back to Work tenant ──────────────────────
   console.log('\n=== Switching back to Work Tenant ===');
-  await strata.loadTenant(work.id);
+  await strata.tenants.open(work.id);
   console.log(`Active tenant: ${strata.tenants.activeTenant$.getValue()?.name}`);
 
   const workTasks = taskRepo.query();

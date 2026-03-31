@@ -27,6 +27,7 @@ describe('Dirty tracking integration', () => {
 
   it('isDirty transitions — false → true after save → false after sync', async () => {
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: new MemoryBlobAdapter(),
       cloudAdapter: new MemoryBlobAdapter(),
@@ -37,7 +38,7 @@ describe('Dirty tracking integration', () => {
       name: 'Test',
       meta: { b: 1 },
     });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     // Initially not dirty
     expect(strata.isDirty).toBe(false);
@@ -54,6 +55,7 @@ describe('Dirty tracking integration', () => {
 
   it('isDirty$ observable — emits true on save, false on sync', async () => {
     const strata = track(new Strata({
+      appId: 'test',
       entities: [TaskDef],
       localAdapter: new MemoryBlobAdapter(),
       cloudAdapter: new MemoryBlobAdapter(),
@@ -64,7 +66,7 @@ describe('Dirty tracking integration', () => {
       name: 'Test',
       meta: { b: 1 },
     });
-    await strata.loadTenant(tenant.id);
+    await strata.tenants.open(tenant.id);
 
     const emissions: boolean[] = [];
     const sub = strata.isDirty$.subscribe(v => emissions.push(v));

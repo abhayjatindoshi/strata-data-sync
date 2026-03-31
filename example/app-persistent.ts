@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile, unlink, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Strata, defineEntity } from 'strata-data-sync';
+import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
 import type { StorageAdapter, Tenant } from 'strata-data-sync';
 
 // ─── __dirname for ESM ───────────────────────────────────
@@ -81,7 +81,8 @@ async function main() {
   // Clean up from any previous run
   await rm(tmpDir, { recursive: true, force: true });
 
-  const adapter = new FsStorageAdapter(tmpDir);
+  const storage = new FsStorageAdapter(tmpDir);
+  const adapter = new AdapterBridge(storage);
 
   // ── Session 1: create tenant and save tasks ────────────
   console.log('=== Session 1: Write ===');
@@ -97,7 +98,7 @@ async function main() {
     meta: { container: 'workspace' },
   });
 
-  await db1.loadTenant(tenant.id);
+  await db1.tenants.open(tenant.id);
 
   const tasks = db1.repo(Task);
   tasks.save({ title: 'Design schema', done: true });
@@ -125,7 +126,7 @@ async function main() {
     deviceId: 'device-1',
   });
 
-  await db2.loadTenant(tenant.id);
+  await db2.tenants.open(tenant.id);
 
   const reloaded = db2.repo(Task).query();
   console.log(`Loaded ${reloaded.length} tasks from disk:`);
