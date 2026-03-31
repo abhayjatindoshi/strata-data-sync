@@ -1,5 +1,6 @@
 import debug from 'debug';
 import type { BlobAdapter } from '@strata/adapter';
+import type { ResolvedStrataOptions } from '../options';
 import type { Tenant } from './types';
 import { loadTenantList, saveTenantList } from './tenant-list';
 
@@ -28,19 +29,21 @@ export function mergeTenantLists(
 export async function pushTenantList(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
+  options: ResolvedStrataOptions,
 ): Promise<void> {
-  const local = await loadTenantList(localAdapter);
-  await saveTenantList(cloudAdapter, local);
+  const local = await loadTenantList(localAdapter, options);
+  await saveTenantList(cloudAdapter, local, options);
   log('pushed tenant list (%d tenants)', local.length);
 }
 
 export async function pullTenantList(
   localAdapter: BlobAdapter,
   cloudAdapter: BlobAdapter,
+  options: ResolvedStrataOptions,
 ): Promise<void> {
-  const local = await loadTenantList(localAdapter);
-  const remote = await loadTenantList(cloudAdapter);
+  const local = await loadTenantList(localAdapter, options);
+  const remote = await loadTenantList(cloudAdapter, options);
   const merged = mergeTenantLists(local, remote);
-  await saveTenantList(localAdapter, merged);
+  await saveTenantList(localAdapter, merged, options);
   log('pulled tenant list (%d merged)', merged.length);
 }

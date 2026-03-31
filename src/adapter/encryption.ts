@@ -1,6 +1,5 @@
 import debug from 'debug';
 import type { BlobTransform, Tenant } from './types';
-import { TENANTS_KEY, STRATA_MARKER_KEY } from './keys';
 import {
   deriveKey, generateDek, exportDek, importDek,
   encrypt as encryptData, decrypt as decryptData,
@@ -10,14 +9,21 @@ import {
 const log = debug('strata:encryption');
 
 export class EncryptionTransformService {
-  private markerKey: CryptoKey | null = null;
+  private markerCryptoKey: CryptoKey | null = null;
   private dek: CryptoKey | null = null;
+  private readonly tenantKey: string;
+  private readonly markerKey: string;
+
+  constructor(options: { readonly tenantKey: string; readonly markerKey: string }) {
+    this.tenantKey = options.tenantKey;
+    this.markerKey = options.markerKey;
+  }
 
   async setup(
     password: string,
     appId: string,
   ): Promise<void> {
-    this.markerKey = await deriveKey(password, appId);
+    this.markerCryptoKey = await deriveKey(password, appId);
     this.dek = null;
     log('marker key derived for app %s', appId);
   }
@@ -27,31 +33,31 @@ export class EncryptionTransformService {
   }
 
   clear(): void {
-    this.markerKey = null;
+    this.markerCryptoKey = null;
     this.dek = null;
   }
 
   get isConfigured(): boolean {
-    return this.markerKey !== null;
+    return this.markerCryptoKey !== null;
   }
 
   toTransform(): BlobTransform {
     return {
       encode: async (_tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<Uint8Array> => {
-        if (key === TENANTS_KEY) return data;
-        if (key === STRATA_MARKER_KEY) {
-          if (!this.markerKey) return data;
-          return encryptData(data, this.markerKey);
+        if (key === this.tenantKey) return data;
+        if (key === this.markerKey) {
+          if (!this.markerCryptoKey) return data;
+          return encryptData(data, this.markerCryptoKey);
         }
         if (!this.dek) return data;
         return encryptData(data, this.dek);
       },
       decode: async (_tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<Uint8Array> => {
-        if (key === TENANTS_KEY) return data;
-        if (key === STRATA_MARKER_KEY) {
-          if (!this.markerKey) return data;
+        if (key === this.tenantKey) return data;
+        if (key === this.markerKey) {
+          if (!this.markerCryptoKey) return data;
           try {
-            return await decryptData(data, this.markerKey);
+            return await decryptData(data, this.markerCryptoKey);
           } catch {
             throw new InvalidEncryptionKeyError();
           }

@@ -1,10 +1,9 @@
 import type { BehaviorSubject } from 'rxjs';
+import type { ResolvedStrataOptions } from '../options';
 
 export type Tenant = {
   readonly id: string;
   readonly name: string;
-  readonly icon?: string;
-  readonly color?: string;
   readonly meta: Readonly<Record<string, unknown>>;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -21,7 +20,7 @@ export type SetupTenantOptions = {
   readonly name?: string;
 };
 
-export type TenantManagerOptions = {
+export type TenantManagerOptions = ResolvedStrataOptions & {
   readonly appId?: string;
   readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
   readonly entityTypes?: readonly string[];

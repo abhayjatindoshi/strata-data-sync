@@ -37,7 +37,7 @@ export class TenantManager {
 
   constructor(
     private readonly adapter: BlobAdapter,
-    private readonly options?: TenantManagerOptions,
+    private readonly options: TenantManagerOptions,
     private readonly encryptionService?: EncryptionTransformService,
   ) {
     this.subject = new BehaviorSubject<Tenant | undefined>(undefined);
@@ -46,14 +46,14 @@ export class TenantManager {
 
   private async getList(): Promise<Tenant[]> {
     if (!this.cachedList) {
-      this.cachedList = await loadTenantList(this.adapter);
+      this.cachedList = await loadTenantList(this.adapter, this.options);
     }
     return this.cachedList;
   }
 
   private async persistList(tenants: Tenant[]): Promise<void> {
     this.cachedList = tenants;
-    await saveTenantList(this.adapter, tenants);
+    await saveTenantList(this.adapter, tenants, this.options);
   }
 
   async list(): Promise<ReadonlyArray<Tenant>> {
@@ -91,7 +91,7 @@ export class TenantManager {
       this.encryptionService.setDek(dek);
     }
 
-    await writeMarkerBlob(this.adapter, tenant, this.options?.entityTypes ?? [], dekBase64);
+    await writeMarkerBlob(this.adapter, tenant, this.options?.entityTypes ?? [], this.options, dekBase64);
 
     if (opts.encryption && this.encryptionService) {
       this.encryptionService.clear();
@@ -134,7 +134,7 @@ export class TenantManager {
       updatedAt: now,
     };
 
-    const marker = await readMarkerBlob(this.adapter, tempTenant);
+    const marker = await readMarkerBlob(this.adapter, tempTenant, this.options);
     if (!marker) {
       throw new Error('No strata workspace found at the specified location');
     }
@@ -147,8 +147,6 @@ export class TenantManager {
     const tenant: Tenant = {
       id,
       name: prefs?.name ?? opts.name ?? 'Shared Workspace',
-      icon: prefs?.icon,
-      color: prefs?.color,
       meta: opts.meta,
       createdAt: now,
       updatedAt: now,

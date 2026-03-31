@@ -9,8 +9,6 @@ const PREFS_ENTITY_KEY = '__prefs';
 
 export type TenantPrefs = {
   readonly name: string;
-  readonly icon?: string;
-  readonly color?: string;
 };
 
 export async function saveTenantPrefs(

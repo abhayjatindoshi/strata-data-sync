@@ -5,6 +5,7 @@ import { tick } from '@strata/hlc';
 import type { EntityEventBus } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { BlobMigration } from '@strata/schema/migration';
+import type { ResolvedStrataOptions } from '../options';
 import type {
   SyncLocation, SyncQueueItem, SyncEventListener, SyncEvent,
   SyncEnqueueResult, SyncEngine as SyncEngineType, SyncBetweenResult,
@@ -28,6 +29,7 @@ export class SyncEngine {
     private readonly hlcRef: { current: Hlc },
     private readonly eventBus: EntityEventBus,
     private readonly migrations?: ReadonlyArray<BlobMigration>,
+    private readonly options?: ResolvedStrataOptions,
   ) {}
 
   private resolveAdapter(loc: SyncLocation): BlobAdapter {
@@ -74,6 +76,7 @@ export class SyncEngine {
       try {
         syncResult = await syncBetween(
           sourceAdapter, targetAdapter, this.entityNames, tenant, this.migrations,
+          this.options,
         );
 
         if (syncResult.maxHlc) {

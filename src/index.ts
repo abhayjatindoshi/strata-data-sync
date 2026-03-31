@@ -1,5 +1,6 @@
 export { Strata, validateEntityDefinitions } from './strata';
-export type { StrataConfig, StrataOptions } from './strata';
+export type { StrataConfig, StrataOptions, ResolvedStrataOptions } from './strata';
+export { resolveOptions } from './strata';
 
 export * from '@strata/hlc';
 export * from '@strata/adapter';

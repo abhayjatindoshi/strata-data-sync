@@ -1,5 +1,5 @@
 export type { BlobAdapter, Tenant, BlobTransform, StorageAdapter } from './types';
-export { TENANTS_KEY, STRATA_MARKER_KEY, partitionBlobKey } from './keys';
+export { partitionBlobKey } from './keys';
 export { MemoryBlobAdapter } from './memory-blob-adapter';
 export { applyTransforms, reverseTransforms } from './transform';
 export { AdapterBridge } from './bridge';

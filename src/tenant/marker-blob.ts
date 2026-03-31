@@ -1,7 +1,7 @@
 import debug from 'debug';
 import type { BlobAdapter, Tenant } from '@strata/adapter';
-import { STRATA_MARKER_KEY } from '@strata/adapter';
 import type { AllIndexes, PartitionBlob } from '@strata/persistence';
+import type { ResolvedStrataOptions } from '../options';
 
 const log = debug('strata:tenant');
 
@@ -19,6 +19,7 @@ export async function writeMarkerBlob(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
   entityTypes: readonly string[],
+  options: ResolvedStrataOptions,
   dekBase64?: string,
 ): Promise<void> {
   const marker: MarkerData = {
@@ -32,15 +33,16 @@ export async function writeMarkerBlob(
     [MARKER_ENTITY_KEY]: { marker },
     deleted: {},
   };
-  await adapter.write(tenant, STRATA_MARKER_KEY, blob);
+  await adapter.write(tenant, options.markerKey, blob);
   log('wrote marker blob');
 }
 
 export async function readMarkerBlob(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
+  options: ResolvedStrataOptions,
 ): Promise<MarkerData | undefined> {
-  const blob = await adapter.read(tenant, STRATA_MARKER_KEY);
+  const blob = await adapter.read(tenant, options.markerKey);
   if (!blob) return undefined;
   const systemEntities = blob[MARKER_ENTITY_KEY] as Record<string, unknown> | undefined;
   if (!systemEntities) return undefined;

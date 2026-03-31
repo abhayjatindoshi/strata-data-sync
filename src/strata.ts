@@ -3,7 +3,7 @@ import type { Observable } from 'rxjs';
 import { createHlc } from '@strata/hlc';
 import type { Hlc } from '@strata/hlc';
 import type { BlobAdapter, StorageAdapter } from '@strata/adapter';
-import { AdapterBridge, STRATA_MARKER_KEY } from '@strata/adapter';
+import { AdapterBridge } from '@strata/adapter';
 import {
   EncryptionTransformService,
   importDek,
@@ -32,11 +32,10 @@ const log = debug('strata:core');
 
 // ─── Types ───────────────────────────────────────────────
 
-export type StrataOptions = {
-  readonly cloudSyncIntervalMs?: number;
-  readonly localFlushIntervalMs?: number;
-  readonly tombstoneRetentionMs?: number;
-};
+export type { StrataOptions, ResolvedStrataOptions } from './options';
+export { resolveOptions } from './options';
+import { resolveOptions } from './options';
+import type { StrataOptions, ResolvedStrataOptions } from './options';
 
 export type StrataConfig = {
   readonly appId: string;
@@ -86,6 +85,7 @@ export class Strata {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly repoMap = new Map<string, RepositoryType<unknown> | SingletonRepositoryType<unknown>>();
   private readonly config: StrataConfig;
+  private readonly resolvedOptions: ResolvedStrataOptions;
   private readonly localAdapter: BlobAdapter;
   private readonly storageAdapter: StorageAdapter | undefined;
   private readonly encryptionService: EncryptionTransformService;
@@ -98,7 +98,8 @@ export class Strata {
   constructor(config: StrataConfig) {
     validateEntityDefinitions(config.entities);
     this.config = config;
-    this.encryptionService = new EncryptionTransformService();
+    this.resolvedOptions = resolveOptions(config.options);
+    this.encryptionService = new EncryptionTransformService(this.resolvedOptions);
 
     if (config.localAdapter.kind === 'storage') {
       this.storageAdapter = config.localAdapter;
@@ -112,11 +113,11 @@ export class Strata {
 
     this.hlcRef = { current: createHlc(config.deviceId) };
     this.eventBus = new EventBus();
-    this.store = new Store();
+    this.store = new Store(this.resolvedOptions);
     this.syncEngine = new SyncEngine(
       this.store, this.localAdapter, config.cloudAdapter,
       config.entities.map(d => d.name), this.hlcRef, this.eventBus,
-      config.migrations,
+      config.migrations, this.resolvedOptions,
     );
     this.dirtyTracker = new DirtyTracker();
     this.entityNames = config.entities.map(d => d.name);
@@ -131,6 +132,7 @@ export class Strata {
     }
 
     this.tenants = new TenantManager(this.localAdapter, {
+      ...this.resolvedOptions,
       appId: config.appId,
       entityTypes: this.entityNames,
       deriveTenantId: config.deriveTenantId,
@@ -169,7 +171,7 @@ export class Strata {
 
     // Detect encryption: read raw __strata bytes
     if (this.storageAdapter) {
-      const rawBytes = await this.storageAdapter.read(tenant, STRATA_MARKER_KEY);
+      const rawBytes = await this.storageAdapter.read(tenant, this.resolvedOptions.markerKey);
       if (rawBytes && rawBytes.length > 0 && rawBytes[0] !== 0x7B) {
         // Encrypted marker — password required
         if (!opts?.password) {
@@ -179,7 +181,7 @@ export class Strata {
         try {
           await this.encryptionService.setup(opts.password, this.config.appId);
           // Now the transform is configured with markerKey — read marker through bridge
-          const marker = await readMarkerBlob(this.localAdapter, tenant);
+          const marker = await readMarkerBlob(this.localAdapter, tenant, this.resolvedOptions);
           if (!marker?.dek) {
             this.encryptionService.clear();
             this.tenants.activeTenant$.next(undefined);
@@ -208,8 +210,7 @@ export class Strata {
 
     this.syncScheduler = new SyncScheduler(
       this.syncEngine, tenant, !!this.config.cloudAdapter, {
-        localFlushIntervalMs: this.config.options?.localFlushIntervalMs,
-        cloudSyncIntervalMs: this.config.options?.cloudSyncIntervalMs,
+        ...this.resolvedOptions,
         dirtyTracker: this.dirtyTracker,
       },
     );
@@ -262,7 +263,7 @@ export class Strata {
     if (!tenant) throw new Error('No tenant loaded');
 
     // Read current __strata raw bytes — should be encrypted
-    const rawBytes = await this.storageAdapter.read(tenant, STRATA_MARKER_KEY);
+    const rawBytes = await this.storageAdapter.read(tenant, this.resolvedOptions.markerKey);
     if (!rawBytes || rawBytes[0] === 0x7B) {
       throw new Error('Current tenant is not encrypted');
     }
@@ -271,14 +272,14 @@ export class Strata {
     const newMarkerKey = await deriveKey(newPassword, this.config.appId);
 
     // Read the marker through bridge (already decrypted by current transform)
-    const marker = await readMarkerBlob(this.localAdapter, tenant);
+    const marker = await readMarkerBlob(this.localAdapter, tenant, this.resolvedOptions);
     if (!marker) throw new Error('Failed to read marker blob');
 
     // Re-serialize and encrypt with new markerKey
     const blob = { __system: { marker }, deleted: {} };
     const serialized = serialize(blob);
     const reEncrypted = await encryptData(serialized, newMarkerKey);
-    await this.storageAdapter.write(tenant, STRATA_MARKER_KEY, reEncrypted);
+    await this.storageAdapter.write(tenant, this.resolvedOptions.markerKey, reEncrypted);
 
     // Update the encryption service with new markerKey
     await this.encryptionService.setup(newPassword, this.config.appId);

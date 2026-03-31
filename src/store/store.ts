@@ -1,8 +1,8 @@
 import type { Hlc } from '@strata/hlc';
 import type { Tenant } from '@strata/adapter';
-import { STRATA_MARKER_KEY } from '@strata/adapter';
 import type { PartitionBlob } from '@strata/persistence';
 import { partitionHash } from '@strata/persistence';
+import type { ResolvedStrataOptions } from '../options';
 import type { EntityStore } from './types';
 
 export class Store implements EntityStore {
@@ -10,7 +10,12 @@ export class Store implements EntityStore {
   private readonly partitions = new Map<string, Map<string, unknown>>();
   private readonly tombstones = new Map<string, Map<string, Hlc>>();
   private readonly dirtyKeys = new Set<string>();
+  private readonly markerKey: string;
   private storedMarkerBlob: PartitionBlob | null = null;
+
+  constructor(options: ResolvedStrataOptions) {
+    this.markerKey = options.markerKey;
+  }
 
   getEntity(entityKey: string, id: string): unknown | undefined {
     return this.partitions.get(entityKey)?.get(id);
@@ -94,7 +99,7 @@ export class Store implements EntityStore {
   // ─── BlobAdapter interface ─────────────────────────────
 
   async read(_tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null> {
-    if (key === STRATA_MARKER_KEY) {
+    if (key === this.markerKey) {
       return this.buildMarkerBlob();
     }
     const dotIndex = key.indexOf('.');
@@ -119,7 +124,7 @@ export class Store implements EntityStore {
   }
 
   async write(_tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void> {
-    if (key === STRATA_MARKER_KEY) {
+    if (key === this.markerKey) {
       this.storedMarkerBlob = data;
       return;
     }

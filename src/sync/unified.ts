@@ -8,6 +8,7 @@ import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
 import { partitionHash, updatePartitionIndexEntry } from '@strata/persistence';
 import type { BlobMigration } from '@strata/schema/migration';
 import { migrateBlob } from '@strata/schema/migration';
+import type { ResolvedStrataOptions } from '../options';
 import { diffPartitions } from './diff';
 import { mergePartition } from './merge';
 import type { SyncEntity, SyncEntityChange, SyncBetweenResult } from './types';
@@ -35,10 +36,11 @@ async function buildPlan(
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
   migrations?: ReadonlyArray<BlobMigration>,
+  options?: ResolvedStrataOptions,
 ): Promise<SyncPlan> {
   const [indexesA, indexesB] = await Promise.all([
-    loadAllIndexes(adapterA, tenant),
-    loadAllIndexes(adapterB, tenant),
+    loadAllIndexes(adapterA, tenant, options!),
+    loadAllIndexes(adapterB, tenant, options!),
   ]);
 
   const applyToA: SyncChange[] = [];
@@ -141,8 +143,9 @@ async function isStale(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
   snapshot: AllIndexes,
+  options?: ResolvedStrataOptions,
 ): Promise<boolean> {
-  const current = await loadAllIndexes(adapter, tenant);
+  const current = await loadAllIndexes(adapter, tenant, options!);
   for (const entityName of Object.keys(snapshot)) {
     const snapIndex = snapshot[entityName] ?? {};
     const curIndex = current[entityName] ?? {};
@@ -256,8 +259,9 @@ export async function syncBetween(
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
   migrations?: ReadonlyArray<BlobMigration>,
+  options?: ResolvedStrataOptions,
 ): Promise<SyncBetweenResult> {
-  const plan = await buildPlan(adapterA, adapterB, entityNames, tenant, migrations);
+  const plan = await buildPlan(adapterA, adapterB, entityNames, tenant, migrations, options);
 
   if (plan.applyToB.length === 0 && plan.applyToA.length === 0) {
     return { changesForA: [], changesForB: [], stale: false, maxHlc: undefined };
@@ -267,7 +271,7 @@ export async function syncBetween(
   await applyChanges(adapterB, tenant, plan.applyToB);
 
   // Phase 3: stale check, then write to A
-  const stale = await isStale(adapterA, tenant, plan.indexSnapshotA);
+  const stale = await isStale(adapterA, tenant, plan.indexSnapshotA, options);
   if (!stale && plan.applyToA.length > 0) {
     await applyChanges(adapterA, tenant, plan.applyToA);
   }
@@ -276,12 +280,12 @@ export async function syncBetween(
   const allChanges = deduplicateChanges([...plan.applyToA, ...plan.applyToB]);
   const indexUpdates = computeIndexUpdates(allChanges);
   const [existingIdxA, existingIdxB] = await Promise.all([
-    loadAllIndexes(adapterA, tenant),
-    loadAllIndexes(adapterB, tenant),
+    loadAllIndexes(adapterA, tenant, options!),
+    loadAllIndexes(adapterB, tenant, options!),
   ]);
   await Promise.all([
-    saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdates)),
-    saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdates)),
+    saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdates), options!),
+    saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdates), options!),
   ]);
 
   const maxHlc = findMaxHlc(allChanges);

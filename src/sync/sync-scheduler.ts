@@ -15,11 +15,11 @@ export class SyncScheduler {
     private readonly engine: SyncEngine,
     private readonly tenant: Tenant | undefined,
     private readonly hasCloud: boolean,
-    options?: SyncSchedulerOptions,
+    options: SyncSchedulerOptions,
   ) {
-    this.localFlushIntervalMs = options?.localFlushIntervalMs ?? 2000;
-    this.cloudSyncIntervalMs = options?.cloudSyncIntervalMs ?? 300000;
-    this.dirtyTracker = options?.dirtyTracker;
+    this.localFlushIntervalMs = options.localFlushIntervalMs;
+    this.cloudSyncIntervalMs = options.cloudSyncIntervalMs;
+    this.dirtyTracker = options.dirtyTracker;
   }
 
   start(): void {

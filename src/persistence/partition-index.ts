@@ -1,14 +1,15 @@
 import type { BlobAdapter, Tenant } from '@strata/adapter';
-import { STRATA_MARKER_KEY } from '@strata/adapter';
 import type { AllIndexes, PartitionIndex, PartitionBlob } from './types';
+import type { ResolvedStrataOptions } from '../options';
 
 const MARKER_ENTITY_KEY = '__system';
 
 export async function loadAllIndexes(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
+  options: ResolvedStrataOptions,
 ): Promise<AllIndexes> {
-  const blob = await adapter.read(tenant, STRATA_MARKER_KEY);
+  const blob = await adapter.read(tenant, options.markerKey);
   if (!blob) return {};
   const systemEntities = blob[MARKER_ENTITY_KEY] as Record<string, unknown> | undefined;
   if (!systemEntities) return {};
@@ -20,8 +21,9 @@ export async function saveAllIndexes(
   adapter: BlobAdapter,
   tenant: Tenant | undefined,
   indexes: AllIndexes,
+  options: ResolvedStrataOptions,
 ): Promise<void> {
-  const existing = await adapter.read(tenant, STRATA_MARKER_KEY);
+  const existing = await adapter.read(tenant, options.markerKey);
   let markerData: Record<string, unknown>;
   if (existing) {
     const systemEntities = existing[MARKER_ENTITY_KEY] as Record<string, unknown> | undefined;
@@ -34,7 +36,7 @@ export async function saveAllIndexes(
     [MARKER_ENTITY_KEY]: { marker: markerData },
     deleted: {},
   };
-  await adapter.write(tenant, STRATA_MARKER_KEY, blob);
+  await adapter.write(tenant, options.markerKey, blob);
 }
 
 export function updatePartitionIndexEntry(

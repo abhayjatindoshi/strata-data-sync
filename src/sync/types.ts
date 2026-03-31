@@ -84,8 +84,8 @@ export type SyncEngine = {
 };
 
 export type SyncSchedulerOptions = {
-  readonly localFlushIntervalMs?: number;
-  readonly cloudSyncIntervalMs?: number;
+  readonly localFlushIntervalMs: number;
+  readonly cloudSyncIntervalMs: number;
   readonly dirtyTracker?: DirtyTracker;
 };
 
