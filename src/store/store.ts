@@ -2,6 +2,7 @@ import type { Hlc } from '@strata/hlc';
 import type { Tenant } from '@strata/adapter';
 import type { PartitionBlob } from '@strata/persistence';
 import { partitionHash } from '@strata/persistence';
+import { parseCompositeKey } from '@strata/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type { EntityStore } from './types';
 
@@ -102,9 +103,9 @@ export class Store implements EntityStore {
     if (key === this.markerKey) {
       return this.buildMarkerBlob();
     }
-    const dotIndex = key.indexOf('.');
-    if (dotIndex < 0) return null;
-    const entityName = key.substring(0, dotIndex);
+    const parsed = parseCompositeKey(key);
+    if (!parsed) return null;
+    const entityName = parsed.entityName;
     const partition = this.getPartition(key);
     if (partition.size === 0 && this.getTombstones(key).size === 0) {
       return null;
@@ -128,9 +129,9 @@ export class Store implements EntityStore {
       this.storedMarkerBlob = data;
       return;
     }
-    const dotIndex = key.indexOf('.');
-    if (dotIndex < 0) return;
-    const entityName = key.substring(0, dotIndex);
+    const parsed = parseCompositeKey(key);
+    if (!parsed) return;
+    const entityName = parsed.entityName;
     const entities =
       (data[entityName] as Record<string, unknown> | undefined) ?? {};
     const deletedSection = data['deleted'] as Record<string, Record<string, Hlc>> | undefined;
@@ -169,10 +170,10 @@ export class Store implements EntityStore {
   private buildMarkerBlob(): PartitionBlob {
     const indexes: Record<string, Record<string, { hash: number; count: number; deletedCount: number; updatedAt: number }>> = {};
     for (const entityKey of this.partitions.keys()) {
-      const dotIndex = entityKey.indexOf('.');
-      if (dotIndex < 0) continue;
-      const entityName = entityKey.substring(0, dotIndex);
-      const partitionKey = entityKey.substring(dotIndex + 1);
+      const parsed = parseCompositeKey(entityKey);
+      if (!parsed) continue;
+      const entityName = parsed.entityName;
+      const partitionKey = parsed.rest;
 
       if (!indexes[entityName]) indexes[entityName] = {};
 

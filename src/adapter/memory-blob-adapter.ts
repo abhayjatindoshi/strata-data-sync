@@ -1,25 +1,22 @@
 import type { BlobAdapter, Tenant } from './types';
 import type { PartitionBlob } from '@strata/persistence';
+import { compositeKey } from '@strata/utils';
 
 export class MemoryBlobAdapter implements BlobAdapter {
   readonly kind = 'blob' as const;
   private readonly store = new Map<string, PartitionBlob>();
 
-  private compositeKey(tenant: Tenant | undefined, key: string): string {
-    return tenant ? `${tenant.id}:${key}` : key;
-  }
-
   async read(tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null> {
-    const data = this.store.get(this.compositeKey(tenant, key));
+    const data = this.store.get(compositeKey(tenant, key));
     return data !== undefined ? structuredClone(data) : null;
   }
 
   async write(tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void> {
-    this.store.set(this.compositeKey(tenant, key), structuredClone(data));
+    this.store.set(compositeKey(tenant, key), structuredClone(data));
   }
 
   async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
-    return this.store.delete(this.compositeKey(tenant, key));
+    return this.store.delete(compositeKey(tenant, key));
   }
 
   async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {

@@ -1,24 +1,21 @@
 import type { StorageAdapter, Tenant } from './types';
+import { compositeKey } from '@strata/utils';
 
 export class MemoryStorageAdapter implements StorageAdapter {
   readonly kind = 'storage' as const;
   private readonly store = new Map<string, Uint8Array>();
 
-  private compositeKey(tenant: Tenant | undefined, key: string): string {
-    return tenant ? `${tenant.id}:${key}` : key;
-  }
-
   async read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null> {
-    const data = this.store.get(this.compositeKey(tenant, key));
+    const data = this.store.get(compositeKey(tenant, key));
     return data !== undefined ? data.slice() : null;
   }
 
   async write(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<void> {
-    this.store.set(this.compositeKey(tenant, key), data.slice());
+    this.store.set(compositeKey(tenant, key), data.slice());
   }
 
   async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
-    return this.store.delete(this.compositeKey(tenant, key));
+    return this.store.delete(compositeKey(tenant, key));
   }
 
   async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {

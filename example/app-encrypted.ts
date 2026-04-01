@@ -1,6 +1,3 @@
-import { mkdir, readFile, writeFile, unlink, readdir, rm } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   Strata,
   AdapterBridge,
@@ -9,64 +6,14 @@ import {
   InvalidEncryptionKeyError,
   resolveOptions,
 } from 'strata-data-sync';
-import type { StorageAdapter, Tenant } from 'strata-data-sync';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ─── Filesystem StorageAdapter ───────────────────────────
-
-class FsStorageAdapter implements StorageAdapter {
-  readonly kind = 'storage' as const;
-
-  constructor(private readonly rootDir: string) {}
-
-  private resolvePath(tenant: Tenant | undefined, key: string): string {
-    return tenant
-      ? path.join(this.rootDir, tenant.id, key)
-      : path.join(this.rootDir, key);
-  }
-
-  async read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null> {
-    try {
-      return await readFile(this.resolvePath(tenant, key));
-    } catch {
-      return null;
-    }
-  }
-
-  async write(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<void> {
-    const filePath = this.resolvePath(tenant, key);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, data);
-  }
-
-  async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
-    try {
-      await unlink(this.resolvePath(tenant, key));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-    const dir = tenant ? path.join(this.rootDir, tenant.id) : this.rootDir;
-    try {
-      const entries = await readdir(dir);
-      return entries.filter(e => e.startsWith(prefix));
-    } catch {
-      return [];
-    }
-  }
-}
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir, printTree } from './common';
 
 type Note = { title: string; body: string };
 const NoteDef = defineEntity<Note>('note');
 
 async function main() {
-  const tmpDir = path.join(__dirname, '.tmp-encrypted');
-  await rm(tmpDir, { recursive: true, force: true });
+  const tmpDir = tmpDirFor('app-encrypted');
+  await cleanTmpDir(tmpDir);
 
   const storage = new FsStorageAdapter(tmpDir);
   const encryptionService = new EncryptionTransformService(resolveOptions());
@@ -142,16 +89,6 @@ async function main() {
   await printTree(tmpDir);
 
   console.log('\nDone.');
-}
-
-async function printTree(dir: string, indent = ''): Promise<void> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    console.log(`${indent}${entry.isDirectory() ? '📁' : '📄'} ${entry.name}`);
-    if (entry.isDirectory()) {
-      await printTree(path.join(dir, entry.name), indent + '  ');
-    }
-  }
 }
 
 main();

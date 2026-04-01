@@ -1,85 +1,17 @@
-import { mkdir, readFile, writeFile, unlink, readdir, rm } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
-import type { StorageAdapter, Tenant } from 'strata-data-sync';
-
-// ─── __dirname for ESM ───────────────────────────────────
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ─── Filesystem StorageAdapter ───────────────────────────
-
-class FsStorageAdapter implements StorageAdapter {
-  readonly kind = 'storage' as const;
-
-  constructor(private readonly rootDir: string) {}
-
-  private resolvePath(tenant: Tenant | undefined, key: string): string {
-    const container = tenant?.meta?.container as string | undefined;
-    return container
-      ? path.join(this.rootDir, container, key)
-      : path.join(this.rootDir, key);
-  }
-
-  async read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null> {
-    try {
-      return await readFile(this.resolvePath(tenant, key));
-    } catch {
-      return null;
-    }
-  }
-
-  async write(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<void> {
-    const filePath = this.resolvePath(tenant, key);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, data);
-  }
-
-  async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
-    try {
-      await unlink(this.resolvePath(tenant, key));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-    const container = tenant?.meta?.container as string | undefined;
-    const dir = container ? path.join(this.rootDir, container) : this.rootDir;
-    try {
-      const entries = await readdir(dir);
-      return entries.filter(e => e.startsWith(prefix));
-    } catch {
-      return [];
-    }
-  }
-}
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir, printTree } from './common';
 
 // ─── Entity ──────────────────────────────────────────────
 
 const Task = defineEntity<{ title: string; done: boolean }>('task');
 
-// ─── Helpers ─────────────────────────────────────────────
-
-async function printTree(dir: string, indent = ''): Promise<void> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    console.log(`${indent}${entry.isDirectory() ? '📁' : '📄'} ${entry.name}`);
-    if (entry.isDirectory()) {
-      await printTree(path.join(dir, entry.name), indent + '  ');
-    }
-  }
-}
-
 // ─── Main ────────────────────────────────────────────────
 
 async function main() {
-  const tmpDir = path.join(__dirname, '.tmp');
+  const tmpDir = tmpDirFor('app-persistent');
 
   // Clean up from any previous run
-  await rm(tmpDir, { recursive: true, force: true });
+  await cleanTmpDir(tmpDir);
 
   const storage = new FsStorageAdapter(tmpDir);
   const adapter = new AdapterBridge(storage);
@@ -95,7 +27,7 @@ async function main() {
 
   const tenant = await db1.tenants.create({
     name: 'My Workspace',
-    meta: { container: 'workspace' },
+    meta: {},
   });
 
   await db1.tenants.open(tenant.id);

@@ -1,16 +1,5 @@
 import type { StorageAdapter, Tenant } from './types';
-
-function compositeKey(tenant: Tenant | undefined, key: string): string {
-  return tenant ? `${tenant.id}:${key}` : key;
-}
-
-function toBase64(data: Uint8Array): string {
-  return btoa(String.fromCharCode(...data));
-}
-
-function fromBase64(base64: string): Uint8Array {
-  return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-}
+import { compositeKey, toBase64, fromBase64 } from '@strata/utils';
 
 export class LocalStorageAdapter implements StorageAdapter {
   readonly kind = 'storage' as const;

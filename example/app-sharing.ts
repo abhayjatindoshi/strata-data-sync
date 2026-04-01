@@ -1,9 +1,11 @@
 import {
   Strata,
   MemoryBlobAdapter,
+  AdapterBridge,
   defineEntity,
   saveTenantPrefs,
 } from 'strata-data-sync';
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 // ── Entity ───────────────────────────────────────────────
 
@@ -23,11 +25,15 @@ const deriveTenantId = (meta: Record<string, unknown>) =>
 async function main() {
   console.log('=== Tenant Sharing Demo ===\n');
 
+  const dataDir = tmpDirFor('app-sharing');
+  await cleanTmpDir(dataDir);
+
   // ─── User A: create workspace and add tasks ───────────
 
   console.log('--- User A: Creating workspace ---');
 
-  const localA = new MemoryBlobAdapter();
+  const storageA = new FsStorageAdapter(dataDir + '-deviceA');
+  const localA = new AdapterBridge(storageA);
   const strataA = new Strata({
     appId: 'sharing-demo',
     entities: [TaskDef],
@@ -68,7 +74,8 @@ async function main() {
 
   console.log('--- User B: Joining workspace ---');
 
-  const localB = new MemoryBlobAdapter();
+  const storageB = new FsStorageAdapter(dataDir + '-deviceB');
+  const localB = new AdapterBridge(storageB);
   const strataB = new Strata({
     appId: 'sharing-demo',
     entities: [TaskDef],

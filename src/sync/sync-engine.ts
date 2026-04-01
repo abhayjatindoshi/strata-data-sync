@@ -5,6 +5,7 @@ import { tick } from '@strata/hlc';
 import type { EntityEventBus } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { BlobMigration } from '@strata/schema/migration';
+import { parseCompositeKey } from '@strata/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type {
   SyncLocation, SyncQueueItem, SyncEventListener, SyncEvent,
@@ -170,7 +171,7 @@ export class SyncEngine {
   private emitEntityChanges(changes: ReadonlyArray<SyncEntityChange>): void {
     const names = new Set<string>();
     for (const c of changes) {
-      names.add(c.key.substring(0, c.key.indexOf('.')));
+      names.add(parseCompositeKey(c.key)!.entityName);
     }
     for (const name of names) {
       this.eventBus.emit({ entityName: name, fromSync: true });

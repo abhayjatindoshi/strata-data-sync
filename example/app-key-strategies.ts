@@ -1,4 +1,5 @@
-import { Strata, MemoryBlobAdapter, defineEntity, partitioned } from 'strata-data-sync';
+import { Strata, AdapterBridge, defineEntity, partitioned } from 'strata-data-sync';
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 // ─── Entity types ────────────────────────────────────────
 
@@ -22,10 +23,16 @@ const Settings = defineEntity<Settings>('settings', {
 // ─── Main ────────────────────────────────────────────────
 
 async function main() {
+  const dataDir = tmpDirFor('app-key-strategies');
+  await cleanTmpDir(dataDir);
+
+  const storage = new FsStorageAdapter(dataDir);
+  const adapter = new AdapterBridge(storage);
+
   const db = new Strata({
     appId: 'key-strategies-demo',
     entities: [Task, Note, Settings],
-    localAdapter: new MemoryBlobAdapter(),
+    localAdapter: adapter,
     deviceId: 'device-1',
   });
 

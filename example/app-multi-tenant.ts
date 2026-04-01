@@ -1,13 +1,20 @@
-import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 type Task = { title: string; done: boolean };
 const TaskDef = defineEntity<Task>('task');
 
 async function main() {
+  const dataDir = tmpDirFor('app-multi-tenant');
+  await cleanTmpDir(dataDir);
+
+  const storage = new FsStorageAdapter(dataDir);
+  const adapter = new AdapterBridge(storage);
+
   const strata = new Strata({
     appId: 'multi-tenant-demo',
     entities: [TaskDef],
-    localAdapter: new MemoryBlobAdapter(),
+    localAdapter: adapter,
     deviceId: 'device-1',
   });
 

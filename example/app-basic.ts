@@ -1,4 +1,5 @@
-import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 // ─── Define a Task entity ────────────────────────────────
 type Task = { title: string; done: boolean };
@@ -7,11 +8,17 @@ const taskDef = defineEntity<Task>('task');
 
 // ─── Main ────────────────────────────────────────────────
 async function main() {
-  // Create a Strata instance backed by in-memory storage
+  const dataDir = tmpDirFor('app-basic');
+  await cleanTmpDir(dataDir);
+
+  const storage = new FsStorageAdapter(dataDir);
+  const adapter = new AdapterBridge(storage);
+
+  // Create a Strata instance backed by file storage
   const strata = new Strata({
     appId: 'demo',
     entities: [taskDef],
-    localAdapter: new MemoryBlobAdapter(),
+    localAdapter: adapter,
     deviceId: 'device-1',
   });
 

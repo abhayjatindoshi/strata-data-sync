@@ -1,18 +1,25 @@
-import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, MemoryBlobAdapter, AdapterBridge, defineEntity } from 'strata-data-sync';
 import type { SyncEvent } from 'strata-data-sync';
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 type Task = { title: string; done: boolean };
 
 const taskDef = defineEntity<Task>('task');
 
 async function main() {
+  const dataDir = tmpDirFor('app-sync');
+  await cleanTmpDir(dataDir);
+
   // Shared cloud adapter simulates remote storage both devices sync to
   const cloudAdapter = new MemoryBlobAdapter();
+
+  const storage1 = new FsStorageAdapter(dataDir + '-device1');
+  const storage2 = new FsStorageAdapter(dataDir + '-device2');
 
   const device1 = new Strata({
     appId: 'demo',
     entities: [taskDef],
-    localAdapter: new MemoryBlobAdapter(),
+    localAdapter: new AdapterBridge(storage1),
     cloudAdapter,
     deviceId: 'device-1',
   });
@@ -20,7 +27,7 @@ async function main() {
   const device2 = new Strata({
     appId: 'demo',
     entities: [taskDef],
-    localAdapter: new MemoryBlobAdapter(),
+    localAdapter: new AdapterBridge(storage2),
     cloudAdapter,
     deviceId: 'device-2',
   });

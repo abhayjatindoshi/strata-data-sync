@@ -10,6 +10,7 @@ import type { EntityStore } from '@strata/store';
 import type { ResolvedStrataOptions } from '../options';
 import type { SyncEngineType, DirtyTrackerType, SyncScheduler as SyncSchedulerType } from '@strata/sync';
 import { SyncScheduler } from '@strata/sync';
+import { generateId } from '@strata/utils';
 import type {
   Tenant,
   ProbeResult,
@@ -22,17 +23,6 @@ import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-bl
 import { loadTenantPrefs } from './tenant-prefs';
 
 const log = debug('strata:tenant');
-
-const ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-const ID_LENGTH = 8;
-
-function generateTenantId(): string {
-  let id = '';
-  for (let i = 0; i < ID_LENGTH; i++) {
-    id += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
-  }
-  return id;
-}
 
 export type TenantManagerDeps = {
   readonly adapter: BlobAdapter;
@@ -77,7 +67,7 @@ export class TenantManager implements TenantManagerType {
     if (this.deps.deriveTenantId) {
       return this.deps.deriveTenantId(meta);
     }
-    return generateTenantId();
+    return generateId();
   }
 
   // ─── Cold ops ────────────────────────────────────────────

@@ -1,3 +1,5 @@
+import { toArrayBuffer } from '@strata/utils';
+
 // ─── Errors ──────────────────────────────────────────────
 
 export class InvalidEncryptionKeyError extends Error {
@@ -15,11 +17,6 @@ const ENCRYPTION_VERSION = 1;
 
 const textEncoder = new TextEncoder();
 
-function buf(data: Uint8Array): ArrayBuffer {
-  // Type assertion needed for TS 5.9 Uint8Array<ArrayBufferLike> vs Web Crypto BufferSource
-  return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
-}
-
 // ─── Key derivation ─────────────────────────────────────
 
 export async function deriveKey(
@@ -28,7 +25,7 @@ export async function deriveKey(
 ): Promise<CryptoKey> {
   const keyMaterial = await globalThis.crypto.subtle.importKey(
     'raw',
-    buf(textEncoder.encode(password)),
+    toArrayBuffer(textEncoder.encode(password)),
     'PBKDF2',
     false,
     ['deriveKey'],
@@ -36,7 +33,7 @@ export async function deriveKey(
   const salt = textEncoder.encode(appId);
 
   return globalThis.crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: buf(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: toArrayBuffer(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -63,7 +60,7 @@ export async function importDek(base64: string): Promise<CryptoKey> {
   const raw = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   return globalThis.crypto.subtle.importKey(
     'raw',
-    buf(raw),
+    toArrayBuffer(raw),
     { name: 'AES-GCM', length: 256 },
     true,
     ['encrypt', 'decrypt'],
@@ -78,9 +75,9 @@ export async function encrypt(
 ): Promise<Uint8Array> {
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const ciphertext = await globalThis.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: buf(iv) },
+    { name: 'AES-GCM', iv: toArrayBuffer(iv) },
     dek,
-    buf(data),
+    toArrayBuffer(data),
   );
   const result = new Uint8Array(1 + IV_LENGTH + ciphertext.byteLength);
   result[0] = ENCRYPTION_VERSION;
@@ -100,9 +97,9 @@ export async function decrypt(
   const iv = data.slice(1, 1 + IV_LENGTH);
   const ciphertext = data.slice(1 + IV_LENGTH);
   const plaintext = await globalThis.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: buf(iv) },
+    { name: 'AES-GCM', iv: toArrayBuffer(iv) },
     dek,
-    buf(ciphertext),
+    toArrayBuffer(ciphertext),
   );
   return new Uint8Array(plaintext);
 }

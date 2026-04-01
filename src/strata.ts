@@ -21,6 +21,7 @@ import type {
   SyncResult, SyncEventListener,
   SyncEngineType,
 } from '@strata/sync';
+import { assertNotDisposed } from '@strata/utils';
 
 const log = debug('strata:core');
 
@@ -130,22 +131,18 @@ export class Strata {
     this.eventBus.on(dirtyFlushListener);
   }
 
-  private assertNotDisposed(): void {
-    if (this.disposed) throw new Error('Strata instance is disposed');
-  }
-
   repo<T>(def: EntityDefinition<T, 'singleton'>): SingletonRepositoryType<T>;
   repo<T>(def: EntityDefinition<T, 'global' | 'partitioned'>): RepositoryType<T>;
   repo<T>(def: EntityDefinition<T>): RepositoryType<T> | SingletonRepositoryType<T>;
   repo<T>(def: EntityDefinition<T>): RepositoryType<T> | SingletonRepositoryType<T> {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Strata instance');
     const r = this.repoMap.get(def.name);
     if (!r) throw new Error(`Unknown entity definition: ${def.name}`);
     return r as RepositoryType<T> | SingletonRepositoryType<T>;
   }
 
   async sync(): Promise<SyncResult> {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Strata instance');
     const tenant = this.tenants.activeTenant$.getValue();
     if (!tenant) throw new Error('No tenant loaded');
     if (!this.config.cloudAdapter) throw new Error('No cloud adapter configured');

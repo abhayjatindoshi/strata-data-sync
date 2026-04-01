@@ -9,6 +9,7 @@ import type { EntityEventBus, EntityEventListener } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { Repository as RepositoryType, QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
+import { assertNotDisposed } from '@strata/utils';
 
 const log = debug('strata:repo');
 
@@ -56,12 +57,6 @@ export class Repository<T> {
     eventBus.on(this.listener);
   }
 
-  private assertNotDisposed(): void {
-    if (this.disposed) {
-      throw new Error('Repository is disposed');
-    }
-  }
-
   get(id: string): (T & BaseEntity) | undefined {
     const entityKey = parseEntityKey(id);
     return this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;
@@ -105,7 +100,7 @@ export class Repository<T> {
   }
 
   save(partial: T & Partial<BaseEntity>): string {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Repository');
     const id = this.saveToStore(partial);
     this.eventBus.emit({ entityName: this.definition.name });
     return id;
@@ -114,7 +109,7 @@ export class Repository<T> {
   saveMany(
     entities: ReadonlyArray<T & Partial<BaseEntity>>,
   ): ReadonlyArray<string> {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Repository');
     const ids = entities.map(entity => this.saveToStore(entity));
     if (ids.length > 0) {
       this.changeSignal.next();
@@ -136,7 +131,7 @@ export class Repository<T> {
   }
 
   delete(id: string): boolean {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Repository');
     const deleted = this.deleteFromStore(id);
     if (deleted) {
       this.eventBus.emit({ entityName: this.definition.name });
@@ -145,7 +140,7 @@ export class Repository<T> {
   }
 
   deleteMany(ids: ReadonlyArray<string>): void {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Repository');
     let anyDeleted = false;
     for (const id of ids) {
       if (this.deleteFromStore(id)) {
@@ -195,7 +190,7 @@ export class Repository<T> {
   }
 
   observe(id: string) {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Repository');
     return this.changeSignal.pipe(
       startWith(undefined as void),
       map(() => this.get(id)),
@@ -204,7 +199,7 @@ export class Repository<T> {
   }
 
   observeQuery(opts?: QueryOptions<T>) {
-    this.assertNotDisposed();
+    assertNotDisposed(this.disposed, 'Repository');
     return this.changeSignal.pipe(
       startWith(undefined as void),
       map(() => this.query(opts)),

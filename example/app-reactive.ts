@@ -1,5 +1,6 @@
-import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
 import { Subscription } from 'rxjs';
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 type Task = { title: string; done: boolean };
 
@@ -8,10 +9,16 @@ const TaskDef = defineEntity<Task>('task');
 const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 async function main() {
+  const dataDir = tmpDirFor('app-reactive');
+  await cleanTmpDir(dataDir);
+
+  const storage = new FsStorageAdapter(dataDir);
+  const adapter = new AdapterBridge(storage);
+
   const strata = new Strata({
     appId: 'reactive-demo',
     entities: [TaskDef],
-    localAdapter: new MemoryBlobAdapter(),
+    localAdapter: adapter,
     deviceId: 'device-1',
   });
 

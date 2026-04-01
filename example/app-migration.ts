@@ -1,8 +1,13 @@
-import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
 import type { BlobMigration } from 'strata-data-sync';
+import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 async function main() {
-  const adapter = new MemoryBlobAdapter();
+  const dataDir = tmpDirFor('app-migration');
+  await cleanTmpDir(dataDir);
+
+  const storage = new FsStorageAdapter(dataDir);
+  const adapter = new AdapterBridge(storage);
 
   // ── Phase 1 — Save data WITHOUT migrations ──────────────
 
