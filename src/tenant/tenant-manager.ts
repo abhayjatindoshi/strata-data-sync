@@ -8,7 +8,8 @@ import {
 } from '@strata/adapter/encryption';
 import type { EntityStore } from '@strata/store';
 import type { ResolvedStrataOptions } from '../options';
-import type { SyncEngineType, DirtyTrackerType, SyncScheduler as SyncSchedulerType } from '@strata/sync';
+import type { SyncEngineType, SyncScheduler as SyncSchedulerType } from '@strata/sync';
+import type { ReactiveFlag } from '@strata/utils';
 import { SyncScheduler } from '@strata/sync';
 import { generateId } from '@strata/utils';
 import type {
@@ -29,7 +30,7 @@ export type TenantManagerDeps = {
   readonly cloudAdapter?: BlobAdapter;
   readonly syncEngine: SyncEngineType;
   readonly store: EntityStore;
-  readonly dirtyTracker: DirtyTrackerType;
+  readonly dirtyTracker: ReactiveFlag;
   readonly encryptionService: EncryptionTransformService;
   readonly options: ResolvedStrataOptions;
   readonly appId: string;
@@ -289,7 +290,7 @@ export class TenantManager implements TenantManagerType {
     await this.deps.syncEngine.drain();
 
     this.deps.store.clear();
-    this.deps.dirtyTracker.clearDirty();
+    this.deps.dirtyTracker.clear();
     this.deps.encryptionService.clear();
     this.subject.next(undefined);
 

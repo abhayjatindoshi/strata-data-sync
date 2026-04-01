@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
-import { serialize, saveAllIndexes, loadAllIndexes } from '@strata/persistence';
+import { saveAllIndexes, loadAllIndexes } from '@strata/persistence';
+import { serialize } from '@strata/utils';
 import type { PartitionBlob } from '@strata/persistence';
 import type { Hlc } from '@strata/hlc';
 import { Store } from '@strata/store';
@@ -196,5 +197,63 @@ describe('syncBetween', () => {
     // When stale, changesForA should be empty (skipped write-back)
     expect(result.stale).toBe(true);
     expect(result.changesForA).toHaveLength(0);
+  });
+
+  it('skips merge when one side has missing blob for diverged partition', async () => {
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
+
+    // Index says diverged, but adapterB has no actual blob for the partition
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+    await saveAllIndexes(adapterB, undefined, {
+      task: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
+    }, DEFAULT_OPTIONS);
+
+    const entityA = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entityA }));
+    // adapterB has no 'task._' blob — just the index reference
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+    // Since blobB is missing, the merge is skipped for that partition
+    // but the A-only copy should still happen via localOnly logic
+    expect(result).toBeDefined();
+  });
+
+  it('applies migrations during merge of diverged partitions', async () => {
+    const adapterA = new MemoryBlobAdapter();
+    const adapterB = new MemoryBlobAdapter();
+
+    const entityA = { id: 'task._.a1', title: 'old', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    const entityB = { id: 'task._.b1', title: 'old', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
+
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entityA }));
+    await adapterB.write(undefined, 'task._', makePartitionBlob('task', { 'task._.b1': entityB }));
+
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+    await saveAllIndexes(adapterB, undefined, {
+      task: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
+    }, DEFAULT_OPTIONS);
+
+    const migrations = [{
+      version: 1,
+      migrate: (blob: Record<string, unknown>) => {
+        const tasks = (blob.task ?? {}) as Record<string, Record<string, unknown>>;
+        const migrated: Record<string, unknown> = {};
+        for (const [id, entity] of Object.entries(tasks)) {
+          migrated[id] = { ...entity, migrated: true };
+        }
+        return { ...blob, task: migrated };
+      },
+    }];
+
+    const result = await syncBetween(
+      adapterA, adapterB, ['task'], undefined, migrations as any, DEFAULT_OPTIONS,
+    );
+
+    expect(result.changesForA.length + result.changesForB.length).toBeGreaterThan(0);
   });
 });

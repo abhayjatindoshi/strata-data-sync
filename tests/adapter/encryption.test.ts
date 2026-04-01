@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { MemoryStorageAdapter, MemoryBlobAdapter, AdapterBridge } from '@strata/adapter';
 import { EncryptionTransformService, createEncryptedMarkerDek } from '@strata/adapter/encryption';
 import { InvalidEncryptionKeyError, encrypt, generateDek, exportDek } from '@strata/adapter/crypto';
-import { serialize, deserialize } from '@strata/persistence';
+import { serialize, deserialize } from '@strata/utils';
 import type { PartitionBlob } from '@strata/persistence';
 
 describe('EncryptionTransformService', () => {

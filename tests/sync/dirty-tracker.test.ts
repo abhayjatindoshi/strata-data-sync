@@ -1,56 +1,56 @@
 import { describe, it, expect } from 'vitest';
-import { DirtyTracker } from '@strata/sync';
+import { ReactiveFlag } from '@strata/utils';
 
-describe('DirtyTracker', () => {
-  it('starts not dirty', () => {
-    const tracker = new DirtyTracker();
-    expect(tracker.isDirty).toBe(false);
+describe('ReactiveFlag', () => {
+  it('starts with initial value false', () => {
+    const tracker = new ReactiveFlag();
+    expect(tracker.value).toBe(false);
   });
 
-  it('markDirty sets isDirty to true', () => {
-    const tracker = new DirtyTracker();
-    tracker.markDirty();
-    expect(tracker.isDirty).toBe(true);
+  it('set() sets value to true', () => {
+    const tracker = new ReactiveFlag();
+    tracker.set();
+    expect(tracker.value).toBe(true);
   });
 
-  it('clearDirty sets isDirty to false', () => {
-    const tracker = new DirtyTracker();
-    tracker.markDirty();
-    tracker.clearDirty();
-    expect(tracker.isDirty).toBe(false);
+  it('clear() sets value to false', () => {
+    const tracker = new ReactiveFlag();
+    tracker.set();
+    tracker.clear();
+    expect(tracker.value).toBe(false);
   });
 
-  it('isDirty$ emits initial false', () => {
-    const tracker = new DirtyTracker();
+  it('value$ emits initial false', () => {
+    const tracker = new ReactiveFlag();
     const values: boolean[] = [];
-    const sub = tracker.isDirty$.subscribe(v => values.push(v));
+    const sub = tracker.value$.subscribe(v => values.push(v));
 
     expect(values).toEqual([false]);
     sub.unsubscribe();
   });
 
-  it('isDirty$ emits on state change', () => {
-    const tracker = new DirtyTracker();
+  it('value$ emits on state change', () => {
+    const tracker = new ReactiveFlag();
     const values: boolean[] = [];
-    const sub = tracker.isDirty$.subscribe(v => values.push(v));
+    const sub = tracker.value$.subscribe(v => values.push(v));
 
-    tracker.markDirty();
-    tracker.clearDirty();
+    tracker.set();
+    tracker.clear();
 
     expect(values).toEqual([false, true, false]);
     sub.unsubscribe();
   });
 
-  it('isDirty$ uses distinctUntilChanged — no duplicate emissions', () => {
-    const tracker = new DirtyTracker();
+  it('value$ uses distinctUntilChanged — no duplicate emissions', () => {
+    const tracker = new ReactiveFlag();
     const values: boolean[] = [];
-    const sub = tracker.isDirty$.subscribe(v => values.push(v));
+    const sub = tracker.value$.subscribe(v => values.push(v));
 
-    tracker.markDirty();
-    tracker.markDirty();
-    tracker.markDirty();
-    tracker.clearDirty();
-    tracker.clearDirty();
+    tracker.set();
+    tracker.set();
+    tracker.set();
+    tracker.clear();
+    tracker.clear();
 
     expect(values).toEqual([false, true, false]);
     sub.unsubscribe();

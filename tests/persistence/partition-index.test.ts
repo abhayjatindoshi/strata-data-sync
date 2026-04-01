@@ -10,6 +10,23 @@ describe('Partition Index', () => {
     expect(indexes).toEqual({});
   });
 
+  it('loadAllIndexes returns empty when blob has no __system key', async () => {
+    const adapter = new MemoryBlobAdapter();
+    await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, { deleted: {} });
+    const indexes = await loadAllIndexes(adapter, undefined, DEFAULT_OPTIONS);
+    expect(indexes).toEqual({});
+  });
+
+  it('loadAllIndexes returns empty when marker has no indexes', async () => {
+    const adapter = new MemoryBlobAdapter();
+    await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, {
+      __system: { marker: { version: 1 } },
+      deleted: {},
+    });
+    const indexes = await loadAllIndexes(adapter, undefined, DEFAULT_OPTIONS);
+    expect(indexes).toEqual({});
+  });
+
   it('save and load round-trip', async () => {
     const adapter = new MemoryBlobAdapter();
     const indexes = {
@@ -62,5 +79,29 @@ describe('Partition Index', () => {
       expect(result['2026-02']).toEqual(index['2026-02']);
       vi.restoreAllMocks();
     });
+  });
+
+  it('saveAllIndexes merges with existing marker data', async () => {
+    const adapter = new MemoryBlobAdapter();
+    await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, {
+      __system: { marker: { version: 1, createdAt: new Date(), entityTypes: ['task'] } },
+      deleted: {},
+    });
+    const indexes = { task: { '_': { hash: 123, count: 1, deletedCount: 0, updatedAt: 1000 } } };
+    await saveAllIndexes(adapter, undefined, indexes, DEFAULT_OPTIONS);
+    const loaded = await loadAllIndexes(adapter, undefined, DEFAULT_OPTIONS);
+    expect(loaded.task?.['_']?.hash).toBe(123);
+  });
+
+  it('saveAllIndexes creates default marker when __system.marker missing', async () => {
+    const adapter = new MemoryBlobAdapter();
+    await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, {
+      __system: {},
+      deleted: {},
+    });
+    const indexes = { task: { '_': { hash: 456, count: 2, deletedCount: 0, updatedAt: 2000 } } };
+    await saveAllIndexes(adapter, undefined, indexes, DEFAULT_OPTIONS);
+    const loaded = await loadAllIndexes(adapter, undefined, DEFAULT_OPTIONS);
+    expect(loaded.task?.['_']?.hash).toBe(456);
   });
 });

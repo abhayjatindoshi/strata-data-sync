@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
 import { EncryptionTransformService } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
-import type { SyncEngineType, DirtyTrackerType } from '@strata/sync';
+import type { SyncEngineType } from '@strata/sync';
+import type { ReactiveFlag } from '@strata/utils';
 import type { EntityStore } from '@strata/store';
 import { loadTenantList, saveTenantList, TenantManager } from '@strata/tenant';
 import type { TenantManagerDeps } from '@strata/tenant';
@@ -24,7 +25,7 @@ function makeDeps(adapter: MemoryBlobAdapter, overrides?: Partial<TenantManagerD
     adapter,
     syncEngine: stubSyncEngine(),
     store: { clear: () => {} } as unknown as EntityStore,
-    dirtyTracker: { isDirty: false, isDirty$: { pipe: () => ({}) }, markDirty: () => {}, clearDirty: () => {} } as unknown as DirtyTrackerType,
+    dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
     encryptionService: new EncryptionTransformService({ tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
@@ -36,6 +37,13 @@ function makeDeps(adapter: MemoryBlobAdapter, overrides?: Partial<TenantManagerD
 describe('tenant list persistence', () => {
   it('loadTenantList returns empty array when no blob', async () => {
     const adapter = new MemoryBlobAdapter();
+    const list = await loadTenantList(adapter, DEFAULT_OPTIONS);
+    expect(list).toEqual([]);
+  });
+
+  it('loadTenantList returns empty when blob has no __tenants key', async () => {
+    const adapter = new MemoryBlobAdapter();
+    await adapter.write(undefined, DEFAULT_OPTIONS.tenantKey, { deleted: {} });
     const list = await loadTenantList(adapter, DEFAULT_OPTIONS);
     expect(list).toEqual([]);
   });
@@ -71,6 +79,54 @@ describe('TenantManager', () => {
       const tm = new TenantManager(makeDeps(adapter));
       const list = await tm.list();
       expect(list).toEqual([]);
+    });
+  });
+
+  describe('probe', () => {
+    it('returns exists: false when no marker found', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(makeDeps(adapter));
+      const result = await tm.probe({ meta: { folder: 'missing' } });
+      expect(result.exists).toBe(false);
+    });
+
+    it('returns exists: true with unencrypted marker', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'probe-id' }));
+      const tempTenant = { id: 'probe-id', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
+      await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, {
+        __system: { marker: { version: 1, createdAt: new Date().toISOString(), entityTypes: [] } },
+        deleted: {},
+      });
+      const result = await tm.probe({ meta: {} });
+      expect(result.exists).toBe(true);
+      expect(result.encrypted).toBe(false);
+      expect(result.tenantId).toBe('probe-id');
+    });
+
+    it('returns encrypted: true when read throws (parse failure)', async () => {
+      const adapter = new MemoryBlobAdapter();
+      // Make read throw to simulate encrypted data parse failure
+      const failAdapter = {
+        ...adapter,
+        kind: 'blob' as const,
+        read: async (tenant: Tenant | undefined, key: string) => {
+          if (key === DEFAULT_OPTIONS.markerKey && tenant?.id === 'fail-id') {
+            throw new Error('decrypt failed');
+          }
+          return adapter.read(tenant, key);
+        },
+        write: adapter.write.bind(adapter),
+        delete: adapter.delete.bind(adapter),
+        list: adapter.list.bind(adapter),
+      };
+      const tm = new TenantManager(makeDeps(adapter, {
+        adapter: failAdapter,
+        deriveTenantId: () => 'fail-id',
+      }));
+      const result = await tm.probe({ meta: {} });
+      expect(result.exists).toBe(true);
+      expect(result.encrypted).toBe(true);
     });
   });
 
@@ -197,6 +253,39 @@ describe('TenantManager', () => {
       const tenant = await tm.join({ meta: {} });
       expect(tenant.name).toBe('Shared Workspace');
     });
+
+    it('throws for incompatible workspace version', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const marker = { version: 99, createdAt: new Date().toISOString(), entityTypes: [] };
+      const tempTenant: Tenant = { id: 'bad-ver', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
+      await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
+
+      const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'bad-ver' }));
+      await expect(tm.join({ meta: {} })).rejects.toThrow('Incompatible strata workspace version');
+    });
+
+    it('detects encrypted workspace via parse failure during join', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const failAdapter = {
+        ...adapter,
+        kind: 'blob' as const,
+        read: async (tenant: Tenant | undefined, key: string) => {
+          if (key === DEFAULT_OPTIONS.markerKey && tenant?.id === 'enc-join') {
+            throw new Error('decrypt failed');
+          }
+          return adapter.read(tenant, key);
+        },
+        write: adapter.write.bind(adapter),
+        delete: adapter.delete.bind(adapter),
+        list: adapter.list.bind(adapter),
+      };
+      const tm = new TenantManager(makeDeps(adapter, {
+        adapter: failAdapter,
+        deriveTenantId: () => 'enc-join',
+      }));
+      const tenant = await tm.join({ meta: {} });
+      expect(tenant.encrypted).toBe(true);
+    });
   });
 
   describe('remove', () => {
@@ -253,6 +342,115 @@ describe('TenantManager', () => {
       const adapter = new MemoryBlobAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await expect(tm.remove('unknown', { purge: true })).resolves.toBeUndefined();
+    });
+  });
+
+  describe('open - encrypted tenant edge cases', () => {
+    it('throws when encrypted marker is missing DEK', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(makeDeps(adapter));
+
+      // Create tenant as encrypted
+      const now = new Date();
+      const tenant: Tenant = { id: 'enc1', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
+      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
+
+      // Write marker without DEK
+      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, {
+        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [] } },
+        deleted: {},
+      });
+
+      await expect(tm.open('enc1', { password: 'test' })).rejects.toThrow('Encrypted marker missing DEK');
+      expect(tm.activeTenant$.getValue()).toBeUndefined();
+    });
+
+    it('throws when no password provided for encrypted tenant', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(makeDeps(adapter));
+
+      const now = new Date();
+      const tenant: Tenant = { id: 'enc2', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
+      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
+
+      await expect(tm.open('enc2')).rejects.toThrow('Password required');
+      expect(tm.activeTenant$.getValue()).toBeUndefined();
+    });
+  });
+
+  describe('open - cloud adapter', () => {
+    it('emits cloud-unreachable when cloud sync fails', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const emittedEvents: string[] = [];
+      const syncEngine = {
+        ...stubSyncEngine(),
+        sync: async (source: string, target: string) => {
+          if (source === 'cloud') throw new Error('network error');
+          return { result: { changesForA: [], changesForB: [], stale: false, maxHlc: undefined }, deduplicated: false };
+        },
+        emit: (event: { type: string }) => { emittedEvents.push(event.type); },
+      };
+      const cloudAdapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(makeDeps(adapter, { syncEngine: syncEngine as unknown as SyncEngineType, cloudAdapter }));
+
+      const now = new Date();
+      const tenant: Tenant = { id: 'c1', name: 'Cloud', encrypted: false, meta: {}, createdAt: now, updatedAt: now };
+      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
+      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, {
+        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [] } },
+        deleted: {},
+      });
+
+      await tm.open('c1');
+      expect(emittedEvents).toContain('cloud-unreachable');
+    });
+  });
+
+  describe('changePassword', () => {
+    it('throws when no tenant is loaded', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(makeDeps(adapter));
+      await expect(tm.changePassword('old', 'new')).rejects.toThrow('No tenant loaded');
+    });
+
+    it('throws when tenant is not encrypted', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const tm = new TenantManager(makeDeps(adapter));
+      await tm.create({ name: 'T', meta: {}, id: 'plain' });
+      await tm.open('plain');
+      await expect(tm.changePassword('old', 'new')).rejects.toThrow('Current tenant is not encrypted');
+    });
+
+    it('error recovery restores encryption service on failure', async () => {
+      const adapter = new MemoryBlobAdapter();
+      const now = new Date();
+      const tenant: Tenant = { id: 'enc-cp', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
+      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
+
+      // Write marker with dek field so readMarkerBlob returns valid marker
+      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, {
+        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [], dek: 'fakeDek' } },
+        deleted: {},
+      });
+
+      let setupCallCount = 0;
+      const mockEncService = {
+        setup: async () => { setupCallCount++; },
+        setDek: () => {},
+        clear: () => {},
+        toTransform: () => ({ encode: async (_t: unknown, _k: unknown, d: Uint8Array) => d, decode: async (_t: unknown, _k: unknown, d: Uint8Array) => d }),
+      } as unknown as EncryptionTransformService;
+
+      const tm = new TenantManager(makeDeps(adapter, { encryptionService: mockEncService }));
+
+      // Manually set active tenant to encrypted tenant (bypass open which needs real crypto)
+      (tm as any).subject.next(tenant);
+
+      // importDek will throw since 'fakeDek' is not valid base64 → enters catch block
+      await expect(tm.changePassword('old', 'new')).rejects.toThrow();
+
+      // Verify error recovery called setup again (restore with old password)
+      expect(setupCallCount).toBeGreaterThanOrEqual(3); // setup(old), setup(new), setup(old) recovery
     });
   });
 });

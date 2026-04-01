@@ -141,5 +141,36 @@ describe('Schema migration', () => {
       expect(entity.v3).toBe(true);
       expect(result.__v).toBe(3);
     });
+
+    it('filters by entityName when entities array is provided', () => {
+      const blob: PartitionBlob = {
+        __v: 0,
+        task: { id1: { id: 'id1' } },
+        deleted: {},
+      };
+      const taskDef = { name: 'task' } as any;
+      const noteDef = { name: 'note' } as any;
+      const migrations: BlobMigration[] = [
+        { version: 1, entities: [taskDef], migrate: (b) => ({ ...b, taskMigrated: true }) },
+        { version: 2, entities: [noteDef], migrate: (b) => ({ ...b, noteMigrated: true }) },
+      ];
+      const result = migrateBlob(blob, migrations, 'task');
+      expect((result as Record<string, unknown>).taskMigrated).toBe(true);
+      expect((result as Record<string, unknown>).noteMigrated).toBeUndefined();
+      expect(result.__v).toBe(1);
+    });
+
+    it('includes migration without entities filter when entityName specified', () => {
+      const blob: PartitionBlob = {
+        __v: 0,
+        task: {},
+        deleted: {},
+      };
+      const migrations: BlobMigration[] = [
+        { version: 1, migrate: (b) => ({ ...b, applied: true }) },
+      ];
+      const result = migrateBlob(blob, migrations, 'task');
+      expect((result as Record<string, unknown>).applied).toBe(true);
+    });
   });
 });

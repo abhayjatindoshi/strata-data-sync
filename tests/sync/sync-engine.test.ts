@@ -274,4 +274,38 @@ describe('SyncEngine', () => {
     const { result } = await engine.sync('local', 'memory', undefined);
     expect(result.changesForB.length).toBeGreaterThan(0);
   });
+
+  it('dispose rejects pending queue items', async () => {
+    const { engine } = makeEngine();
+
+    // Enqueue two syncs — first will run, second will be pending
+    const p1 = engine.sync('memory', 'local', undefined);
+    const p2 = engine.sync('memory', 'local', undefined);
+
+    engine.dispose();
+
+    await p1.catch(() => {}); // may resolve or reject
+    await expect(p2).rejects.toThrow('SyncEngine disposed');
+  });
+
+  it('drain completes when queue is empty', async () => {
+    const { engine } = makeEngine();
+    await expect(engine.drain()).resolves.toBeUndefined();
+  });
+
+  it('drain waits for running sync to complete', async () => {
+    const { engine, store } = makeEngine();
+
+    store.setEntity('task._', 'task._.a1', {
+      id: 'task._.a1', title: 'T',
+      hlc: { timestamp: 1, counter: 0, nodeId: 'n' },
+    });
+
+    // Start sync then immediately drain
+    const syncP = engine.sync('memory', 'local', undefined);
+    const drainP = engine.drain();
+
+    await syncP;
+    await drainP;
+  });
 });

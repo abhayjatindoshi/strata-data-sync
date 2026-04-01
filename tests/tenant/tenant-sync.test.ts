@@ -149,4 +149,12 @@ describe('loadTenantPrefs', () => {
     expect(prefs).toBeDefined();
     expect(prefs!.name).toBe('Plain');
   });
+
+  it('returns undefined when blob has no __prefs key', async () => {
+    const adapter = new MemoryBlobAdapter();
+    const tenant = makeTenant({ id: 'no-prefs', name: 'T', meta: {} });
+    await adapter.write(tenant, '__tenant_prefs', { deleted: {} });
+    const prefs = await loadTenantPrefs(adapter, tenant);
+    expect(prefs).toBeUndefined();
+  });
 });

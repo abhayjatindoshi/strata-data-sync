@@ -1,6 +1,7 @@
 import debug from 'debug';
 import type { Tenant } from '@strata/adapter';
-import type { SyncScheduler as SyncSchedulerType, SyncSchedulerOptions, SyncEngine, DirtyTracker } from './types';
+import type { SyncScheduler as SyncSchedulerType, SyncSchedulerOptions, SyncEngine } from './types';
+import type { ReactiveFlag } from '@strata/utils';
 
 const log = debug('strata:sync');
 
@@ -9,7 +10,7 @@ export class SyncScheduler {
   private cloudTimer: ReturnType<typeof setInterval> | null = null;
   private readonly localFlushIntervalMs: number;
   private readonly cloudSyncIntervalMs: number;
-  private readonly dirtyTracker: DirtyTracker | undefined;
+  private readonly dirtyTracker: ReactiveFlag | undefined;
 
   constructor(
     private readonly engine: SyncEngine,
@@ -35,7 +36,7 @@ export class SyncScheduler {
           try {
             await this.engine.sync('local', 'cloud', this.tenant);
             await this.engine.sync('local', 'memory', this.tenant);
-            this.dirtyTracker?.clearDirty();
+            this.dirtyTracker?.clear();
           } catch (err) {
             log.extend('error')('cloud sync failed: %O', err);
           }

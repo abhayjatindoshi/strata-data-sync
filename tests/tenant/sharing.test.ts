@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { MemoryBlobAdapter } from '@strata/adapter';
 import { EncryptionTransformService } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
-import type { SyncEngineType, DirtyTrackerType } from '@strata/sync';
+import type { SyncEngineType } from '@strata/sync';
+import type { ReactiveFlag } from '@strata/utils';
 import type { EntityStore } from '@strata/store';
 import {
   TenantManager,
@@ -32,7 +33,7 @@ function makeDeps(adapter: MemoryBlobAdapter, overrides?: Partial<TenantManagerD
     adapter,
     syncEngine: stubSyncEngine(),
     store: { clear: () => {} } as unknown as EntityStore,
-    dirtyTracker: { isDirty: false, isDirty$: { pipe: () => ({}) }, markDirty: () => {}, clearDirty: () => {} } as unknown as DirtyTrackerType,
+    dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
     encryptionService: new EncryptionTransformService({ tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
     options: DEFAULT_OPTIONS,
     appId: 'test-app',

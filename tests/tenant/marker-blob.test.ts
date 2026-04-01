@@ -73,3 +73,13 @@ describe('validateMarkerBlob', () => {
     expect(validateMarkerBlob({ version: -1, createdAt: new Date(), entityTypes: [] })).toBe(false);
   });
 });
+
+describe('readMarkerBlob edge cases', () => {
+  it('returns undefined when blob has no __system key', async () => {
+    const adapter = new MemoryBlobAdapter();
+    const tenant = makeTenant('t5', {});
+    await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, { deleted: {} });
+    const result = await readMarkerBlob(adapter, tenant, DEFAULT_OPTIONS);
+    expect(result).toBeUndefined();
+  });
+});

@@ -171,4 +171,57 @@ describe('mergePartition', () => {
     expect(result.tombstones['task._.deleted']).toBeDefined();
     expect(Object.keys(result.entities)).toHaveLength(0);
   });
+
+  it('resolves cloud entity vs local tombstone — entity wins when more recent', () => {
+    const local = makeBlob(entityName, {}, {
+      'task._.a': { timestamp: 1000, counter: 0, nodeId: 'n1' },
+    });
+    const cloud = makeBlob(entityName, {
+      'task._.a': { id: 'task._.a', hlc: { timestamp: 3000, counter: 0, nodeId: 'n2' } },
+    });
+
+    const result = mergePartition(local, cloud, entityName);
+
+    expect(result.entities['task._.a']).toBeDefined();
+    expect(result.tombstones['task._.a']).toBeUndefined();
+  });
+
+  it('resolves two tombstones — keeps local when equal', () => {
+    const hlc = { timestamp: 1000, counter: 0, nodeId: 'n1' };
+    const local = makeBlob(entityName, {}, { 'task._.a': hlc });
+    const cloud = makeBlob(entityName, {}, { 'task._.a': hlc });
+
+    const result = mergePartition(local, cloud, entityName);
+    expect(result.tombstones['task._.a']).toBeDefined();
+  });
+
+  it('resolves cloud entity vs local tombstone — cloud entity wins when newer', () => {
+    const local = makeBlob(entityName, {}, {
+      'task._.a': { timestamp: 1000, counter: 0, nodeId: 'n1' },
+    });
+    const cloud = makeBlob(entityName, {
+      'task._.a': { id: 'task._.a', value: 'cloud-wins', hlc: { timestamp: 5000, counter: 0, nodeId: 'n2' } },
+    });
+
+    const result = mergePartition(local, cloud, entityName);
+
+    expect(result.entities['task._.a']).toBeDefined();
+    expect((result.entities['task._.a'] as Record<string, unknown>)['value']).toBe('cloud-wins');
+    expect(result.tombstones['task._.a']).toBeUndefined();
+  });
+
+  it('resolves cloud entity vs local tombstone — local tombstone wins when newer', () => {
+    const local = makeBlob(entityName, {}, {
+      'task._.a': { timestamp: 5000, counter: 0, nodeId: 'n1' },
+    });
+    const cloud = makeBlob(entityName, {
+      'task._.a': { id: 'task._.a', value: 'cloud-loses', hlc: { timestamp: 1000, counter: 0, nodeId: 'n2' } },
+    });
+
+    const result = mergePartition(local, cloud, entityName);
+
+    expect(result.entities['task._.a']).toBeUndefined();
+    expect(result.tombstones['task._.a']).toBeDefined();
+    expect(result.tombstones['task._.a'].timestamp).toBe(5000);
+  });
 });

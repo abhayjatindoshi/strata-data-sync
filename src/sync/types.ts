@@ -86,7 +86,7 @@ export type SyncEngine = {
 export type SyncSchedulerOptions = {
   readonly localFlushIntervalMs: number;
   readonly cloudSyncIntervalMs: number;
-  readonly dirtyTracker?: DirtyTracker;
+  readonly dirtyTracker?: ReactiveFlag;
 };
 
 export type SyncScheduler = {
@@ -94,9 +94,4 @@ export type SyncScheduler = {
   stop(): void;
 };
 
-export type DirtyTracker = {
-  readonly isDirty: boolean;
-  readonly isDirty$: import('rxjs').Observable<boolean>;
-  markDirty(): void;
-  clearDirty(): void;
-};
+import type { ReactiveFlag } from '@strata/utils';

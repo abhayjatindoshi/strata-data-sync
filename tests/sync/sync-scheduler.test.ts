@@ -153,4 +153,18 @@ describe('SyncScheduler — timer callbacks', () => {
     scheduler.stop();
     syncSpy.mockRestore();
   });
+
+  it('stop is safe when no cloud timer was started', () => {
+    vi.useFakeTimers();
+    const { engine } = makeEngine({ cloud: false });
+
+    const scheduler = new SyncScheduler(
+      engine, undefined, false,
+      { localFlushIntervalMs: 50, cloudSyncIntervalMs: 50 },
+    );
+
+    scheduler.start();
+    // cloudTimer is null because hasCloud=false
+    expect(() => scheduler.stop()).not.toThrow();
+  });
 });

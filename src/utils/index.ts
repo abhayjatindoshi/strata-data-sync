@@ -3,4 +3,4 @@ export { compositeKey, parseCompositeKey } from './composite-key';
 export { generateId } from './id';
 export { assertNotDisposed } from './assert';
 export { serialize, deserialize } from './serialize';
-export { DirtyTracker } from './dirty-tracker';
+export { ReactiveFlag } from './reactive-flag';

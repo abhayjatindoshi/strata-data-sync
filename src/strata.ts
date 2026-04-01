@@ -15,13 +15,13 @@ import type { RepositoryType, SingletonRepositoryType } from '@strata/repo';
 import { TenantManager } from '@strata/tenant';
 import type { TenantManagerType } from '@strata/tenant';
 import {
-  SyncEngine, DirtyTracker,
+  SyncEngine,
 } from '@strata/sync';
 import type {
   SyncResult, SyncEventListener,
   SyncEngineType,
 } from '@strata/sync';
-import { assertNotDisposed } from '@strata/utils';
+import { assertNotDisposed, ReactiveFlag } from '@strata/utils';
 
 const log = debug('strata:core');
 
@@ -75,7 +75,7 @@ export class Strata {
   private readonly hlcRef: { current: Hlc };
   private readonly eventBus: EventBus;
   private readonly syncEngine: SyncEngineType;
-  private readonly dirtyTracker: DirtyTracker;
+  private readonly dirtyTracker: ReactiveFlag;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly repoMap = new Map<string, RepositoryType<unknown> | SingletonRepositoryType<unknown>>();
   private readonly config: StrataConfig;
@@ -98,8 +98,8 @@ export class Strata {
       config.entities.map(d => d.name), this.hlcRef, this.eventBus,
       config.migrations, resolvedOptions,
     );
-    this.dirtyTracker = new DirtyTracker();
-    this.isDirty$ = this.dirtyTracker.isDirty$;
+    this.dirtyTracker = new ReactiveFlag();
+    this.isDirty$ = this.dirtyTracker.value$;
 
     for (const def of config.entities) {
       if (def.keyStrategy.kind === 'singleton') {
@@ -124,7 +124,7 @@ export class Strata {
 
     const dirtyFlushListener = (event: { fromSync?: boolean }) => {
       if (!event.fromSync) {
-        this.dirtyTracker.markDirty();
+        this.dirtyTracker.set();
       }
     };
     this.dirtyFlushListener = dirtyFlushListener;
@@ -150,7 +150,7 @@ export class Strata {
     await this.syncEngine.sync('memory', 'local', tenant);
     const { result } = await this.syncEngine.sync('local', 'cloud', tenant);
     await this.syncEngine.sync('local', 'memory', tenant);
-    this.dirtyTracker.clearDirty();
+    this.dirtyTracker.clear();
     return {
       entitiesUpdated: result.changesForB.length,
       conflictsResolved: result.changesForA.length,
@@ -158,7 +158,7 @@ export class Strata {
     };
   }
 
-  get isDirty(): boolean { return this.dirtyTracker.isDirty; }
+  get isDirty(): boolean { return this.dirtyTracker.value; }
 
   onSyncEvent(listener: SyncEventListener): void { this.syncEngine.on(listener); }
 

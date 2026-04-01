@@ -66,4 +66,15 @@ describe('MemoryStorageAdapter', () => {
     expect(r1![0]).toBe(1);
     expect(r2![0]).toBe(2);
   });
+
+  it('list with tenant scopes by tenant id', async () => {
+    const adapter = new MemoryStorageAdapter();
+    const now = new Date();
+    const t1 = { id: 't1', name: 'T1', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
+    await adapter.write(t1, 'foo.a', new Uint8Array([1]));
+    await adapter.write(t1, 'foo.b', new Uint8Array([2]));
+    await adapter.write(undefined, 'foo.c', new Uint8Array([3]));
+    const result = await adapter.list(t1, 'foo.');
+    expect(result.sort()).toEqual(['foo.a', 'foo.b']);
+  });
 });

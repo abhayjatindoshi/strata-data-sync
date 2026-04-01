@@ -236,5 +236,27 @@ describe('EntityStore', () => {
       const keys = await store.list(undefined, 'missing');
       expect(keys).toEqual([]);
     });
+
+    it('write ignores key without dot separator', async () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      await store.write(undefined, 'nodot', { nodot: {}, deleted: {} });
+      expect(store.getPartition('nodot').size).toBe(0);
+    });
+
+    it('read returns null for key without dot separator', async () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      const result = await store.read(undefined, 'nodot');
+      expect(result).toBeNull();
+    });
+
+    it('buildMarkerBlob handles entities without hlc field', async () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      store.setEntity('task._', 'id1', { id: 'id1' });
+      const blob = await store.read(undefined, DEFAULT_OPTIONS.markerKey);
+      expect(blob).not.toBeNull();
+      const system = (blob as Record<string, unknown>)['__system'] as Record<string, unknown>;
+      const marker = system['marker'] as { indexes: Record<string, Record<string, unknown>> };
+      expect(marker.indexes['task']).toBeDefined();
+    });
   });
 });

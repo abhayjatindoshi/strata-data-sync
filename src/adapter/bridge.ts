@@ -1,7 +1,7 @@
 import debug from 'debug';
 import type { BlobAdapter, BlobTransform, StorageAdapter, Tenant } from './types';
 import type { PartitionBlob } from '@strata/persistence';
-import { serialize, deserialize } from '@strata/persistence';
+import { serialize, deserialize } from '@strata/utils';
 import { applyTransforms, reverseTransforms } from './transform';
 
 const log = debug('strata:adapter-bridge');

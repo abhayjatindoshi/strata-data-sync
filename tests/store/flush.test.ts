@@ -45,4 +45,20 @@ describe('loadPartitionFromAdapter', () => {
     expect(result.size).toBe(1);
     expect(store.getTombstones('task._').get('task._.d1')).toBeDefined();
   });
+
+  it('handles blob with no tombstones for entity in deleted section', async () => {
+    const adapter = new MemoryBlobAdapter();
+    const store = new Store(DEFAULT_OPTIONS);
+
+    const blob = {
+      task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } },
+      deleted: {},
+    };
+    await adapter.write(undefined, 'task._', blob);
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+
+    expect(result.size).toBe(1);
+    expect(store.getTombstones('task._').size).toBe(0);
+  });
 });
