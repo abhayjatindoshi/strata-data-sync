@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { MemoryBlobAdapter } from '@strata/adapter';
 import { saveAllIndexes, loadAllIndexes } from '@strata/persistence';
-import { serialize } from '@strata/utils';
 import type { PartitionBlob } from '@strata/persistence';
 import type { Hlc } from '@strata/hlc';
 import { Store } from '@strata/store';
 import { syncBetween } from '@strata/sync';
-import { DEFAULT_OPTIONS } from '../helpers';
+import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 
 function makePartitionBlob(
   entityName: string,
@@ -21,8 +19,8 @@ function makePartitionBlob(
 
 describe('syncBetween', () => {
   it('copies A-only partitions to B', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
@@ -40,8 +38,8 @@ describe('syncBetween', () => {
   });
 
   it('copies B-only partitions to A', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const entity = { id: 'task._.b1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
     await adapterB.write(undefined, 'task._', makePartitionBlob('task', { 'task._.b1': entity }));
@@ -60,8 +58,8 @@ describe('syncBetween', () => {
   });
 
   it('merges diverged partitions', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const entityA = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     const entityB = { id: 'task._.b1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
@@ -88,8 +86,8 @@ describe('syncBetween', () => {
   });
 
   it('returns empty result when no data on either side', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
 
@@ -100,8 +98,8 @@ describe('syncBetween', () => {
   });
 
   it('handles multiple entity types', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const taskEntity = { id: 'task._.t1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     const noteEntity = { id: 'note._.n1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
@@ -123,8 +121,8 @@ describe('syncBetween', () => {
   });
 
   it('updates indexes on both adapters after sync', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
@@ -144,8 +142,8 @@ describe('syncBetween', () => {
   });
 
   it('returns maxHlc from all processed entities', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const entity = { id: 'task._.a1', hlc: { timestamp: 5000, counter: 3, nodeId: 'n1' } };
     await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
@@ -161,8 +159,8 @@ describe('syncBetween', () => {
   });
 
   it('detects stale state when adapterA is modified during sync', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     // Setup both sides with diverged data so merge produces applyToA
     const entityA = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
@@ -200,8 +198,8 @@ describe('syncBetween', () => {
   });
 
   it('skips merge when one side has missing blob for diverged partition', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     // Index says diverged, but adapterB has no actual blob for the partition
     await saveAllIndexes(adapterA, undefined, {
@@ -222,8 +220,8 @@ describe('syncBetween', () => {
   });
 
   it('applies migrations during merge of diverged partitions', async () => {
-    const adapterA = new MemoryBlobAdapter();
-    const adapterB = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
 
     const entityA = { id: 'task._.a1', title: 'old', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
     const entityB = { id: 'task._.b1', title: 'old', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };

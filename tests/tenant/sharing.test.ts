@@ -1,11 +1,11 @@
-import { DEFAULT_OPTIONS } from '../helpers';
+import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { MemoryBlobAdapter } from '@strata/adapter';
 import { EncryptionTransformService } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
 import type { EntityStore } from '@strata/store';
+import type { DataAdapter } from '@strata/persistence';
 import {
   TenantManager,
   writeMarkerBlob,
@@ -28,13 +28,13 @@ function stubSyncEngine(): SyncEngineType {
   };
 }
 
-function makeDeps(adapter: MemoryBlobAdapter, overrides?: Partial<TenantManagerDeps>): TenantManagerDeps {
+function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>): TenantManagerDeps {
   return {
     adapter,
     syncEngine: stubSyncEngine(),
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
-    encryptionService: new EncryptionTransformService({ tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
+    encryptionService: new EncryptionTransformService({ targets: [], tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
     entityTypes: [],
@@ -44,7 +44,7 @@ function makeDeps(adapter: MemoryBlobAdapter, overrides?: Partial<TenantManagerD
 
 describe('Sharing flow', () => {
   it('join reads marker blob and detects existing workspace', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tempTenant = makeTenant('shared-id', { folder: 'shared' });
     await writeMarkerBlob(adapter, tempTenant, ['transaction'], DEFAULT_OPTIONS);
 
@@ -59,12 +59,12 @@ describe('Sharing flow', () => {
       (meta as { folderId: string }).folderId.substring(0, 4);
 
     // User A creates
-    const adapterA = new MemoryBlobAdapter();
+    const adapterA = createDataAdapter();
     const tmA = new TenantManager(makeDeps(adapterA, { deriveTenantId: deriveFn }));
     const tenantA = await tmA.create({ name: 'Project X', meta: { folderId: 'abc12345' } });
 
     // User B sets up (separate adapter simulating separate device, marker blob must exist)
-    const adapterB = new MemoryBlobAdapter();
+    const adapterB = createDataAdapter();
     const tenantRefB = makeTenant('abc1', { folderId: 'abc12345' });
     await writeMarkerBlob(adapterB, tenantRefB, [], DEFAULT_OPTIONS);
     const tmB = new TenantManager(makeDeps(adapterB, { deriveTenantId: deriveFn }));
@@ -76,7 +76,7 @@ describe('Sharing flow', () => {
   });
 
   it('merges tenant prefs into local list', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tempTenant = makeTenant('prefs-id', { folder: 'shared' });
 
     await writeMarkerBlob(adapter, tempTenant, [], DEFAULT_OPTIONS);
@@ -89,7 +89,7 @@ describe('Sharing flow', () => {
   });
 
   it('prefs name takes precedence over opts.name', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tempTenant = makeTenant('prefs-id2', { folder: 'shared' });
 
     await writeMarkerBlob(adapter, tempTenant, [], DEFAULT_OPTIONS);
@@ -102,7 +102,7 @@ describe('Sharing flow', () => {
   });
 
   it('rejects location without valid marker blob', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'no-data' }));
 
     await expect(tm.join({ meta: { folder: 'empty' } })).rejects.toThrow(
@@ -111,7 +111,7 @@ describe('Sharing flow', () => {
   });
 
   it('rejects location with incompatible marker blob version', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tempTenant = makeTenant('bad-ver', {});
     const marker = { version: 99, createdAt: new Date(), entityTypes: [] };
     await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
@@ -123,7 +123,7 @@ describe('Sharing flow', () => {
   });
 
   it('create writes marker blob with entity types', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tm = new TenantManager(makeDeps(adapter, { entityTypes: ['transaction', 'account'] }));
 
     const created = await tm.create({ name: 'My App', meta: { bucket: 'x' } });
@@ -134,3 +134,4 @@ describe('Sharing flow', () => {
     expect(marker!.entityTypes).toEqual(['transaction', 'account']);
   });
 });
+

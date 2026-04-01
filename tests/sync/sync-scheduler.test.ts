@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { createDataAdapter } from '../helpers';
 import { createHlc } from '@strata/hlc';
 import { EventBus } from '@strata/reactive';
 import { saveAllIndexes } from '@strata/persistence';
@@ -16,8 +16,8 @@ function makePartitionBlob(entityName: string, entities: Record<string, unknown>
 
 function makeEngine(opts?: { cloud?: boolean }) {
   const store = new Store(DEFAULT_OPTIONS);
-  const local = new MemoryBlobAdapter();
-  const cloud = opts?.cloud !== false ? new MemoryBlobAdapter() : undefined;
+  const local = createDataAdapter();
+  const cloud = opts?.cloud !== false ? createDataAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };
   const eventBus = new EventBus();
   const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus);
@@ -168,3 +168,4 @@ describe('SyncScheduler — timer callbacks', () => {
     expect(() => scheduler.stop()).not.toThrow();
   });
 });
+

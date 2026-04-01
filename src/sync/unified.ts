@@ -1,9 +1,9 @@
 import debug from 'debug';
-import type { BlobAdapter, Tenant } from '@strata/adapter';
+import type { Tenant } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import { compareHlc } from '@strata/hlc';
-import type { AllIndexes, PartitionBlob } from '@strata/persistence';
+import type { AllIndexes, PartitionBlob, DataAdapter } from '@strata/persistence';
 import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
 import { partitionHash, updatePartitionIndexEntry } from '@strata/persistence';
 import type { BlobMigration } from '@strata/schema/migration';
@@ -31,8 +31,8 @@ type SyncPlan = {
 // ─── Phase 1: Build plan ─────────────────────────────────
 
 async function buildPlan(
-  adapterA: BlobAdapter,
-  adapterB: BlobAdapter,
+  adapterA: DataAdapter,
+  adapterB: DataAdapter,
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
   migrations?: ReadonlyArray<BlobMigration>,
@@ -65,8 +65,8 @@ async function buildPlan(
 }
 
 async function planCopies(
-  adapterA: BlobAdapter,
-  adapterB: BlobAdapter,
+  adapterA: DataAdapter,
+  adapterB: DataAdapter,
   tenant: Tenant | undefined,
   entityName: string,
   aOnly: ReadonlyArray<string>,
@@ -94,8 +94,8 @@ async function planCopies(
 }
 
 async function planMerges(
-  adapterA: BlobAdapter,
-  adapterB: BlobAdapter,
+  adapterA: DataAdapter,
+  adapterB: DataAdapter,
   tenant: Tenant | undefined,
   entityName: string,
   diverged: ReadonlyArray<string>,
@@ -130,7 +130,7 @@ async function planMerges(
 // ─── Phase 2 & 3: Apply changes ─────────────────────────
 
 async function applyChanges(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   changes: ReadonlyArray<SyncChange>,
 ): Promise<void> {
@@ -140,7 +140,7 @@ async function applyChanges(
 }
 
 async function isStale(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   snapshot: AllIndexes,
   options?: ResolvedStrataOptions,
@@ -254,8 +254,8 @@ function findMaxHlc(
 // ─── Main ────────────────────────────────────────────────
 
 export async function syncBetween(
-  adapterA: BlobAdapter,
-  adapterB: BlobAdapter,
+  adapterA: DataAdapter,
+  adapterB: DataAdapter,
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
   migrations?: ReadonlyArray<BlobMigration>,

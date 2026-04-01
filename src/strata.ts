@@ -2,13 +2,15 @@ import debug from 'debug';
 import type { Observable } from 'rxjs';
 import { createHlc } from '@strata/hlc';
 import type { Hlc } from '@strata/hlc';
-import type { BlobAdapter } from '@strata/adapter';
+import type { BlobAdapter, EncryptionService } from '@strata/adapter';
 import {
   EncryptionTransformService,
+  withEncryption,
 } from '@strata/adapter/encryption';
 import type { EntityDefinition } from '@strata/schema';
 import type { BlobMigration } from '@strata/schema/migration';
 import { EventBus } from '@strata/reactive';
+import { toDataAdapter } from '@strata/persistence';
 import { Store } from '@strata/store';
 import { Repository, SingletonRepository } from '@strata/repo';
 import type { RepositoryType, SingletonRepositoryType } from '@strata/repo';
@@ -41,7 +43,7 @@ export type StrataConfig = {
   readonly deviceId: string;
   readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
   readonly migrations?: ReadonlyArray<BlobMigration>;
-  readonly encryptionService?: EncryptionTransformService;
+  readonly encryptionService?: EncryptionService;
   readonly options?: StrataOptions;
 };
 
@@ -88,13 +90,36 @@ export class Strata {
     validateEntityDefinitions(config.entities);
     this.config = config;
     const resolvedOptions = resolveOptions(config.options);
-    const encryptionService = config.encryptionService ?? new EncryptionTransformService(resolvedOptions);
+    const encryptionService = config.encryptionService ?? new EncryptionTransformService({
+      targets: [],
+      tenantKey: resolvedOptions.tenantKey,
+      markerKey: resolvedOptions.markerKey,
+    });
     const store = new Store(resolvedOptions);
+
+    // Apply encryption wrapping based on targets
+    let localBlobAdapter = config.localAdapter;
+    let cloudBlobAdapter = config.cloudAdapter;
+
+    if (config.encryptionService) {
+      const targets = config.encryptionService.targets;
+      if (targets.includes('local')) {
+        localBlobAdapter = withEncryption(localBlobAdapter, config.encryptionService);
+      }
+      if (targets.includes('cloud')) {
+        if (!cloudBlobAdapter) throw new Error('Encryption target "cloud" requires cloudAdapter');
+        cloudBlobAdapter = withEncryption(cloudBlobAdapter, config.encryptionService);
+      }
+    }
+
+    // Convert to DataAdapter for internal use
+    const localAdapter = toDataAdapter(localBlobAdapter);
+    const cloudAdapter = cloudBlobAdapter ? toDataAdapter(cloudBlobAdapter) : undefined;
 
     this.hlcRef = { current: createHlc(config.deviceId) };
     this.eventBus = new EventBus();
     this.syncEngine = new SyncEngine(
-      store, config.localAdapter, config.cloudAdapter,
+      store, localAdapter, cloudAdapter,
       config.entities.map(d => d.name), this.hlcRef, this.eventBus,
       config.migrations, resolvedOptions,
     );
@@ -110,8 +135,8 @@ export class Strata {
     }
 
     this.tenants = new TenantManager({
-      adapter: config.localAdapter,
-      cloudAdapter: config.cloudAdapter,
+      adapter: localAdapter,
+      cloudAdapter,
       syncEngine: this.syncEngine,
       store,
       dirtyTracker: this.dirtyTracker,

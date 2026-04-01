@@ -4,6 +4,7 @@ import {
   defineEntity,
   MemoryBlobAdapter,
   resolveOptions,
+  toDataAdapter,
 } from '@strata/index';
 import type { Tenant } from '@strata/index';
 import type { Repository } from '@strata/repo';
@@ -141,7 +142,7 @@ describe('Tenant integration', () => {
     const deriveFn = () => 'setup-id';
     const tempTenant: Tenant = { id: 'setup-id', name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };
 
-    await writeMarkerBlob(localAdapter, tempTenant, ['task'], resolveOptions());
+    await writeMarkerBlob(toDataAdapter(localAdapter), tempTenant, ['task'], resolveOptions());
 
     const strata = track(new Strata({
       appId: 'test',
@@ -188,7 +189,7 @@ describe('Tenant integration', () => {
     // Device B sets up (needs marker in its adapter with matching tenant ID)
     const localB = new MemoryBlobAdapter();
     const tenantRefB: Tenant = { id: deriveFn(meta), name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };
-    await writeMarkerBlob(localB, tenantRefB, ['task'], resolveOptions());
+    await writeMarkerBlob(toDataAdapter(localB), tenantRefB, ['task'], resolveOptions());
     const strataB2 = track(new Strata({
       appId: 'test',
       entities: [TaskDef],

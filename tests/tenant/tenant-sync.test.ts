@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { createDataAdapter } from '../helpers';
 import { mergeTenantLists, pushTenantList, pullTenantList } from '@strata/tenant';
 import { saveTenantPrefs, loadTenantPrefs } from '@strata/tenant';
 import { saveTenantList, loadTenantList } from '@strata/tenant';
@@ -59,8 +59,8 @@ describe('mergeTenantLists', () => {
 
 describe('pushTenantList', () => {
   it('copies local tenant list to cloud adapter', async () => {
-    const localAdapter = new MemoryBlobAdapter();
-    const cloudAdapter = new MemoryBlobAdapter();
+    const localAdapter = createDataAdapter();
+    const cloudAdapter = createDataAdapter();
     const now = new Date();
     await saveTenantList(localAdapter, [
       makeTenant({ id: 't1', name: 'Test', updatedAt: now }),
@@ -74,8 +74,8 @@ describe('pushTenantList', () => {
   });
 
   it('handles empty local list', async () => {
-    const localAdapter = new MemoryBlobAdapter();
-    const cloudAdapter = new MemoryBlobAdapter();
+    const localAdapter = createDataAdapter();
+    const cloudAdapter = createDataAdapter();
 
     await pushTenantList(localAdapter, cloudAdapter, DEFAULT_OPTIONS);
 
@@ -86,8 +86,8 @@ describe('pushTenantList', () => {
 
 describe('pullTenantList', () => {
   it('merges cloud tenants into local list', async () => {
-    const localAdapter = new MemoryBlobAdapter();
-    const cloudAdapter = new MemoryBlobAdapter();
+    const localAdapter = createDataAdapter();
+    const cloudAdapter = createDataAdapter();
     await saveTenantList(localAdapter, [
       makeTenant({ id: 't1', name: 'Local' }),
     ], DEFAULT_OPTIONS);
@@ -103,8 +103,8 @@ describe('pullTenantList', () => {
   });
 
   it('takes newer entry on conflict', async () => {
-    const localAdapter = new MemoryBlobAdapter();
-    const cloudAdapter = new MemoryBlobAdapter();
+    const localAdapter = createDataAdapter();
+    const cloudAdapter = createDataAdapter();
     await saveTenantList(localAdapter, [
       makeTenant({ id: 't1', name: 'OldLocal', updatedAt: new Date('2026-01-01') }),
     ], DEFAULT_OPTIONS);
@@ -122,7 +122,7 @@ describe('pullTenantList', () => {
 
 describe('saveTenantPrefs', () => {
   it('saves and loads prefs round-trip', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant({ id: 'prefs-t1', name: 'Test', meta: { folder: 'test-folder' } });
 
     await saveTenantPrefs(adapter, tenant, { name: 'My Tenant' });
@@ -135,14 +135,14 @@ describe('saveTenantPrefs', () => {
 
 describe('loadTenantPrefs', () => {
   it('returns undefined when no prefs blob exists', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant({ id: 'none', name: 'None', meta: { folder: 'nonexistent' } });
     const prefs = await loadTenantPrefs(adapter, tenant);
     expect(prefs).toBeUndefined();
   });
 
   it('loads prefs without optional fields', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant({ id: 'plain-t', name: 'Plain', meta: { folder: 'test' } });
     await saveTenantPrefs(adapter, tenant, { name: 'Plain' });
     const prefs = await loadTenantPrefs(adapter, tenant);
@@ -151,10 +151,11 @@ describe('loadTenantPrefs', () => {
   });
 
   it('returns undefined when blob has no __prefs key', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant({ id: 'no-prefs', name: 'T', meta: {} });
     await adapter.write(tenant, '__tenant_prefs', { deleted: {} });
     const prefs = await loadTenantPrefs(adapter, tenant);
     expect(prefs).toBeUndefined();
   });
 });
+

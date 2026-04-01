@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { PartitionIndex } from '@strata/persistence';
 import { saveAllIndexes } from '@strata/persistence';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { createDataAdapter } from '../helpers';
 import { diffPartitions } from '@strata/sync';
 import { loadAllIndexPairs } from '@strata/sync/diff';
 import { DEFAULT_OPTIONS } from '../helpers';
@@ -104,8 +104,8 @@ describe('diffPartitions', () => {
 
 describe('loadAllIndexPairs', () => {
   it('loads indexes from both adapters in parallel', async () => {
-    const local = new MemoryBlobAdapter();
-    const cloud = new MemoryBlobAdapter();
+    const local = createDataAdapter();
+    const cloud = createDataAdapter();
 
     await saveAllIndexes(local, undefined, {
       task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
@@ -121,8 +121,8 @@ describe('loadAllIndexPairs', () => {
   });
 
   it('returns empty indexes when adapters have no data', async () => {
-    const local = new MemoryBlobAdapter();
-    const cloud = new MemoryBlobAdapter();
+    const local = createDataAdapter();
+    const cloud = createDataAdapter();
 
     const { localIndexes, cloudIndexes } = await loadAllIndexPairs(local, cloud, undefined, DEFAULT_OPTIONS);
 
@@ -130,3 +130,4 @@ describe('loadAllIndexPairs', () => {
     expect(Object.keys(cloudIndexes)).toHaveLength(0);
   });
 });
+

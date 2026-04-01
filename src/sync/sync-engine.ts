@@ -1,10 +1,11 @@
 import debug from 'debug';
-import type { BlobAdapter, Tenant } from '@strata/adapter';
+import type { Tenant } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import { tick } from '@strata/hlc';
 import type { EntityEventBus } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { BlobMigration } from '@strata/schema/migration';
+import type { DataAdapter } from '@strata/persistence';
 import { parseCompositeKey } from '@strata/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type {
@@ -24,8 +25,8 @@ export class SyncEngine {
 
   constructor(
     private readonly store: EntityStore,
-    private readonly localAdapter: BlobAdapter,
-    private readonly cloudAdapter: BlobAdapter | undefined,
+    private readonly localAdapter: DataAdapter,
+    private readonly cloudAdapter: DataAdapter | undefined,
     private readonly entityNames: ReadonlyArray<string>,
     private readonly hlcRef: { current: Hlc },
     private readonly eventBus: EntityEventBus,
@@ -33,7 +34,7 @@ export class SyncEngine {
     private readonly options?: ResolvedStrataOptions,
   ) {}
 
-  private resolveAdapter(loc: SyncLocation): BlobAdapter {
+  private resolveAdapter(loc: SyncLocation): DataAdapter {
     switch (loc) {
       case 'memory': return this.store;
       case 'local': return this.localAdapter;

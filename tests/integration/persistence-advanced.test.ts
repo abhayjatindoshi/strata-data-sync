@@ -6,7 +6,6 @@ import {
   partitioned,
 } from '@strata/index';
 import type { BlobAdapter } from '@strata/index';
-import type { PartitionBlob } from '@strata/persistence';
 import type { Repository } from '@strata/repo';
 
 type Item = { name: string; category: string };
@@ -32,20 +31,24 @@ describe('Persistence advanced integration', () => {
     return s;
   }
 
-  it('transform pipeline end-to-end — custom adapter wrapping applied on flush and reversed on reload', async () => {
+  it('transform pipeline end-to-end — custom adapter decorator applied on flush and reversed on reload', async () => {
     const rawAdapter = new MemoryBlobAdapter();
 
-    // Create a wrapping adapter that adds an envelope around stored data
+    // Create a XOR decorator adapter that transforms bytes
+    const xorKey = 0x42;
+    const xor = (data: Uint8Array) => {
+      const result = new Uint8Array(data.length);
+      for (let i = 0; i < data.length; i++) result[i] = data[i] ^ xorKey;
+      return result;
+    };
     const transformedAdapter: BlobAdapter = {
-      kind: 'blob',
       async read(cm, key) {
         const data = await rawAdapter.read(cm, key);
         if (!data) return null;
-        const envelope = data as unknown as { __wrapped: PartitionBlob };
-        return envelope.__wrapped;
+        return xor(data);
       },
       async write(cm, key, data) {
-        await rawAdapter.write(cm, key, { __wrapped: data } as unknown as PartitionBlob);
+        await rawAdapter.write(cm, key, xor(data));
       },
       async delete(cm, key) { return rawAdapter.delete(cm, key); },
       async list(cm, prefix) { return rawAdapter.list(cm, prefix); },
@@ -65,10 +68,10 @@ describe('Persistence advanced integration', () => {
     const id = repo1.save({ name: 'Secret', category: 'classified' });
     await strata1.dispose();
 
-    // Read raw blob — should be wrapped in envelope
-    const rawBlob = await rawAdapter.read(tenant, 'item._') as Record<string, unknown>;
-    expect(rawBlob).not.toBeNull();
-    expect(rawBlob).toHaveProperty('__wrapped');
+    // Read raw bytes — should be XOR'd (not valid JSON)
+    const rawBytes = await rawAdapter.read(tenant, 'item._');
+    expect(rawBytes).not.toBeNull();
+    expect(() => JSON.parse(new TextDecoder().decode(rawBytes!))).toThrow();
 
     // Phase 2: Reload through transformed adapter → data should be readable
     const strata2 = track(new Strata({

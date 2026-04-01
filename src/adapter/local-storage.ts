@@ -1,8 +1,7 @@
-import type { StorageAdapter, Tenant } from './types';
+import type { BlobAdapter, Tenant } from './types';
 import { compositeKey, toBase64, fromBase64 } from '@strata/utils';
 
-export class LocalStorageAdapter implements StorageAdapter {
-  readonly kind = 'storage' as const;
+export class LocalStorageAdapter implements BlobAdapter {
 
   constructor(private readonly prefix: string = 'strata') {}
 

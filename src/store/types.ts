@@ -1,7 +1,7 @@
 import type { Hlc } from '@strata/hlc';
-import type { BlobAdapter } from '@strata/adapter';
+import type { DataAdapter } from '@strata/persistence';
 
-export type EntityStore = BlobAdapter & {
+export type EntityStore = DataAdapter & {
   getEntity(entityKey: string, id: string): unknown | undefined;
   setEntity(entityKey: string, id: string, entity: unknown): void;
   deleteEntity(entityKey: string, id: string): boolean;

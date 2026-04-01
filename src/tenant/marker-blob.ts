@@ -1,6 +1,6 @@
 import debug from 'debug';
-import type { BlobAdapter, Tenant } from '@strata/adapter';
-import type { AllIndexes, PartitionBlob } from '@strata/persistence';
+import type { Tenant } from '@strata/adapter';
+import type { AllIndexes, PartitionBlob, DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
 
 const log = debug('strata:tenant');
@@ -16,7 +16,7 @@ export type MarkerData = {
 };
 
 export async function writeMarkerBlob(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   entityTypes: readonly string[],
   options: ResolvedStrataOptions,
@@ -38,7 +38,7 @@ export async function writeMarkerBlob(
 }
 
 export async function readMarkerBlob(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   options: ResolvedStrataOptions,
 ): Promise<MarkerData | undefined> {

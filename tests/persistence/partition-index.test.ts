@@ -1,24 +1,24 @@
 import { describe, it, expect, vi } from 'vitest';
 import { loadAllIndexes, saveAllIndexes, updatePartitionIndexEntry } from '@strata/persistence';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { createDataAdapter } from '../helpers';
 import { DEFAULT_OPTIONS } from '../helpers';
 
 describe('Partition Index', () => {
   it('loadAllIndexes returns empty object for missing blob', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const indexes = await loadAllIndexes(adapter, undefined, DEFAULT_OPTIONS);
     expect(indexes).toEqual({});
   });
 
   it('loadAllIndexes returns empty when blob has no __system key', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, { deleted: {} });
     const indexes = await loadAllIndexes(adapter, undefined, DEFAULT_OPTIONS);
     expect(indexes).toEqual({});
   });
 
   it('loadAllIndexes returns empty when marker has no indexes', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, {
       __system: { marker: { version: 1 } },
       deleted: {},
@@ -28,7 +28,7 @@ describe('Partition Index', () => {
   });
 
   it('save and load round-trip', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const indexes = {
       transaction: {
         '2026-01': { hash: 12345, count: 10, deletedCount: 0, updatedAt: 1711100000 },
@@ -41,7 +41,7 @@ describe('Partition Index', () => {
   });
 
   it('stores indexes inside __strata blob', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const indexes = {
       transaction: { '2026-01': { hash: 1, count: 1, deletedCount: 0, updatedAt: 1 } },
     };
@@ -82,7 +82,7 @@ describe('Partition Index', () => {
   });
 
   it('saveAllIndexes merges with existing marker data', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, {
       __system: { marker: { version: 1, createdAt: new Date(), entityTypes: ['task'] } },
       deleted: {},
@@ -94,7 +94,7 @@ describe('Partition Index', () => {
   });
 
   it('saveAllIndexes creates default marker when __system.marker missing', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     await adapter.write(undefined, DEFAULT_OPTIONS.markerKey, {
       __system: {},
       deleted: {},
@@ -105,3 +105,4 @@ describe('Partition Index', () => {
     expect(loaded.task?.['_']?.hash).toBe(456);
   });
 });
+

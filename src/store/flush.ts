@@ -1,6 +1,7 @@
 import debug from 'debug';
-import type { BlobAdapter, Tenant } from '@strata/adapter';
+import type { Tenant } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
+import type { DataAdapter } from '@strata/persistence';
 import type { BlobMigration } from '@strata/schema/migration';
 import { migrateBlob } from '@strata/schema/migration';
 import type { EntityStore } from './types';
@@ -8,7 +9,7 @@ import type { EntityStore } from './types';
 const log = debug('strata:store');
 
 export async function loadPartitionFromAdapter(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   store: EntityStore,
   entityName: string,

@@ -1,4 +1,4 @@
-import type { BlobAdapter } from '@strata/adapter';
+import type { DataAdapter } from '@strata/persistence';
 import type { PartitionBlob } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { Tenant } from './types';
@@ -6,7 +6,7 @@ import type { Tenant } from './types';
 const TENANTS_ENTITY_KEY = '__tenants';
 
 export async function loadTenantList(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   options: ResolvedStrataOptions,
 ): Promise<Tenant[]> {
   const blob = await adapter.read(undefined, options.tenantKey);
@@ -17,7 +17,7 @@ export async function loadTenantList(
 }
 
 export async function saveTenantList(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenants: ReadonlyArray<Tenant>,
   options: ResolvedStrataOptions,
 ): Promise<void> {

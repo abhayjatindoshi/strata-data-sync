@@ -1,12 +1,13 @@
 import debug from 'debug';
 import { BehaviorSubject } from 'rxjs';
-import type { BlobAdapter } from '@strata/adapter';
+import type { EncryptionService } from '@strata/adapter';
 import {
   EncryptionTransformService,
   createEncryptedMarkerDek,
   importDek,
 } from '@strata/adapter/encryption';
 import type { EntityStore } from '@strata/store';
+import type { DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { SyncEngineType, SyncScheduler as SyncSchedulerType } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
@@ -26,12 +27,12 @@ import { loadTenantPrefs } from './tenant-prefs';
 const log = debug('strata:tenant');
 
 export type TenantManagerDeps = {
-  readonly adapter: BlobAdapter;
-  readonly cloudAdapter?: BlobAdapter;
+  readonly adapter: DataAdapter;
+  readonly cloudAdapter?: DataAdapter;
   readonly syncEngine: SyncEngineType;
   readonly store: EntityStore;
   readonly dirtyTracker: ReactiveFlag;
-  readonly encryptionService: EncryptionTransformService;
+  readonly encryptionService: EncryptionService;
   readonly options: ResolvedStrataOptions;
   readonly appId: string;
   readonly entityTypes: readonly string[];

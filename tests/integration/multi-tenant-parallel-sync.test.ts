@@ -9,8 +9,10 @@ import {
   updatePartitionIndexEntry,
   loadAllIndexes,
   resolveOptions,
+  toDataAdapter,
 } from '@strata/index';
-import type { BlobAdapter, SyncEvent, Tenant } from '@strata/index';
+import type { SyncEvent, Tenant } from '@strata/index';
+import type { DataAdapter } from '@strata/persistence';
 import type { Repository } from '@strata/repo';
 
 type Note = { title: string; body: string; priority: number };
@@ -36,7 +38,7 @@ describe('Multi-tenant parallel sync integration', () => {
 
   /** Write a partition blob externally into an adapter (simulating another device). */
   async function writeExternalPartition(
-    adapter: BlobAdapter,
+    adapter: DataAdapter,
     tenant: Tenant | undefined,
     entityName: string,
     partitionKey: string,
@@ -53,7 +55,7 @@ describe('Multi-tenant parallel sync integration', () => {
 
   /** Write an external partition + update the __strata index so sync can discover it. */
   async function seedExternal(
-    adapter: BlobAdapter,
+    adapter: DataAdapter,
     tenant: Tenant | undefined,
     entityName: string,
     partitionKey: string,
@@ -178,7 +180,7 @@ describe('Multi-tenant parallel sync integration', () => {
       device: 'phantom-device',
       hlc: { timestamp: Date.now() + 5000, counter: 0, nodeId: 'phantom-device' },
     };
-    await seedExternal(sharedCloud, tenant, 'note', '_', {
+    await seedExternal(toDataAdapter(sharedCloud), tenant, 'note', '_', {
       'note._.ext001': externalNote,
     });
 
@@ -290,7 +292,7 @@ describe('Multi-tenant parallel sync integration', () => {
       device: 'external',
       hlc: { timestamp: Date.now() + 10000, counter: 0, nodeId: 'external' },
     };
-    await seedExternal(sharedCloud, tenantA, 'note', '_', {
+    await seedExternal(toDataAdapter(sharedCloud), tenantA, 'note', '_', {
       'note._.ext-a': externalNote,
     });
 
@@ -344,7 +346,7 @@ describe('Multi-tenant parallel sync integration', () => {
       device: 'auto-device',
       hlc: { timestamp: Date.now() + 20000, counter: 0, nodeId: 'auto-device' },
     };
-    await seedExternal(sharedCloud, tenant, 'note', '_', {
+    await seedExternal(toDataAdapter(sharedCloud), tenant, 'note', '_', {
       'note._.auto-ext': externalNote,
     });
 
@@ -474,3 +476,4 @@ describe('Multi-tenant parallel sync integration', () => {
     expect(titles3).toEqual(['From 1', 'From 2', 'From 3']);
   });
 });
+

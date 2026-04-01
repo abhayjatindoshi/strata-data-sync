@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SyncEngine } from '@strata/sync';
 import type { SyncEvent } from '@strata/sync';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { createDataAdapter } from '../helpers';
 import { createHlc } from '@strata/hlc';
 import { saveAllIndexes } from '@strata/persistence';
 import { EventBus } from '@strata/reactive';
@@ -10,8 +10,8 @@ import { DEFAULT_OPTIONS } from '../helpers';
 
 function makeEngine(opts?: { cloud?: boolean }) {
   const store = new Store(DEFAULT_OPTIONS);
-  const local = new MemoryBlobAdapter();
-  const cloud = opts?.cloud ? new MemoryBlobAdapter() : undefined;
+  const local = createDataAdapter();
+  const cloud = opts?.cloud ? createDataAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };
   const eventBus = new EventBus();
   const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, undefined, DEFAULT_OPTIONS);
@@ -309,3 +309,4 @@ describe('SyncEngine', () => {
     await drainP;
   });
 });
+

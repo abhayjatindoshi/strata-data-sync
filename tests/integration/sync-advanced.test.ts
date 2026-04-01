@@ -16,7 +16,6 @@ const TaskDef = defineEntity<Task>('task');
 
 function createFailingAdapter(): BlobAdapter {
   return {
-    kind: 'blob',
     async read() { throw new Error('Cloud unreachable'); },
     async write() { throw new Error('Cloud unreachable'); },
     async delete() { throw new Error('Cloud unreachable'); },

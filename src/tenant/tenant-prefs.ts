@@ -1,6 +1,6 @@
 import debug from 'debug';
-import type { BlobAdapter, Tenant } from '@strata/adapter';
-import type { PartitionBlob } from '@strata/persistence';
+import type { Tenant } from '@strata/adapter';
+import type { PartitionBlob, DataAdapter } from '@strata/persistence';
 
 const log = debug('strata:tenant');
 
@@ -12,7 +12,7 @@ export type TenantPrefs = {
 };
 
 export async function saveTenantPrefs(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   prefs: TenantPrefs,
 ): Promise<void> {
@@ -25,7 +25,7 @@ export async function saveTenantPrefs(
 }
 
 export async function loadTenantPrefs(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
 ): Promise<TenantPrefs | undefined> {
   const blob = await adapter.read(tenant, TENANT_PREFS_KEY);

@@ -1,6 +1,6 @@
 import debug from 'debug';
-import type { BlobAdapter, Tenant } from '@strata/adapter';
-import type { AllIndexes, PartitionIndex } from '@strata/persistence';
+import type { Tenant } from '@strata/adapter';
+import type { AllIndexes, PartitionIndex, DataAdapter } from '@strata/persistence';
 import { loadAllIndexes } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { PartitionDiffResult } from './types';
@@ -8,8 +8,8 @@ import type { PartitionDiffResult } from './types';
 const log = debug('strata:sync');
 
 export async function loadAllIndexPairs(
-  localAdapter: BlobAdapter,
-  cloudAdapter: BlobAdapter,
+  localAdapter: DataAdapter,
+  cloudAdapter: DataAdapter,
   tenant: Tenant | undefined,
   options: ResolvedStrataOptions,
 ): Promise<{ localIndexes: AllIndexes; cloudIndexes: AllIndexes }> {

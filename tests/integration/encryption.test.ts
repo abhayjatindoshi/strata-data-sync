@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { MemoryStorageAdapter, InvalidEncryptionKeyError, AdapterBridge, EncryptionTransformService } from '@strata/adapter';
-import { Strata, defineEntity, resolveOptions } from '@strata/index';
+import { MemoryBlobAdapter, EncryptionTransformService } from '@strata/adapter';
+import { Strata, defineEntity } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean };
@@ -22,21 +22,19 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
     return s;
   }
 
-  function createStrata(storage?: MemoryStorageAdapter): Strata {
-    const s = storage ?? new MemoryStorageAdapter();
-    const encService = new EncryptionTransformService(resolveOptions());
-    const adapter = new AdapterBridge(s, { transforms: [encService.toTransform()] });
+  function createStrata(storage?: MemoryBlobAdapter): Strata {
+    const s = storage ?? new MemoryBlobAdapter();
     return track(new Strata({
       appId,
       entities: [TaskDef],
-      localAdapter: adapter,
-      encryptionService: encService,
+      localAdapter: s,
+      encryptionService: new EncryptionTransformService({ targets: ['local'] }),
       deviceId: 'dev-1',
     }));
   }
 
   it('encrypted tenant: save, dispose, reload with password', async () => {
-    const storage = new MemoryStorageAdapter();
+    const storage = new MemoryBlobAdapter();
 
     // Phase 1: create encrypted tenant, save data
     const strata1 = createStrata(storage);
@@ -60,7 +58,7 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
   });
 
   it('encrypted tenant: wrong password throws InvalidEncryptionKeyError', async () => {
-    const storage = new MemoryStorageAdapter();
+    const storage = new MemoryBlobAdapter();
     const strata1 = createStrata(storage);
     await strata1.tenants.create({
       name: 'Encrypted',
@@ -76,7 +74,7 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
   });
 
   it('encrypted tenant: no password throws', async () => {
-    const storage = new MemoryStorageAdapter();
+    const storage = new MemoryBlobAdapter();
     const strata1 = createStrata(storage);
     const tenant = await strata1.tenants.create({
       name: 'Encrypted',
@@ -91,7 +89,7 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
   });
 
   it('unencrypted tenant: loads without password', async () => {
-    const storage = new MemoryStorageAdapter();
+    const storage = new MemoryBlobAdapter();
     const strata1 = createStrata(storage);
     const tenant = await strata1.tenants.create({
       name: 'Plain',
@@ -109,7 +107,7 @@ describe('Per-tenant encrypted Strata lifecycle', () => {
   });
 
   it('mixed tenants: one encrypted, one plain on same adapter', async () => {
-    const storage = new MemoryStorageAdapter();
+    const storage = new MemoryBlobAdapter();
     const strata = createStrata(storage);
 
     const encTenant = await strata.tenants.create({

@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { Store } from '@strata/store';
 import { DEFAULT_OPTIONS } from '../helpers';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { createDataAdapter } from '../helpers';
 import { loadPartitionFromAdapter } from '@strata/store/flush';
 
 describe('loadPartitionFromAdapter', () => {
   it('loads entities from blob without deleted section', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const store = new Store(DEFAULT_OPTIONS);
 
     const blob = { task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } }, deleted: {} };
@@ -20,7 +20,7 @@ describe('loadPartitionFromAdapter', () => {
   });
 
   it('returns empty map when blob does not exist', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const store = new Store(DEFAULT_OPTIONS);
 
     const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
@@ -29,7 +29,7 @@ describe('loadPartitionFromAdapter', () => {
   });
 
   it('loads entities and tombstones from blob with deleted section', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const store = new Store(DEFAULT_OPTIONS);
 
     const blob = {
@@ -47,7 +47,7 @@ describe('loadPartitionFromAdapter', () => {
   });
 
   it('handles blob with no tombstones for entity in deleted section', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const store = new Store(DEFAULT_OPTIONS);
 
     const blob = {
@@ -62,3 +62,4 @@ describe('loadPartitionFromAdapter', () => {
     expect(store.getTombstones('task._').size).toBe(0);
   });
 });
+

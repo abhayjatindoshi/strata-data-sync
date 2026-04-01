@@ -4,8 +4,6 @@ import {
   validateEntityDefinitions,
   defineEntity,
   MemoryBlobAdapter,
-  MemoryStorageAdapter,
-  AdapterBridge,
   EncryptionTransformService,
   resolveOptions,
   serialize,
@@ -570,13 +568,12 @@ describe('Strata', () => {
 
     it('throws when no tenant is loaded', async () => {
       const taskDef = defineEntity<Task>('task');
-      const storage = new MemoryStorageAdapter();
-      const encService = new EncryptionTransformService(resolveOptions());
-      const adapter = new AdapterBridge(storage, { transforms: [encService.toTransform()] });
+      const storage = new MemoryBlobAdapter();
+      const encService = new EncryptionTransformService({ targets: ['local'] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: adapter,
+        localAdapter: storage,
         encryptionService: encService,
         deviceId: 'dev',
       });
@@ -586,14 +583,13 @@ describe('Strata', () => {
     });
 
     it('throws when current tenant is not encrypted', async () => {
-      const storage = new MemoryStorageAdapter();
+      const storage = new MemoryBlobAdapter();
       const taskDef = defineEntity<Task>('task');
-      const encService = new EncryptionTransformService(resolveOptions());
-      const adapter = new AdapterBridge(storage, { transforms: [encService.toTransform()] });
+      const encService = new EncryptionTransformService({ targets: ['local'] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: adapter,
+        localAdapter: storage,
         encryptionService: encService,
         deviceId: 'dev',
       });
@@ -605,16 +601,15 @@ describe('Strata', () => {
     });
 
     it('changes password on an encrypted tenant', async () => {
-      const storage = new MemoryStorageAdapter();
+      const storage = new MemoryBlobAdapter();
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant with data
-      const encService1 = new EncryptionTransformService(resolveOptions());
-      const adapter1 = new AdapterBridge(storage, { transforms: [encService1.toTransform()] });
+      const encService1 = new EncryptionTransformService({ targets: ['local'] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: adapter1,
+        localAdapter: storage,
         encryptionService: encService1,
         deviceId: 'dev',
       });
@@ -632,12 +627,11 @@ describe('Strata', () => {
       await strata.dispose();
 
       // Phase 2: Reload with new password
-      const encService2 = new EncryptionTransformService(resolveOptions());
-      const adapter2 = new AdapterBridge(storage, { transforms: [encService2.toTransform()] });
+      const encService2 = new EncryptionTransformService({ targets: ['local'] });
       const strata2 = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: adapter2,
+        localAdapter: storage,
         encryptionService: encService2,
         deviceId: 'dev',
       });
@@ -651,13 +645,12 @@ describe('Strata', () => {
 
     it('throws after dispose', async () => {
       const taskDef = defineEntity<Task>('task');
-      const storage = new MemoryStorageAdapter();
-      const encService = new EncryptionTransformService(resolveOptions());
-      const adapter = new AdapterBridge(storage, { transforms: [encService.toTransform()] });
+      const storage = new MemoryBlobAdapter();
+      const encService = new EncryptionTransformService({ targets: ['local'] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: adapter,
+        localAdapter: storage,
         encryptionService: encService,
         deviceId: 'dev',
       });
@@ -688,16 +681,15 @@ describe('Strata', () => {
 
   describe('open() encryption error paths', () => {
     it('clears encryption and resets tenant on wrong password (catch block)', async () => {
-      const storage = new MemoryStorageAdapter();
+      const storage = new MemoryBlobAdapter();
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant
-      const encService1 = new EncryptionTransformService(resolveOptions());
-      const adapter1 = new AdapterBridge(storage, { transforms: [encService1.toTransform()] });
+      const encService1 = new EncryptionTransformService({ targets: ['local'] });
       const strata1 = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: adapter1,
+        localAdapter: storage,
         encryptionService: encService1,
         deviceId: 'dev',
       });
@@ -711,12 +703,11 @@ describe('Strata', () => {
       await strata1.dispose();
 
       // Phase 2: Try loading with wrong password — should hit catch block
-      const encService2 = new EncryptionTransformService(resolveOptions());
-      const adapter2 = new AdapterBridge(storage, { transforms: [encService2.toTransform()] });
+      const encService2 = new EncryptionTransformService({ targets: ['local'] });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: adapter2,
+        localAdapter: storage,
         encryptionService: encService2,
         deviceId: 'dev',
       });
@@ -729,3 +720,4 @@ describe('Strata', () => {
     });
   });
 });
+

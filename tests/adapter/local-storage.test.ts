@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { StorageAdapter, Tenant } from '@strata/adapter';
+import type { Tenant } from '@strata/adapter';
 import { LocalStorageAdapter } from '@strata/adapter/local-storage';
 
 // Minimal localStorage polyfill for Node
@@ -38,13 +38,9 @@ describe('LocalStorageAdapter', () => {
     (globalThis as Record<string, unknown>).localStorage = originalLS;
   });
 
-  it('has kind "storage"', () => {
-    expect(adapter.kind).toBe('storage');
-  });
-
-  it('uses default prefix when none provided', () => {
+  it('creates with default prefix', () => {
     const defaultAdapter = new LocalStorageAdapter();
-    expect(defaultAdapter.kind).toBe('storage');
+    expect(defaultAdapter).toBeDefined();
   });
 
   describe('read', () => {

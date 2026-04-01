@@ -1,49 +1,69 @@
 import { describe, it, expect } from 'vitest';
-import { gzipTransform } from '@strata/adapter';
+import { withGzip, MemoryBlobAdapter } from '@strata/adapter';
 
-describe('gzipTransform', () => {
-  const transform = gzipTransform();
-
-  it('round-trips data through encode/decode', async () => {
+describe('withGzip', () => {
+  it('round-trips data through write/read', async () => {
+    const inner = new MemoryBlobAdapter();
+    const adapter = withGzip(inner);
     const input = new TextEncoder().encode('Hello, Strata!');
-    const compressed = await transform.encode(undefined, 'test', input);
-    const decompressed = await transform.decode(undefined, 'test', compressed);
-    expect(decompressed).toEqual(input);
+    await adapter.write(undefined, 'test', input);
+    const result = await adapter.read(undefined, 'test');
+    expect(result).toEqual(input);
   });
 
-  it('compressed output differs from input', async () => {
+  it('compressed data on inner adapter differs from input', async () => {
+    const inner = new MemoryBlobAdapter();
+    const adapter = withGzip(inner);
     const input = new TextEncoder().encode('Hello, Strata!');
-    const compressed = await transform.encode(undefined, 'test', input);
-    expect(compressed).not.toEqual(input);
+    await adapter.write(undefined, 'test', input);
+    const raw = await inner.read(undefined, 'test');
+    expect(raw).not.toEqual(input);
   });
 
   it('compresses repetitive data smaller than input', async () => {
+    const inner = new MemoryBlobAdapter();
+    const adapter = withGzip(inner);
     const input = new TextEncoder().encode('A'.repeat(1000));
-    const compressed = await transform.encode(undefined, 'test', input);
-    expect(compressed.length).toBeLessThan(input.length);
+    await adapter.write(undefined, 'test', input);
+    const raw = await inner.read(undefined, 'test');
+    expect(raw!.length).toBeLessThan(input.length);
   });
 
   it('round-trips empty data', async () => {
+    const inner = new MemoryBlobAdapter();
+    const adapter = withGzip(inner);
     const input = new Uint8Array(0);
-    const compressed = await transform.encode(undefined, 'test', input);
-    const decompressed = await transform.decode(undefined, 'test', compressed);
-    expect(decompressed).toEqual(input);
+    await adapter.write(undefined, 'test', input);
+    const result = await adapter.read(undefined, 'test');
+    expect(result).toEqual(input);
   });
 
   it('round-trips large data', async () => {
+    const inner = new MemoryBlobAdapter();
+    const adapter = withGzip(inner);
     const input = new Uint8Array(10_000);
     for (let i = 0; i < input.length; i++) {
       input[i] = i % 256;
     }
-    const compressed = await transform.encode(undefined, 'test', input);
-    const decompressed = await transform.decode(undefined, 'test', compressed);
-    expect(decompressed).toEqual(input);
+    await adapter.write(undefined, 'test', input);
+    const result = await adapter.read(undefined, 'test');
+    expect(result).toEqual(input);
   });
 
-  it('produces valid gzip (starts with gzip magic bytes)', async () => {
+  it('produces valid gzip on inner adapter (starts with gzip magic bytes)', async () => {
+    const inner = new MemoryBlobAdapter();
+    const adapter = withGzip(inner);
     const input = new TextEncoder().encode('test');
-    const compressed = await transform.encode(undefined, 'test', input);
-    expect(compressed[0]).toBe(0x1f);
-    expect(compressed[1]).toBe(0x8b);
+    await adapter.write(undefined, 'test', input);
+    const raw = await inner.read(undefined, 'test');
+    expect(raw![0]).toBe(0x1f);
+    expect(raw![1]).toBe(0x8b);
+  });
+
+  it('read returns null for missing key', async () => {
+    const inner = new MemoryBlobAdapter();
+    const adapter = withGzip(inner);
+    const result = await adapter.read(undefined, 'missing');
+    expect(result).toBeNull();
   });
 });

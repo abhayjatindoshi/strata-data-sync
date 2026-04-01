@@ -1,12 +1,8 @@
-export type { BlobAdapter, Tenant, BlobTransform, StorageAdapter } from './types';
+export type { BlobAdapter, Tenant, EncryptionService } from './types';
 export { partitionBlobKey } from './keys';
-export { MemoryBlobAdapter } from './memory-blob-adapter';
-export { applyTransforms, reverseTransforms } from './transform';
-export { AdapterBridge } from './bridge';
-export type { AdapterBridgeOptions } from './bridge';
-export { MemoryStorageAdapter } from './memory-storage';
+export { MemoryBlobAdapter } from './memory-storage';
 export { LocalStorageAdapter } from './local-storage';
-export { gzipTransform } from './gzip';
+export { withGzip } from './gzip';
 export {
   encrypt, decrypt,
   deriveKey, generateDek, exportDek, importDek,
@@ -15,4 +11,6 @@ export {
 export {
   EncryptionTransformService,
   createEncryptedMarkerDek,
+  withEncryption,
 } from './encryption';
+export type { EncryptionServiceOptions } from './encryption';

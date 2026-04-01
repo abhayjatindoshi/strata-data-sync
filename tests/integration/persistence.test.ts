@@ -7,6 +7,7 @@ import {
   serialize,
   deserialize,
   partitionHash,
+  toDataAdapter,
 } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import type { Hlc } from '@strata/hlc';
@@ -95,8 +96,9 @@ describe('Persistence round-trip integration', () => {
     await strata.dispose();
 
     // Verify separate partition blobs exist
-    const checkingBlob = await localAdapter.read(tenant, 'transaction.checking');
-    const savingsBlob = await localAdapter.read(tenant, 'transaction.savings');
+    const da = toDataAdapter(localAdapter);
+    const checkingBlob = await da.read(tenant, 'transaction.checking');
+    const savingsBlob = await da.read(tenant, 'transaction.savings');
 
     expect(checkingBlob).not.toBeNull();
     expect(savingsBlob).not.toBeNull();
@@ -216,7 +218,8 @@ describe('Persistence round-trip integration', () => {
     await strata.dispose();
 
     // Verify the partition blob contains tombstone
-    const blob = await localAdapter.read(tenant, 'item._');
+    const da2 = toDataAdapter(localAdapter);
+    const blob = await da2.read(tenant, 'item._');
     expect(blob).not.toBeNull();
 
     const data = blob as Record<string, unknown>;

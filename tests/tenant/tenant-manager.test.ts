@@ -1,11 +1,11 @@
-import { DEFAULT_OPTIONS } from '../helpers';
+import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { MemoryBlobAdapter } from '@strata/adapter';
 import { EncryptionTransformService } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
 import type { EntityStore } from '@strata/store';
+import type { DataAdapter } from '@strata/persistence';
 import { loadTenantList, saveTenantList, TenantManager } from '@strata/tenant';
 import type { TenantManagerDeps } from '@strata/tenant';
 
@@ -20,13 +20,13 @@ function stubSyncEngine(): SyncEngineType {
   };
 }
 
-function makeDeps(adapter: MemoryBlobAdapter, overrides?: Partial<TenantManagerDeps>): TenantManagerDeps {
+function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>): TenantManagerDeps {
   return {
     adapter,
     syncEngine: stubSyncEngine(),
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
-    encryptionService: new EncryptionTransformService({ tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
+    encryptionService: new EncryptionTransformService({ targets: [], tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
     entityTypes: [],
@@ -36,20 +36,20 @@ function makeDeps(adapter: MemoryBlobAdapter, overrides?: Partial<TenantManagerD
 
 describe('tenant list persistence', () => {
   it('loadTenantList returns empty array when no blob', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const list = await loadTenantList(adapter, DEFAULT_OPTIONS);
     expect(list).toEqual([]);
   });
 
   it('loadTenantList returns empty when blob has no __tenants key', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     await adapter.write(undefined, DEFAULT_OPTIONS.tenantKey, { deleted: {} });
     const list = await loadTenantList(adapter, DEFAULT_OPTIONS);
     expect(list).toEqual([]);
   });
 
   it('save and load round-trip', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const now = new Date('2026-03-23T12:00:00Z');
     const tenants: Tenant[] = [
       { id: 't1', name: 'Tenant 1', encrypted: false, meta: { folder: 'abc' }, createdAt: now, updatedAt: now },
@@ -62,7 +62,7 @@ describe('tenant list persistence', () => {
   });
 
   it('stores under __tenants key', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const now = new Date();
     await saveTenantList(adapter, [
       { id: 't1', name: 'T', encrypted: false, meta: {}, createdAt: now, updatedAt: now },
@@ -75,7 +75,7 @@ describe('tenant list persistence', () => {
 describe('TenantManager', () => {
   describe('list', () => {
     it('returns empty array initially', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       const list = await tm.list();
       expect(list).toEqual([]);
@@ -84,14 +84,14 @@ describe('TenantManager', () => {
 
   describe('probe', () => {
     it('returns exists: false when no marker found', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       const result = await tm.probe({ meta: { folder: 'missing' } });
       expect(result.exists).toBe(false);
     });
 
     it('returns exists: true with unencrypted marker', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'probe-id' }));
       const tempTenant = { id: 'probe-id', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, {
@@ -105,11 +105,10 @@ describe('TenantManager', () => {
     });
 
     it('returns encrypted: true when read throws (parse failure)', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       // Make read throw to simulate encrypted data parse failure
       const failAdapter = {
         ...adapter,
-        kind: 'blob' as const,
         read: async (tenant: Tenant | undefined, key: string) => {
           if (key === DEFAULT_OPTIONS.markerKey && tenant?.id === 'fail-id') {
             throw new Error('decrypt failed');
@@ -132,7 +131,7 @@ describe('TenantManager', () => {
 
   describe('create', () => {
     it('creates tenant with provided ID', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       const tenant = await tm.create({ name: 'My App', meta: { bucket: 'x' }, id: 'custom-id' });
       expect(tenant.id).toBe('custom-id');
@@ -141,14 +140,14 @@ describe('TenantManager', () => {
     });
 
     it('generates ID when not provided', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       const tenant = await tm.create({ name: 'My App', meta: { bucket: 'x' } });
       expect(tenant.id).toHaveLength(8);
     });
 
     it('derives ID from meta when deriveTenantId is configured', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter, {
         deriveTenantId: (meta) => (meta as { folderId: string }).folderId.substring(0, 4),
       }));
@@ -157,7 +156,7 @@ describe('TenantManager', () => {
     });
 
     it('writes __strata marker blob', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       const created = await tm.create({ name: 'T', meta: { folder: 'f1' } });
       const marker = await adapter.read(created, DEFAULT_OPTIONS.markerKey);
@@ -168,7 +167,7 @@ describe('TenantManager', () => {
     });
 
     it('persists tenant to list', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: {}, id: 'abc' });
       const list = await tm.list();
@@ -179,7 +178,7 @@ describe('TenantManager', () => {
 
   describe('open', () => {
     it('sets active tenant', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T1', meta: {}, id: 't1' });
       await tm.open('t1');
@@ -187,13 +186,13 @@ describe('TenantManager', () => {
     });
 
     it('throws for unknown tenant ID', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await expect(tm.open('unknown')).rejects.toThrow('Tenant not found: unknown');
     });
 
     it('notifies subscribers', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T1', meta: {}, id: 't1' });
 
@@ -207,7 +206,7 @@ describe('TenantManager', () => {
 
   describe('join', () => {
     it('reads marker blob and adds tenant', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'shared-id', name: 'Shared', encrypted: false, meta: { folder: 'shared' }, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
@@ -220,7 +219,7 @@ describe('TenantManager', () => {
     });
 
     it('throws if no marker blob found', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await expect(tm.join({ meta: { folder: 'empty' } })).rejects.toThrow(
         'No strata workspace found',
@@ -228,7 +227,7 @@ describe('TenantManager', () => {
     });
 
     it('returns existing tenant if already in list', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'derived-id', name: '', encrypted: false, meta: { folder: 'f1' }, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
@@ -244,7 +243,7 @@ describe('TenantManager', () => {
     });
 
     it('defaults name to Shared Workspace', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const marker = { version: 1, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'default-id', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
@@ -255,7 +254,7 @@ describe('TenantManager', () => {
     });
 
     it('throws for incompatible workspace version', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const marker = { version: 99, createdAt: new Date().toISOString(), entityTypes: [] };
       const tempTenant: Tenant = { id: 'bad-ver', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
@@ -265,10 +264,9 @@ describe('TenantManager', () => {
     });
 
     it('detects encrypted workspace via parse failure during join', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const failAdapter = {
         ...adapter,
-        kind: 'blob' as const,
         read: async (tenant: Tenant | undefined, key: string) => {
           if (key === DEFAULT_OPTIONS.markerKey && tenant?.id === 'enc-join') {
             throw new Error('decrypt failed');
@@ -290,7 +288,7 @@ describe('TenantManager', () => {
 
   describe('remove', () => {
     it('removes tenant from list', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.remove('t1');
@@ -299,7 +297,7 @@ describe('TenantManager', () => {
     });
 
     it('clears active tenant if removed is active', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.open('t1');
@@ -309,7 +307,7 @@ describe('TenantManager', () => {
     });
 
     it('does not delete cloud data', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       const created = await tm.create({ name: 'T', meta: { f: '1' }, id: 't1' });
       await tm.remove('t1');
@@ -321,7 +319,7 @@ describe('TenantManager', () => {
 
   describe('remove with purge', () => {
     it('removes tenant from list and deletes cloud data', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: { f: '1' }, id: 't1' });
       await tm.remove('t1', { purge: true });
@@ -330,7 +328,7 @@ describe('TenantManager', () => {
     });
 
     it('clears active tenant if deleted is active', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.open('t1');
@@ -339,7 +337,7 @@ describe('TenantManager', () => {
     });
 
     it('is a no-op for unknown tenant ID', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await expect(tm.remove('unknown', { purge: true })).resolves.toBeUndefined();
     });
@@ -347,7 +345,7 @@ describe('TenantManager', () => {
 
   describe('open - encrypted tenant edge cases', () => {
     it('throws when encrypted marker is missing DEK', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
 
       // Create tenant as encrypted
@@ -366,7 +364,7 @@ describe('TenantManager', () => {
     });
 
     it('throws when no password provided for encrypted tenant', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
 
       const now = new Date();
@@ -380,7 +378,7 @@ describe('TenantManager', () => {
 
   describe('open - cloud adapter', () => {
     it('emits cloud-unreachable when cloud sync fails', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const emittedEvents: string[] = [];
       const syncEngine = {
         ...stubSyncEngine(),
@@ -390,7 +388,7 @@ describe('TenantManager', () => {
         },
         emit: (event: { type: string }) => { emittedEvents.push(event.type); },
       };
-      const cloudAdapter = new MemoryBlobAdapter();
+      const cloudAdapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter, { syncEngine: syncEngine as unknown as SyncEngineType, cloudAdapter }));
 
       const now = new Date();
@@ -408,13 +406,13 @@ describe('TenantManager', () => {
 
   describe('changePassword', () => {
     it('throws when no tenant is loaded', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await expect(tm.changePassword('old', 'new')).rejects.toThrow('No tenant loaded');
     });
 
     it('throws when tenant is not encrypted', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: {}, id: 'plain' });
       await tm.open('plain');
@@ -422,7 +420,7 @@ describe('TenantManager', () => {
     });
 
     it('error recovery restores encryption service on failure', async () => {
-      const adapter = new MemoryBlobAdapter();
+      const adapter = createDataAdapter();
       const now = new Date();
       const tenant: Tenant = { id: 'enc-cp', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
       await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
@@ -454,3 +452,4 @@ describe('TenantManager', () => {
     });
   });
 });
+

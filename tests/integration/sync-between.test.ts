@@ -4,6 +4,7 @@ import {
   defineEntity,
   MemoryBlobAdapter,
   resolveOptions,
+  toDataAdapter,
 } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import { loadAllIndexes } from '@strata/persistence';
@@ -59,7 +60,7 @@ describe('syncBetween integration', () => {
 
     await strataA.sync();
 
-    const indexes = await loadAllIndexes(localAdapter, tenant, resolveOptions());
+    const indexes = await loadAllIndexes(toDataAdapter(localAdapter), tenant, resolveOptions());
     const taskIndex = indexes['task'];
     expect(taskIndex).toBeDefined();
     const partitionEntry = Object.values(taskIndex)[0];
@@ -120,8 +121,8 @@ describe('syncBetween integration', () => {
     repo.save({ title: 'Task 1', done: false });
     await strata.sync();
 
-    const localIndexes = await loadAllIndexes(localAdapter, tenant, resolveOptions());
-    const cloudIndexes = await loadAllIndexes(sharedCloud, tenant, resolveOptions());
+    const localIndexes = await loadAllIndexes(toDataAdapter(localAdapter), tenant, resolveOptions());
+    const cloudIndexes = await loadAllIndexes(toDataAdapter(sharedCloud), tenant, resolveOptions());
 
     const localEntry = localIndexes['task']?.['_'];
     const cloudEntry = cloudIndexes['task']?.['_'];

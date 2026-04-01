@@ -1,11 +1,12 @@
-import type { BlobAdapter, Tenant } from '@strata/adapter';
+import type { Tenant } from '@strata/adapter';
 import type { AllIndexes, PartitionIndex, PartitionBlob } from './types';
+import type { DataAdapter } from './blob-io';
 import type { ResolvedStrataOptions } from '../options';
 
 const MARKER_ENTITY_KEY = '__system';
 
 export async function loadAllIndexes(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   options: ResolvedStrataOptions,
 ): Promise<AllIndexes> {
@@ -18,7 +19,7 @@ export async function loadAllIndexes(
 }
 
 export async function saveAllIndexes(
-  adapter: BlobAdapter,
+  adapter: DataAdapter,
   tenant: Tenant | undefined,
   indexes: AllIndexes,
   options: ResolvedStrataOptions,

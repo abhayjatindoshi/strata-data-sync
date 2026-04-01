@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { BlobAdapter } from '@strata/adapter';
+import type { DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { Tenant } from './types';
 import { loadTenantList, saveTenantList } from './tenant-list';
@@ -27,8 +27,8 @@ export function mergeTenantLists(
 }
 
 export async function pushTenantList(
-  localAdapter: BlobAdapter,
-  cloudAdapter: BlobAdapter,
+  localAdapter: DataAdapter,
+  cloudAdapter: DataAdapter,
   options: ResolvedStrataOptions,
 ): Promise<void> {
   const local = await loadTenantList(localAdapter, options);
@@ -37,8 +37,8 @@ export async function pushTenantList(
 }
 
 export async function pullTenantList(
-  localAdapter: BlobAdapter,
-  cloudAdapter: BlobAdapter,
+  localAdapter: DataAdapter,
+  cloudAdapter: DataAdapter,
   options: ResolvedStrataOptions,
 ): Promise<void> {
   const local = await loadTenantList(localAdapter, options);

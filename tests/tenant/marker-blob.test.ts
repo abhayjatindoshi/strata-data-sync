@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { createDataAdapter } from '../helpers';
 import type { Tenant } from '@strata/adapter';
 import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/tenant';
 
@@ -10,7 +10,7 @@ function makeTenant(id: string, meta: Record<string, unknown>): Tenant {
 
 describe('writeMarkerBlob / readMarkerBlob', () => {
   it('round-trips marker blob', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant('t1', { folder: 'test' });
     await writeMarkerBlob(adapter, tenant, ['transaction', 'account'], DEFAULT_OPTIONS);
 
@@ -22,14 +22,14 @@ describe('writeMarkerBlob / readMarkerBlob', () => {
   });
 
   it('returns undefined for missing blob', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant('missing', { folder: 'missing' });
     const result = await readMarkerBlob(adapter, tenant, DEFAULT_OPTIONS);
     expect(result).toBeUndefined();
   });
 
   it('persists entity types array correctly', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant('t2', { bucket: 'x' });
     await writeMarkerBlob(adapter, tenant, ['user', 'post', 'comment'], DEFAULT_OPTIONS);
 
@@ -38,7 +38,7 @@ describe('writeMarkerBlob / readMarkerBlob', () => {
   });
 
   it('writes to __strata key', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant('t3', { f: '1' });
     await writeMarkerBlob(adapter, tenant, [], DEFAULT_OPTIONS);
 
@@ -47,7 +47,7 @@ describe('writeMarkerBlob / readMarkerBlob', () => {
   });
 
   it('persists empty entity types array', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant('t4', {});
     await writeMarkerBlob(adapter, tenant, [], DEFAULT_OPTIONS);
 
@@ -76,10 +76,11 @@ describe('validateMarkerBlob', () => {
 
 describe('readMarkerBlob edge cases', () => {
   it('returns undefined when blob has no __system key', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = createDataAdapter();
     const tenant = makeTenant('t5', {});
     await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, { deleted: {} });
     const result = await readMarkerBlob(adapter, tenant, DEFAULT_OPTIONS);
     expect(result).toBeUndefined();
   });
 });
+
