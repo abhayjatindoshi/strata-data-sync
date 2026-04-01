@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { EncryptionTransformService } from '@strata/adapter';
+import { noopEncryptionService } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
@@ -26,7 +26,7 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
     syncEngine: stubSyncEngine(),
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
-    encryptionService: new EncryptionTransformService({ targets: [], tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
+    encryptionService: noopEncryptionService,
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
     entityTypes: [],
@@ -344,26 +344,7 @@ describe('TenantManager', () => {
   });
 
   describe('open - encrypted tenant edge cases', () => {
-    it('throws when encrypted marker is missing DEK', async () => {
-      const adapter = createDataAdapter();
-      const tm = new TenantManager(makeDeps(adapter));
-
-      // Create tenant as encrypted
-      const now = new Date();
-      const tenant: Tenant = { id: 'enc1', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
-      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
-
-      // Write marker without DEK
-      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, {
-        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [] } },
-        deleted: {},
-      });
-
-      await expect(tm.open('enc1', { password: 'test' })).rejects.toThrow('Encrypted marker missing DEK');
-      expect(tm.activeTenant$.getValue()).toBeUndefined();
-    });
-
-    it('throws when no password provided for encrypted tenant', async () => {
+    it('throws when no credential provided for encrypted tenant', async () => {
       const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
 
@@ -371,7 +352,7 @@ describe('TenantManager', () => {
       const tenant: Tenant = { id: 'enc2', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
       await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
 
-      await expect(tm.open('enc2')).rejects.toThrow('Password required');
+      await expect(tm.open('enc2')).rejects.toThrow('Credential required');
       expect(tm.activeTenant$.getValue()).toBeUndefined();
     });
   });
@@ -404,11 +385,11 @@ describe('TenantManager', () => {
     });
   });
 
-  describe('changePassword', () => {
+  describe('changeCredential', () => {
     it('throws when no tenant is loaded', async () => {
       const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter));
-      await expect(tm.changePassword('old', 'new')).rejects.toThrow('No tenant loaded');
+      await expect(tm.changeCredential('old', 'new')).rejects.toThrow('No tenant loaded');
     });
 
     it('throws when tenant is not encrypted', async () => {
@@ -416,40 +397,46 @@ describe('TenantManager', () => {
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: {}, id: 'plain' });
       await tm.open('plain');
-      await expect(tm.changePassword('old', 'new')).rejects.toThrow('Current tenant is not encrypted');
+      await expect(tm.changeCredential('old', 'new')).rejects.toThrow('Current tenant is not encrypted');
     });
 
-    it('error recovery restores encryption service on failure', async () => {
+    it('error recovery restores encryption lifecycle on failure', async () => {
       const adapter = createDataAdapter();
       const now = new Date();
       const tenant: Tenant = { id: 'enc-cp', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
       await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
 
-      // Write marker with dek field so readMarkerBlob returns valid marker
+      // Write marker with keyData so readMarkerBlob returns valid marker
       await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, {
-        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [], dek: 'fakeDek' } },
+        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [], keyData: { dek: 'fakeDek' } } },
         deleted: {},
       });
 
-      let setupCallCount = 0;
-      const mockEncService = {
-        setup: async () => { setupCallCount++; },
-        setDek: () => {},
-        clear: () => {},
-        toTransform: () => ({ encode: async (_t: unknown, _k: unknown, d: Uint8Array) => d, decode: async (_t: unknown, _k: unknown, d: Uint8Array) => d }),
-      } as unknown as EncryptionTransformService;
+      let activateCallCount = 0;
+      const mockService = {
+        targets: ['local'] as const,
+        activate: async () => { activateCallCount++; },
+        generateKeyData: async () => undefined,
+        loadKeyData: async () => { throw new Error('invalid key data'); },
+        rekey: async () => undefined,
+        deactivate: () => {},
+        get isActive() { return false; },
+        encrypt: async (_blobKey: string, data: Uint8Array) => data,
+        decrypt: async (_blobKey: string, data: Uint8Array) => data,
+      };
 
-      const tm = new TenantManager(makeDeps(adapter, { encryptionService: mockEncService }));
+      const tm = new TenantManager(makeDeps(adapter, { encryptionService: mockService }));
 
       // Manually set active tenant to encrypted tenant (bypass open which needs real crypto)
       (tm as any).subject.next(tenant);
 
-      // importDek will throw since 'fakeDek' is not valid base64 → enters catch block
-      await expect(tm.changePassword('old', 'new')).rejects.toThrow();
+      // loadKeyData will throw → enters catch block
+      await expect(tm.changeCredential('old', 'new')).rejects.toThrow();
 
-      // Verify error recovery called setup again (restore with old password)
-      expect(setupCallCount).toBeGreaterThanOrEqual(3); // setup(old), setup(new), setup(old) recovery
+      // Verify error recovery called activate again (restore with old credential)
+      expect(activateCallCount).toBeGreaterThanOrEqual(2); // activate(old), activate(old) recovery
     });
   });
 });
+
 

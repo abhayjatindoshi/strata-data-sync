@@ -1,4 +1,4 @@
-import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { Strata, defineEntity } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 // ─── Define a Task entity ────────────────────────────────
@@ -12,13 +12,12 @@ async function main() {
   await cleanTmpDir(dataDir);
 
   const storage = new FsStorageAdapter(dataDir);
-  const adapter = new AdapterBridge(storage);
 
   // Create a Strata instance backed by file storage
   const strata = new Strata({
     appId: 'demo',
     entities: [taskDef],
-    localAdapter: adapter,
+    localAdapter: storage,
     deviceId: 'device-1',
   });
 

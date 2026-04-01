@@ -4,7 +4,8 @@ import {
   validateEntityDefinitions,
   defineEntity,
   MemoryBlobAdapter,
-  EncryptionTransformService,
+  Pbkdf2EncryptionService,
+  AesGcmEncryptionStrategy,
   resolveOptions,
   serialize,
 } from '@strata/index';
@@ -196,7 +197,7 @@ describe('Strata', () => {
       expect(strata.tenants.open).toBeTypeOf('function');
       expect(strata.tenants.join).toBeTypeOf('function');
       expect(strata.tenants.remove).toBeTypeOf('function');
-      expect(strata.tenants.changePassword).toBeTypeOf('function');
+      expect(strata.tenants.changeCredential).toBeTypeOf('function');
       expect(strata.tenants.activeTenant$).toBeDefined();
     });
 
@@ -554,7 +555,7 @@ describe('Strata', () => {
     });
   });
 
-  describe('changePassword()', () => {
+  describe('changeCredential()', () => {
     it('throws when no tenant is loaded (blob adapter)', async () => {
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
@@ -563,13 +564,13 @@ describe('Strata', () => {
         localAdapter: makeAdapter(), // BlobAdapter, not StorageAdapter
         deviceId: 'dev',
       });
-      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow();
+      await expect(strata.tenants.changeCredential('old', 'new')).rejects.toThrow();
     });
 
     it('throws when no tenant is loaded', async () => {
       const taskDef = defineEntity<Task>('task');
       const storage = new MemoryBlobAdapter();
-      const encService = new EncryptionTransformService({ targets: ['local'] });
+      const encService = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
@@ -577,7 +578,7 @@ describe('Strata', () => {
         encryptionService: encService,
         deviceId: 'dev',
       });
-      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow(
+      await expect(strata.tenants.changeCredential('old', 'new')).rejects.toThrow(
         'No tenant loaded',
       );
     });
@@ -585,7 +586,7 @@ describe('Strata', () => {
     it('throws when current tenant is not encrypted', async () => {
       const storage = new MemoryBlobAdapter();
       const taskDef = defineEntity<Task>('task');
-      const encService = new EncryptionTransformService({ targets: ['local'] });
+      const encService = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
@@ -595,7 +596,7 @@ describe('Strata', () => {
       });
       const tenant = await strata.tenants.create({ name: 'Plain', meta: {} });
       await strata.tenants.open(tenant.id);
-      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow(
+      await expect(strata.tenants.changeCredential('old', 'new')).rejects.toThrow(
         'Current tenant is not encrypted',
       );
     });
@@ -605,7 +606,7 @@ describe('Strata', () => {
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant with data
-      const encService1 = new EncryptionTransformService({ targets: ['local'] });
+      const encService1 = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
@@ -616,18 +617,18 @@ describe('Strata', () => {
       const tenant = await strata.tenants.create({
         name: 'Encrypted',
         meta: {},
-        encryption: { password: 'oldpass' },
+        encryption: { credential: 'oldpass' },
       });
-      await strata.tenants.open(tenant.id, { password: 'oldpass' });
+      await strata.tenants.open(tenant.id, { credential: 'oldpass' });
       const repo = strata.repo(taskDef) as Repository<Task>;
       repo.save({ title: 'Secret', done: false });
 
       // Change password
-      await strata.tenants.changePassword('oldpass', 'newpass');
+      await strata.tenants.changeCredential('oldpass', 'newpass');
       await strata.dispose();
 
       // Phase 2: Reload with new password
-      const encService2 = new EncryptionTransformService({ targets: ['local'] });
+      const encService2 = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       const strata2 = new Strata({
         appId: 'test-app',
         entities: [taskDef],
@@ -635,7 +636,7 @@ describe('Strata', () => {
         encryptionService: encService2,
         deviceId: 'dev',
       });
-      await strata2.tenants.open(tenant.id, { password: 'newpass' });
+      await strata2.tenants.open(tenant.id, { credential: 'newpass' });
       const repo2 = strata2.repo(taskDef) as Repository<Task>;
       const tasks = repo2.query();
       expect(tasks).toHaveLength(1);
@@ -646,7 +647,7 @@ describe('Strata', () => {
     it('throws after dispose', async () => {
       const taskDef = defineEntity<Task>('task');
       const storage = new MemoryBlobAdapter();
-      const encService = new EncryptionTransformService({ targets: ['local'] });
+      const encService = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
@@ -655,7 +656,7 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       await strata.dispose();
-      await expect(strata.tenants.changePassword('old', 'new')).rejects.toThrow(
+      await expect(strata.tenants.changeCredential('old', 'new')).rejects.toThrow(
         'No tenant loaded',
       );
     });
@@ -685,7 +686,7 @@ describe('Strata', () => {
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant
-      const encService1 = new EncryptionTransformService({ targets: ['local'] });
+      const encService1 = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       const strata1 = new Strata({
         appId: 'test-app',
         entities: [taskDef],
@@ -696,14 +697,14 @@ describe('Strata', () => {
       const tenant = await strata1.tenants.create({
         name: 'Encrypted',
         meta: {},
-        encryption: { password: 'correctpass' },
+        encryption: { credential: 'correctpass' },
       });
-      await strata1.tenants.open(tenant.id, { password: 'correctpass' });
+      await strata1.tenants.open(tenant.id, { credential: 'correctpass' });
       strata1.repo(taskDef).save({ title: 'secret', done: false });
       await strata1.dispose();
 
       // Phase 2: Try loading with wrong password — should hit catch block
-      const encService2 = new EncryptionTransformService({ targets: ['local'] });
+      const encService2 = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
@@ -712,7 +713,7 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       await expect(
-        strata.tenants.open(tenant.id, { password: 'wrongpass' }),
+        strata.tenants.open(tenant.id, { credential: 'wrongpass' }),
       ).rejects.toThrow();
 
       // After error, active tenant should be cleared
@@ -720,4 +721,6 @@ describe('Strata', () => {
     });
   });
 });
+
+
 

@@ -1,11 +1,6 @@
 import debug from 'debug';
 import { BehaviorSubject } from 'rxjs';
 import type { EncryptionService } from '@strata/adapter';
-import {
-  EncryptionTransformService,
-  createEncryptedMarkerDek,
-  importDek,
-} from '@strata/adapter/encryption';
 import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
@@ -92,7 +87,7 @@ export class TenantManager implements TenantManagerType {
     try {
       const marker = await readMarkerBlob(this.deps.adapter, tempTenant, this.deps.options);
       if (!marker) return { exists: false };
-      return { exists: true, encrypted: !!marker.dek, tenantId: id };
+      return { exists: true, encrypted: !!marker.keyData, tenantId: id };
     } catch {
       // Parse failure means encrypted data
       return { exists: true, encrypted: true, tenantId: id };
@@ -120,22 +115,20 @@ export class TenantManager implements TenantManagerType {
       updatedAt: now,
     };
 
-    let dekBase64: string | undefined;
+    let keyData: Record<string, unknown> | undefined;
     if (opts.encryption) {
-      const { dek, dekBase64: b64 } = await createEncryptedMarkerDek();
-      dekBase64 = b64;
-      await this.deps.encryptionService.setup(
-        opts.encryption.password, this.deps.appId,
+      await this.deps.encryptionService.activate(
+        opts.encryption.credential, this.deps.appId,
       );
-      this.deps.encryptionService.setDek(dek);
+      keyData = await this.deps.encryptionService.generateKeyData();
     }
 
     await writeMarkerBlob(
-      this.deps.adapter, tenant, this.deps.entityTypes, this.deps.options, dekBase64,
+      this.deps.adapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
     );
 
     if (opts.encryption) {
-      this.deps.encryptionService.clear();
+      this.deps.encryptionService.deactivate();
     }
 
     await this.persistList([...tenants, tenant]);
@@ -170,7 +163,7 @@ export class TenantManager implements TenantManagerType {
       if (!validateMarkerBlob(marker)) {
         throw new Error('Incompatible strata workspace version');
       }
-      encrypted = !!marker.dek;
+      encrypted = !!marker.keyData;
     } catch (err) {
       if (err instanceof Error && (
         err.message.includes('No strata workspace') ||
@@ -222,7 +215,7 @@ export class TenantManager implements TenantManagerType {
 
   // ─── Hot ops ─────────────────────────────────────────────
 
-  async open(tenantId: string, opts?: { password?: string }): Promise<void> {
+  async open(tenantId: string, opts?: { credential?: string }): Promise<void> {
     await this.close();
 
     const tenants = await this.getList();
@@ -235,22 +228,18 @@ export class TenantManager implements TenantManagerType {
 
     // Encryption setup
     if (tenant.encrypted) {
-      if (!opts?.password) {
+      if (!opts?.credential) {
         this.subject.next(undefined);
-        throw new Error('Password required for encrypted tenant');
+        throw new Error('Credential required for encrypted tenant');
       }
       try {
-        await this.deps.encryptionService.setup(opts.password, this.deps.appId);
+        await this.deps.encryptionService.activate(opts.credential, this.deps.appId);
         const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
-        if (!marker?.dek) {
-          this.deps.encryptionService.clear();
-          this.subject.next(undefined);
-          throw new Error('Encrypted marker missing DEK');
+        if (marker?.keyData) {
+          await this.deps.encryptionService.loadKeyData(marker.keyData);
         }
-        const dek = await importDek(marker.dek);
-        this.deps.encryptionService.setDek(dek);
       } catch (err) {
-        this.deps.encryptionService.clear();
+        this.deps.encryptionService.deactivate();
         this.subject.next(undefined);
         throw err;
       }
@@ -292,39 +281,41 @@ export class TenantManager implements TenantManagerType {
 
     this.deps.store.clear();
     this.deps.dirtyTracker.clear();
-    this.deps.encryptionService.clear();
+    this.deps.encryptionService.deactivate();
     this.subject.next(undefined);
 
     log('tenant closed');
   }
 
-  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  async changeCredential(oldCredential: string, newCredential: string): Promise<void> {
     const tenant = this.subject.getValue();
     if (!tenant) throw new Error('No tenant loaded');
     if (!tenant.encrypted) throw new Error('Current tenant is not encrypted');
 
-    // Validate old password: re-derive marker key and try to read through encryption.
-    // If oldPassword is wrong, AES-GCM decryption will throw InvalidEncryptionKeyError.
     try {
-      await this.deps.encryptionService.setup(oldPassword, this.deps.appId);
+      await this.deps.encryptionService.activate(oldCredential, this.deps.appId);
       const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
       if (!marker) throw new Error('Failed to read marker blob');
+      if (marker.keyData) {
+        await this.deps.encryptionService.loadKeyData(marker.keyData);
+      }
 
-      // Old password verified — now switch to new password
-      await this.deps.encryptionService.setup(newPassword, this.deps.appId);
-      this.deps.encryptionService.setDek(await importDek(marker.dek!));
-
-      await writeMarkerBlob(
-        this.deps.adapter, tenant, marker.entityTypes, this.deps.options, marker.dek,
+      // Old credential verified — rekey with new credential
+      const newKeyData = await this.deps.encryptionService.rekey(
+        newCredential, this.deps.appId,
       );
 
-      log('encryption password changed');
+      await writeMarkerBlob(
+        this.deps.adapter, tenant, marker.entityTypes, this.deps.options, newKeyData,
+      );
+
+      log('encryption credential changed');
     } catch (err) {
-      // Restore encryption service to current state (re-setup with old password)
-      await this.deps.encryptionService.setup(oldPassword, this.deps.appId);
+      // Restore encryption lifecycle to current state
+      await this.deps.encryptionService.activate(oldCredential, this.deps.appId).catch(() => {});
       const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options).catch(() => null);
-      if (marker?.dek) {
-        this.deps.encryptionService.setDek(await importDek(marker.dek));
+      if (marker?.keyData) {
+        await this.deps.encryptionService.loadKeyData(marker.keyData).catch(() => {});
       }
       throw err;
     }

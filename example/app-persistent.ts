@@ -1,4 +1,4 @@
-import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { Strata, defineEntity } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir, printTree } from './common';
 
 // ─── Entity ──────────────────────────────────────────────
@@ -14,14 +14,13 @@ async function main() {
   await cleanTmpDir(tmpDir);
 
   const storage = new FsStorageAdapter(tmpDir);
-  const adapter = new AdapterBridge(storage);
 
   // ── Session 1: create tenant and save tasks ────────────
   console.log('=== Session 1: Write ===');
   const db1 = new Strata({
     appId: 'persistent-demo',
     entities: [Task],
-    localAdapter: adapter,
+    localAdapter: storage,
     deviceId: 'device-1',
   });
 
@@ -54,7 +53,7 @@ async function main() {
   const db2 = new Strata({
     appId: 'persistent-demo',
     entities: [Task],
-    localAdapter: adapter,
+    localAdapter: storage,
     deviceId: 'device-1',
   });
 
@@ -71,3 +70,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

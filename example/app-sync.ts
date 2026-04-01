@@ -1,4 +1,4 @@
-import { Strata, MemoryBlobAdapter, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
 import type { SyncEvent } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
@@ -19,7 +19,7 @@ async function main() {
   const device1 = new Strata({
     appId: 'demo',
     entities: [taskDef],
-    localAdapter: new AdapterBridge(storage1),
+    localAdapter: storage1,
     cloudAdapter,
     deviceId: 'device-1',
   });
@@ -27,7 +27,7 @@ async function main() {
   const device2 = new Strata({
     appId: 'demo',
     entities: [taskDef],
-    localAdapter: new AdapterBridge(storage2),
+    localAdapter: storage2,
     cloudAdapter,
     deviceId: 'device-2',
   });

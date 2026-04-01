@@ -12,7 +12,7 @@ export type MarkerData = {
   readonly createdAt: Date;
   readonly entityTypes: readonly string[];
   readonly indexes?: AllIndexes;
-  readonly dek?: string;
+  readonly keyData?: Record<string, unknown>;
 };
 
 export async function writeMarkerBlob(
@@ -20,14 +20,14 @@ export async function writeMarkerBlob(
   tenant: Tenant | undefined,
   entityTypes: readonly string[],
   options: ResolvedStrataOptions,
-  dekBase64?: string,
+  keyData?: Record<string, unknown>,
 ): Promise<void> {
   const marker: MarkerData = {
     version: 1,
     createdAt: new Date(),
     entityTypes,
     indexes: {},
-    ...(dekBase64 ? { dek: dekBase64 } : {}),
+    ...(keyData ? { keyData } : {}),
   };
   const blob: PartitionBlob = {
     [MARKER_ENTITY_KEY]: { marker },

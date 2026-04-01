@@ -4,7 +4,9 @@ import { createHlc } from '@strata/hlc';
 import type { Hlc } from '@strata/hlc';
 import type { BlobAdapter, EncryptionService } from '@strata/adapter';
 import {
-  EncryptionTransformService,
+  noopEncryptionService,
+} from '@strata/adapter';
+import {
   withEncryption,
 } from '@strata/adapter/encryption';
 import type { EntityDefinition } from '@strata/schema';
@@ -90,26 +92,21 @@ export class Strata {
     validateEntityDefinitions(config.entities);
     this.config = config;
     const resolvedOptions = resolveOptions(config.options);
-    const encryptionService = config.encryptionService ?? new EncryptionTransformService({
-      targets: [],
-      tenantKey: resolvedOptions.tenantKey,
-      markerKey: resolvedOptions.markerKey,
-    });
+    const encryptionService = config.encryptionService ?? noopEncryptionService;
+
     const store = new Store(resolvedOptions);
 
     // Apply encryption wrapping based on targets
     let localBlobAdapter = config.localAdapter;
     let cloudBlobAdapter = config.cloudAdapter;
 
-    if (config.encryptionService) {
-      const targets = config.encryptionService.targets;
-      if (targets.includes('local')) {
-        localBlobAdapter = withEncryption(localBlobAdapter, config.encryptionService);
-      }
-      if (targets.includes('cloud')) {
-        if (!cloudBlobAdapter) throw new Error('Encryption target "cloud" requires cloudAdapter');
-        cloudBlobAdapter = withEncryption(cloudBlobAdapter, config.encryptionService);
-      }
+    const targets = encryptionService.targets;
+    if (targets.includes('local')) {
+      localBlobAdapter = withEncryption(localBlobAdapter, encryptionService);
+    }
+    if (targets.includes('cloud')) {
+      if (!cloudBlobAdapter) throw new Error('Encryption target "cloud" requires cloudAdapter');
+      cloudBlobAdapter = withEncryption(cloudBlobAdapter, encryptionService);
     }
 
     // Convert to DataAdapter for internal use

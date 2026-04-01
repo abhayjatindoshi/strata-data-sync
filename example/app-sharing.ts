@@ -1,7 +1,6 @@
 import {
   Strata,
   MemoryBlobAdapter,
-  AdapterBridge,
   defineEntity,
   saveTenantPrefs,
 } from 'strata-data-sync';
@@ -33,11 +32,10 @@ async function main() {
   console.log('--- User A: Creating workspace ---');
 
   const storageA = new FsStorageAdapter(dataDir + '-deviceA');
-  const localA = new AdapterBridge(storageA);
   const strataA = new Strata({
     appId: 'sharing-demo',
     entities: [TaskDef],
-    localAdapter: localA,
+    localAdapter: storageA,
     cloudAdapter: sharedCloud,
     deviceId: 'device-A',
     deriveTenantId,
@@ -75,7 +73,6 @@ async function main() {
   console.log('--- User B: Joining workspace ---');
 
   const storageB = new FsStorageAdapter(dataDir + '-deviceB');
-  const localB = new AdapterBridge(storageB);
   const strataB = new Strata({
     appId: 'sharing-demo',
     entities: [TaskDef],

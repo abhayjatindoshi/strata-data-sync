@@ -1,4 +1,4 @@
-import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { Strata, defineEntity } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 type Task = { title: string; done: boolean };
@@ -9,12 +9,11 @@ async function main() {
   await cleanTmpDir(dataDir);
 
   const storage = new FsStorageAdapter(dataDir);
-  const adapter = new AdapterBridge(storage);
 
   const strata = new Strata({
     appId: 'multi-tenant-demo',
     entities: [TaskDef],
-    localAdapter: adapter,
+    localAdapter: storage,
     deviceId: 'device-1',
   });
 
@@ -77,3 +76,4 @@ async function main() {
 }
 
 main();
+

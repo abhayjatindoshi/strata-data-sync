@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { EncryptionTransformService } from '@strata/adapter';
+import { noopEncryptionService } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
@@ -34,7 +34,7 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
     syncEngine: stubSyncEngine(),
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
-    encryptionService: new EncryptionTransformService({ targets: [], tenantKey: DEFAULT_OPTIONS.tenantKey, markerKey: DEFAULT_OPTIONS.markerKey }),
+    encryptionService: noopEncryptionService,
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
     entityTypes: [],

@@ -1,4 +1,4 @@
-import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { Strata, defineEntity } from 'strata-data-sync';
 import type { BlobMigration } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
@@ -7,7 +7,6 @@ async function main() {
   await cleanTmpDir(dataDir);
 
   const storage = new FsStorageAdapter(dataDir);
-  const adapter = new AdapterBridge(storage);
 
   // ── Phase 1 — Save data WITHOUT migrations ──────────────
 
@@ -19,7 +18,7 @@ async function main() {
   const strata1 = new Strata({
     appId: 'migration-demo',
     entities: [taskDefV0],
-    localAdapter: adapter,
+    localAdapter: storage,
     deviceId: 'device-1',
   });
 
@@ -62,7 +61,7 @@ async function main() {
   const strata2 = new Strata({
     appId: 'migration-demo',
     entities: [taskDefV1],
-    localAdapter: adapter,
+    localAdapter: storage,
     deviceId: 'device-1',
     migrations: [migration],
   });
@@ -79,3 +78,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

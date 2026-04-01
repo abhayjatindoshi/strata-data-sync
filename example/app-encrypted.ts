@@ -1,10 +1,9 @@
 import {
   Strata,
-  AdapterBridge,
-  EncryptionTransformService,
+  Pbkdf2EncryptionService,
+  AesGcmEncryptionStrategy,
   defineEntity,
   InvalidEncryptionKeyError,
-  resolveOptions,
 } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir, printTree } from './common';
 
@@ -16,14 +15,14 @@ async function main() {
   await cleanTmpDir(tmpDir);
 
   const storage = new FsStorageAdapter(tmpDir);
-  const encryptionService = new EncryptionTransformService(resolveOptions());
-  const adapter = new AdapterBridge(storage, {
-    transforms: [encryptionService.toTransform()],
+  const encryptionService = new Pbkdf2EncryptionService({
+    targets: ['local'],
+    strategy: new AesGcmEncryptionStrategy(),
   });
   const strata = new Strata({
     appId: 'demo',
     entities: [NoteDef],
-    localAdapter: adapter,
+    localAdapter: storage,
     encryptionService,
     deviceId: 'device-1',
   });
@@ -32,7 +31,7 @@ async function main() {
   const encrypted = await strata.tenants.create({
     name: 'Secure',
     meta: {},
-    encryption: { password: 'secret123' },
+    encryption: { credential: 'secret123' },
   });
   console.log('Created encrypted tenant:', encrypted.id);
 
@@ -44,7 +43,7 @@ async function main() {
   console.log('Created unencrypted tenant:', unencrypted.id);
 
   // 3. Open encrypted tenant with password, save notes, query
-  await strata.tenants.open(encrypted.id, { password: 'secret123' });
+  await strata.tenants.open(encrypted.id, { credential: 'secret123' });
   const repo = strata.repo(NoteDef);
   repo.save({ title: 'Secret Note', body: 'Eyes only' });
   repo.save({ title: 'Another Secret', body: 'Classified' });
@@ -73,7 +72,7 @@ async function main() {
 
   // 6. Try opening with WRONG password
   try {
-    await strata.tenants.open(encrypted.id, { password: 'wrongpass' });
+    await strata.tenants.open(encrypted.id, { credential: 'wrongpass' });
   } catch (err) {
     if (err instanceof InvalidEncryptionKeyError) {
       console.log('Wrong password');
@@ -92,3 +91,4 @@ async function main() {
 }
 
 main();
+

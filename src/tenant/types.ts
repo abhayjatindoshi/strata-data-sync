@@ -18,7 +18,7 @@ export type CreateTenantOptions = {
   readonly name: string;
   readonly meta: Record<string, unknown>;
   readonly id?: string;
-  readonly encryption?: { readonly password: string };
+  readonly encryption?: { readonly credential: string };
 };
 
 export type JoinTenantOptions = {
@@ -32,8 +32,8 @@ export type TenantManager = {
   create(opts: CreateTenantOptions): Promise<Tenant>;
   join(opts: JoinTenantOptions): Promise<Tenant>;
   remove(tenantId: string, opts?: { purge?: boolean }): Promise<void>;
-  open(tenantId: string, opts?: { password?: string }): Promise<void>;
+  open(tenantId: string, opts?: { credential?: string }): Promise<void>;
   close(): Promise<void>;
-  changePassword(oldPassword: string, newPassword: string): Promise<void>;
+  changeCredential(oldCredential: string, newCredential: string): Promise<void>;
   readonly activeTenant$: BehaviorSubject<Tenant | undefined>;
 };

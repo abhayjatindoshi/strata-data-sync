@@ -1,4 +1,4 @@
-import { Strata, AdapterBridge, LocalStorageAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, LocalStorageAdapter, defineEntity } from 'strata-data-sync';
 
 // ─── Entity Definitions ──────────────────────────────────
 
@@ -10,7 +10,7 @@ export const taskDef = defineEntity<Task>('task');
 export const strata = new Strata({
   appId: 'react-example',
   entities: [taskDef],
-  localAdapter: new AdapterBridge(new LocalStorageAdapter('react-example')),
+  localAdapter: new LocalStorageAdapter('react-example'),
   deviceId: 'browser-1',
 });
 

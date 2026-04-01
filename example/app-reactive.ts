@@ -1,4 +1,4 @@
-import { Strata, AdapterBridge, defineEntity } from 'strata-data-sync';
+import { Strata, defineEntity } from 'strata-data-sync';
 import { Subscription } from 'rxjs';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
@@ -13,12 +13,11 @@ async function main() {
   await cleanTmpDir(dataDir);
 
   const storage = new FsStorageAdapter(dataDir);
-  const adapter = new AdapterBridge(storage);
 
   const strata = new Strata({
     appId: 'reactive-demo',
     entities: [TaskDef],
-    localAdapter: adapter,
+    localAdapter: storage,
     deviceId: 'device-1',
   });
 
@@ -115,3 +114,4 @@ async function main() {
 }
 
 main().catch(console.error);
+
