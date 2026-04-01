@@ -9,17 +9,17 @@
 
 | ID | Severity | Issue | Flagged by |
 |----|----------|-------|-----------|
-| SH1 | Security-High | `changePassword()` never validates old password | All 4 |
-| W3 | Warning | Magic byte `0x7B` encryption detection is brittle | Opus, Sonnet |
+| ~~SH1~~ | ~~Security-High~~ | ~~`changePassword()` never validates old password~~ | ~~All 4~~ |
+| ~~W3~~ | ~~Warning~~ | ~~Magic byte `0x7B` encryption detection is brittle — no longer exists in code~~ | ~~Opus, Sonnet~~ |
 | W4 | Warning | `tombstoneRetentionMs` accepted but never implemented — unbounded growth | Opus |
-| W5 | Warning | `unloadCurrentTenant()` leaves `activeTenant$` stale | GPT-5.4 |
-| W6 | Warning | `loadTenant` has no concurrency guard — orphaned schedulers possible | Sonnet |
+| ~~W5~~ | ~~Warning~~ | ~~`unloadCurrentTenant()` leaves `activeTenant$` stale — renamed to `close()`, properly clears~~ | ~~GPT-5.4~~ |
+| ~~W6~~ | ~~Warning~~ | ~~`loadTenant` has no concurrency guard — `open()` now calls `close()` first~~ | ~~Sonnet~~ |
 | W7 | Warning | `sync()` return value only reports `local→cloud`, not full round-trip | Opus |
 | W8 | Warning | Cloud sync failure during `loadTenant()` silently swallowed | Opus |
 | W9 | Warning | `partitionsSynced` double-counts merged partitions | Sonnet |
 | L12 | Low | Non-null assertion `marker.dek!` — opaque error if undefined | Sonnet |
 | L13 | Low | `StrataConfig.entities` typed as `EntityDefinition<any>[]` — weakens type safety | Sonnet |
-| S13 | Suggestion | Validate `oldPassword` explicitly before accepting password rotation | Codex |
+| ~~S13~~ | ~~Suggestion~~ | ~~Validate `oldPassword` explicitly before accepting password rotation — now validated via AES-GCM decryption~~ | ~~Codex~~ |
 
 ---
 
@@ -110,7 +110,7 @@
 
 | ID | Severity | Issue | Flagged by |
 |----|----------|-------|-----------|
-| S5 | Suggestion | File is empty except for a comment — consider removing | Opus |
+| ~~S5~~ | ~~Suggestion~~ | ~~File is empty except for a comment — intentionally cleared, documents removal reason~~ | ~~Opus~~ |
 
 ---
 
@@ -213,7 +213,7 @@ No issues flagged.
 | ID | Severity | Issue | Flagged by |
 |----|----------|-------|-----------|
 | W26 | Warning | `pushTenantList` overwrites cloud list without merging | Opus |
-| W27 | Warning | Date comparison in `mergeTenantLists` may fail after deserialization | Opus |
+| ~~W27~~ | ~~Warning~~ | ~~Date comparison in `mergeTenantLists` may fail after deserialization — works correctly, `>` operator on Date objects is valid~~ | ~~Opus~~ |
 
 ### `marker-blob.ts`
 
