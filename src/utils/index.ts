@@ -9,4 +9,4 @@ export {
   aesGcmEncrypt, aesGcmDecrypt,
 } from './crypto';
 export { FNV_OFFSET, FNV_PRIME, fnv1a, fnv1aAppend } from './fnv';
-export { compareValues } from './compare';
+export { compareValues, valuesEqual } from './compare';

@@ -6,7 +6,11 @@ export function toArrayBuffer(data: Uint8Array): ArrayBuffer {
 }
 
 export function toBase64(data: Uint8Array): string {
-  return btoa(String.fromCharCode(...data));
+  let binary = '';
+  for (let i = 0; i < data.length; i++) {
+    binary += String.fromCharCode(data[i]);
+  }
+  return btoa(binary);
 }
 
 export function fromBase64(base64: string): Uint8Array {

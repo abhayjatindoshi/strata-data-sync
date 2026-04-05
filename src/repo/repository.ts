@@ -55,6 +55,9 @@ export class Repository<T> {
     let entityKey: string;
 
     if (partial.id) {
+      if (!partial.id.startsWith(this.definition.name + '.')) {
+        throw new Error(`Entity ID "${partial.id}" does not belong to repository "${this.definition.name}"`);
+      }
       id = partial.id;
       entityKey = parseEntityKey(id);
     } else {

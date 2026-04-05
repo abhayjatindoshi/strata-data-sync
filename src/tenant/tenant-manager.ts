@@ -108,6 +108,10 @@ export class TenantManager implements TenantManagerType {
       id = this.deriveId(opts.meta);
     }
 
+    if (tenants.some(t => t.id === id)) {
+      return tenants.find(t => t.id === id)!;
+    }
+
     const now = new Date();
     const encrypted = !!opts.encryption;
     const tenant: Tenant = {
@@ -205,6 +209,10 @@ export class TenantManager implements TenantManagerType {
     const tenants = await this.getList();
     const tenant = tenants.find(t => t.id === tenantId);
 
+    // Update list first — safer on crash (leaves orphaned data, not orphaned listing)
+    const filtered = tenants.filter(t => t.id !== tenantId);
+    await this.persistList(filtered);
+
     if (opts?.purge && tenant) {
       const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
       if (marker?.indexes) {
@@ -216,9 +224,6 @@ export class TenantManager implements TenantManagerType {
       }
       await this.deps.adapter.delete(tenant, this.deps.options.markerKey);
     }
-
-    const filtered = tenants.filter(t => t.id !== tenantId);
-    await this.persistList(filtered);
 
     if (this.deps.tenantContext.activeTenant?.id === tenantId) {
       this.deps.tenantContext.clear();

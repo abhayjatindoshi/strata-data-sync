@@ -11,10 +11,12 @@ export class Store implements EntityStore {
   private readonly tombstones = new Map<string, Map<string, Hlc>>();
   private readonly dirtyKeys = new Set<string>();
   private readonly markerKey: string;
-  private storedMarkerBlob: PartitionBlob | null = null;
+  private readonly tombstoneRetentionMs: number;
+  private cachedMarkerBlob: PartitionBlob | null = null;
 
   constructor(options: ResolvedStrataOptions) {
     this.markerKey = options.markerKey;
+    this.tombstoneRetentionMs = options.tombstoneRetentionMs;
   }
 
   getEntity(entityKey: string, id: string): unknown | undefined {
@@ -28,7 +30,9 @@ export class Store implements EntityStore {
       this.partitions.set(entityKey, partition);
     }
     partition.set(id, entity);
+    this.tombstones.get(entityKey)?.delete(id);
     this.dirtyKeys.add(entityKey);
+    this.cachedMarkerBlob = null;
   }
 
   deleteEntity(entityKey: string, id: string): boolean {
@@ -37,6 +41,7 @@ export class Store implements EntityStore {
     const deleted = partition.delete(id);
     if (deleted) {
       this.dirtyKeys.add(entityKey);
+      this.cachedMarkerBlob = null;
     }
     return deleted;
   }
@@ -47,13 +52,14 @@ export class Store implements EntityStore {
 
   getAllPartitionKeys(entityName: string): ReadonlyArray<string> {
     const prefix = `${entityName}.`;
-    const keys: string[] = [];
+    const keys = new Set<string>();
     for (const key of this.partitions.keys()) {
-      if (key.startsWith(prefix)) {
-        keys.push(key);
-      }
+      if (key.startsWith(prefix)) keys.add(key);
     }
-    return keys;
+    for (const key of this.tombstones.keys()) {
+      if (key.startsWith(prefix)) keys.add(key);
+    }
+    return [...keys];
   }
 
   getDirtyKeys(): ReadonlySet<string> {
@@ -83,6 +89,7 @@ export class Store implements EntityStore {
     }
     partition.set(entityId, hlc);
     this.dirtyKeys.add(entityKey);
+    this.cachedMarkerBlob = null;
   }
 
   getTombstones(entityKey: string): ReadonlyMap<string, Hlc> {
@@ -93,14 +100,17 @@ export class Store implements EntityStore {
     this.partitions.clear();
     this.tombstones.clear();
     this.dirtyKeys.clear();
-    this.storedMarkerBlob = null;
+    this.cachedMarkerBlob = null;
   }
 
   // ─── StorageAdapter interface ─────────────────────────────
 
   async read(_tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null> {
     if (key === this.markerKey) {
-      return this.buildMarkerBlob();
+      if (!this.cachedMarkerBlob) {
+        this.cachedMarkerBlob = this.buildMarkerBlob();
+      }
+      return this.cachedMarkerBlob;
     }
     const parsed = parseCompositeKey(key);
     if (!parsed) return null;
@@ -114,8 +124,11 @@ export class Store implements EntityStore {
       entities[id] = entity;
     }
     const tombstoneEntries: Record<string, Hlc> = {};
+    const cutoff = Date.now() - this.tombstoneRetentionMs;
     for (const [id, hlc] of this.getTombstones(key)) {
-      tombstoneEntries[id] = hlc;
+      if (hlc.timestamp >= cutoff) {
+        tombstoneEntries[id] = hlc;
+      }
     }
     return {
       [entityName]: entities,
@@ -123,11 +136,14 @@ export class Store implements EntityStore {
     };
   }
 
+  // write() intentionally does not mark dirty — it's used by sync to import
+  // remote data into memory. Only user mutations via setEntity/deleteEntity
+  // should trigger dirty tracking and subsequent sync cycles.
   async write(_tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void> {
     if (key === this.markerKey) {
-      this.storedMarkerBlob = data;
-      return;
+      return; // marker is always computed from live state
     }
+    this.cachedMarkerBlob = null;
     const parsed = parseCompositeKey(key);
     if (!parsed) return;
     const entityName = parsed.entityName;
@@ -179,7 +195,7 @@ export class Store implements EntityStore {
 
       indexes[entityName][partitionKey] = {
         hash: partitionHash(hlcMap),
-        count: hlcMap.size,
+        count: partition.size,
         deletedCount: tombstoneMap.size,
         updatedAt: Date.now(),
       };

@@ -75,22 +75,25 @@ async function planCopies(
   applyToB: SyncChange[],
   migrations?: ReadonlyArray<BlobMigration>,
 ): Promise<void> {
-  for (const partitionKey of aOnly) {
-    const key = partitionBlobKey(entityName, partitionKey);
-    let blob = await adapterA.read(tenant, key);
-    if (blob) {
-      if (migrations) blob = migrateBlob(blob, migrations, entityName);
-      applyToB.push({ entityName, partitionKey, key, blob });
-    }
-  }
-  for (const partitionKey of bOnly) {
-    const key = partitionBlobKey(entityName, partitionKey);
-    let blob = await adapterB.read(tenant, key);
-    if (blob) {
-      if (migrations) blob = migrateBlob(blob, migrations, entityName);
-      applyToA.push({ entityName, partitionKey, key, blob });
-    }
-  }
+  const reads = [
+    ...aOnly.map(async (partitionKey) => {
+      const key = partitionBlobKey(entityName, partitionKey);
+      let blob = await adapterA.read(tenant, key);
+      if (blob) {
+        if (migrations) blob = migrateBlob(blob, migrations, entityName);
+        applyToB.push({ entityName, partitionKey, key, blob });
+      }
+    }),
+    ...bOnly.map(async (partitionKey) => {
+      const key = partitionBlobKey(entityName, partitionKey);
+      let blob = await adapterB.read(tenant, key);
+      if (blob) {
+        if (migrations) blob = migrateBlob(blob, migrations, entityName);
+        applyToA.push({ entityName, partitionKey, key, blob });
+      }
+    }),
+  ];
+  await Promise.all(reads);
 }
 
 async function planMerges(
@@ -139,12 +142,12 @@ async function applyChanges(
   }
 }
 
-async function isStale(
+async function checkStale(
   adapter: DataAdapter,
   tenant: Tenant | undefined,
   snapshot: AllIndexes,
   options?: ResolvedStrataOptions,
-): Promise<boolean> {
+): Promise<{ stale: boolean; currentIndexes: AllIndexes }> {
   const current = await loadAllIndexes(adapter, tenant, options!);
   for (const entityName of Object.keys(snapshot)) {
     const snapIndex = snapshot[entityName] ?? {};
@@ -153,10 +156,12 @@ async function isStale(
       ...Object.keys(snapIndex), ...Object.keys(curIndex),
     ]);
     for (const key of allKeys) {
-      if (snapIndex[key]?.hash !== curIndex[key]?.hash) return true;
+      if (snapIndex[key]?.hash !== curIndex[key]?.hash) {
+        return { stale: true, currentIndexes: current };
+      }
     }
   }
-  return false;
+  return { stale: false, currentIndexes: current };
 }
 
 // ─── Index computation ───────────────────────────────────
@@ -271,24 +276,24 @@ export async function syncBetween(
   await applyChanges(adapterB, tenant, plan.applyToB);
 
   // Phase 3: stale check, then write to A
-  const stale = await isStale(adapterA, tenant, plan.indexSnapshotA, options);
+  const { stale, currentIndexes: existingIdxA } = await checkStale(adapterA, tenant, plan.indexSnapshotA, options);
   if (!stale && plan.applyToA.length > 0) {
     await applyChanges(adapterA, tenant, plan.applyToA);
   }
 
-  // Update indexes on both sides for all synced partitions
-  const allChanges = deduplicateChanges([...plan.applyToA, ...plan.applyToB]);
-  const indexUpdates = computeIndexUpdates(allChanges);
-  const [existingIdxA, existingIdxB] = await Promise.all([
-    loadAllIndexes(adapterA, tenant, options!),
-    loadAllIndexes(adapterB, tenant, options!),
-  ]);
+  // Update indexes — each adapter only gets updates for changes actually written to it
+  // Reuse existingIdxA from stale check to avoid redundant read
+  const appliedToA = stale ? [] : plan.applyToA;
+  const indexUpdatesA = computeIndexUpdates(deduplicateChanges(appliedToA));
+  const indexUpdatesB = computeIndexUpdates(deduplicateChanges(plan.applyToB));
+  const existingIdxB = await loadAllIndexes(adapterB, tenant, options!);
   await Promise.all([
-    saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdates), options!),
-    saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdates), options!),
+    saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdatesA), options!),
+    saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options!),
   ]);
 
-  const maxHlc = findMaxHlc(allChanges);
+  const allApplied = deduplicateChanges([...appliedToA, ...plan.applyToB]);
+  const maxHlc = findMaxHlc(allApplied);
 
   log(
     'syncBetween complete: %d→B, %d→A, stale=%s',

@@ -1,4 +1,4 @@
-import { compareValues } from '@strata/utils';
+import { compareValues, valuesEqual } from '@strata/utils';
 
 export function applyWhere<T>(
   entities: ReadonlyArray<T>,
@@ -6,7 +6,7 @@ export function applyWhere<T>(
 ): ReadonlyArray<T> {
   const keys = Object.keys(where) as Array<keyof T>;
   return entities.filter(entity =>
-    keys.every(key => entity[key] === where[key]),
+    keys.every(key => valuesEqual(entity[key], where[key])),
   );
 }
 

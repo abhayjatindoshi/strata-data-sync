@@ -3,7 +3,11 @@ import { compositeKey, toBase64, fromBase64 } from '@strata/utils';
 
 export class LocalStorageAdapter implements StorageAdapter {
 
-  constructor(private readonly prefix: string = 'strata') {}
+  constructor(private readonly prefix: string = 'strata') {
+    if (typeof globalThis.localStorage === 'undefined') {
+      throw new Error('LocalStorageAdapter requires a browser environment with localStorage');
+    }
+  }
 
   private prefixedKey(compositeKey: string): string {
     return `${this.prefix}:${compositeKey}`;
@@ -18,10 +22,14 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async write(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<void> {
-    globalThis.localStorage.setItem(
-      this.prefixedKey(compositeKey(tenant, key)),
-      toBase64(data),
-    );
+    try {
+      globalThis.localStorage.setItem(
+        this.prefixedKey(compositeKey(tenant, key)),
+        toBase64(data),
+      );
+    } catch (e) {
+      throw new Error(`localStorage write failed for key "${key}": ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {

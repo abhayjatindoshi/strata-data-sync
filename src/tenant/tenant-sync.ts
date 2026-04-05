@@ -18,7 +18,7 @@ export function mergeTenantLists(
 
   for (const tenant of remote) {
     const existing = merged.get(tenant.id);
-    if (!existing || tenant.updatedAt > existing.updatedAt) {
+    if (!existing || new Date(tenant.updatedAt).getTime() > new Date(existing.updatedAt).getTime()) {
       merged.set(tenant.id, tenant);
     }
   }
@@ -31,9 +31,13 @@ export async function pushTenantList(
   cloudAdapter: DataAdapter,
   options: ResolvedStrataOptions,
 ): Promise<void> {
-  const local = await loadTenantList(localAdapter, options);
-  await saveTenantList(cloudAdapter, local, options);
-  log('pushed tenant list (%d tenants)', local.length);
+  const [local, remote] = await Promise.all([
+    loadTenantList(localAdapter, options),
+    loadTenantList(cloudAdapter, options),
+  ]);
+  const merged = mergeTenantLists(local, remote);
+  await saveTenantList(cloudAdapter, merged, options);
+  log('pushed tenant list (%d tenants)', merged.length);
 }
 
 export async function pullTenantList(

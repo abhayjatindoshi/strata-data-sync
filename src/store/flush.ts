@@ -21,16 +21,15 @@ export async function loadPartitionFromAdapter(
   if (!blob) return new Map();
 
   if (migrations && migrations.length > 0) {
-    blob = migrateBlob(blob, migrations);
+    blob = migrateBlob(blob, migrations, entityName);
   }
 
   const entities =
     (blob[entityName] as Record<string, unknown> | undefined) ?? {};
   const tombstoneData = blob.deleted[entityName] ?? {};
 
-  const entityKey = partitionBlobKey(entityName, partitionKey);
   for (const [id, hlc] of Object.entries(tombstoneData)) {
-    store.setTombstone(entityKey, id, hlc);
+    store.setTombstone(key, id, hlc);
   }
 
   return new Map(Object.entries(entities));

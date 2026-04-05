@@ -26,7 +26,21 @@ describe('Pbkdf2EncryptionService', () => {
     expect(encoded).toEqual(data);
   });
 
-  it('encrypts/decrypts __strata with KEK', async () => {
+  it('throws when encrypting partition data with DEK not loaded', async () => {
+    const svc = createService();
+    const keys = await svc.deriveKeys('password', appId); // keys.dek is null
+    const data = new Uint8Array([1, 2, 3]);
+    await expect(svc.encrypt('task.global', data, keys)).rejects.toThrow('DEK not loaded');
+  });
+
+  it('throws when decrypting partition data with DEK not loaded', async () => {
+    const svc = createService();
+    const keys = await svc.deriveKeys('password', appId); // keys.dek is null
+    const data = new Uint8Array([1, 2, 3]);
+    await expect(svc.decrypt('task.global', data, keys)).rejects.toThrow('DEK not loaded');
+  });
+
+  it('encrypts/decrypts __strata with KEK even when DEK is null', async () => {
     const svc = createService();
     const keys = await svc.deriveKeys('password', appId);
     const data = new TextEncoder().encode('marker data');

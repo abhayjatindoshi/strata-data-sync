@@ -117,6 +117,23 @@ The framework exports the individual query stages for advanced use:
 | `applyOrderBy(entities, orderBy)` | Sorts by one or more fields with direction |
 | `applyPagination(entities, offset, limit)` | Applies offset/limit slicing |
 
+### Supported Field Types
+
+Entity fields are JSON-serializable. The query system supports these types across all operations:
+
+| Type | `where` | `orderBy` | `range` | Sort order |
+|------|---------|-----------|---------|------------|
+| `string` | ✓ | ✓ | ✓ | lexicographic |
+| `number` | ✓ | ✓ | ✓ | numeric |
+| `boolean` | ✓ | ✓ | ✓ | `false` < `true` |
+| `Date` | ✓ | ✓ | ✓ | chronological |
+| `null` | ✓ | ✓ | ✓ | less than all values |
+| `undefined` | ✓ | ✓ | ✓ | less than all values (incl. null) |
+| nested object | ✗ | ✗ | ✗ | not comparable |
+| array | ✗ | ✗ | ✗ | not comparable |
+
+When sorting mixed-type fields, values are ordered by type rank: `undefined` < `null` < `boolean` < `number` < `string` < `Date`.
+
 ### Batch Event Semantics
 
 - `saveMany()` performs all Map writes then emits a **single** change signal

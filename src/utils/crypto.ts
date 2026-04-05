@@ -1,8 +1,8 @@
-import { toArrayBuffer } from './buffer';
+import { toArrayBuffer, toBase64 } from './buffer';
 
 // ─── Constants ───────────────────────────────────────────
 
-const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_ITERATIONS = 600_000;
 const IV_LENGTH = 12;
 const ENCRYPTION_VERSION = 1;
 
@@ -44,7 +44,7 @@ export async function aesGcmGenerateKey(): Promise<CryptoKey> {
 
 export async function exportCryptoKey(key: CryptoKey): Promise<string> {
   const raw = await globalThis.crypto.subtle.exportKey('raw', key);
-  return btoa(String.fromCharCode(...new Uint8Array(raw)));
+  return toBase64(new Uint8Array(raw));
 }
 
 export async function importAesGcmKey(base64: string): Promise<CryptoKey> {
@@ -81,6 +81,10 @@ export async function aesGcmDecrypt(
   data: Uint8Array,
   key: CryptoKey,
 ): Promise<Uint8Array> {
+  const minLength = 1 + IV_LENGTH + 1; // version + IV + at least 1 byte ciphertext
+  if (data.length < minLength) {
+    throw new Error(`Encrypted data too short (${data.length} bytes, minimum ${minLength})`);
+  }
   const version = data[0];
   if (version !== ENCRYPTION_VERSION) {
     throw new Error(`Unsupported encryption version: ${version}`);

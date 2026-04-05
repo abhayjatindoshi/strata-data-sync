@@ -62,26 +62,31 @@ export class Pbkdf2EncryptionService implements EncryptionService {
   }
 
   // ── Encrypt / Decrypt (stateless — keys passed in) ─────
+  //
+  // Key semantics:
+  //   keys === null       → unencrypted tenant, pass data through unchanged
+  //   keys.kek only       → marker blob can be encrypted/decrypted with KEK
+  //   keys.dek === null   → lifecycle error, DEK not yet loaded — throw
+  //   keys.dek present    → partition data encrypted/decrypted with DEK
+  //
+  // The tenant list key is always unencrypted so tenants can be
+  // enumerated before authentication.
 
   async encrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys | null): Promise<Uint8Array> {
+    if (blobKey === this.tenantKey) return data; // always unencrypted
     const k = this.castKeys(keys);
-    if (blobKey === this.tenantKey) return data;
-    if (blobKey === this.markerKey) {
-      if (!k?.kek) return data;
-      return this.strategy.encrypt(data, k.kek);
-    }
-    if (!k?.dek) return data;
+    if (!k) return data; // unencrypted tenant
+    if (blobKey === this.markerKey) return this.strategy.encrypt(data, k.kek);
+    if (!k.dek) throw new Error('DEK not loaded — cannot encrypt partition data');
     return this.strategy.encrypt(data, k.dek);
   }
 
   async decrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys | null): Promise<Uint8Array> {
+    if (blobKey === this.tenantKey) return data; // always unencrypted
     const k = this.castKeys(keys);
-    if (blobKey === this.tenantKey) return data;
-    if (blobKey === this.markerKey) {
-      if (!k?.kek) return data;
-      return this.strategy.decrypt(data, k.kek);
-    }
-    if (!k?.dek) return data;
+    if (!k) return data; // unencrypted tenant
+    if (blobKey === this.markerKey) return this.strategy.decrypt(data, k.kek);
+    if (!k.dek) throw new Error('DEK not loaded — cannot decrypt partition data');
     return this.strategy.decrypt(data, k.dek);
   }
 
