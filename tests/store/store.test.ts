@@ -220,23 +220,6 @@ describe('EntityStore', () => {
       expect(result).toBe(true);
     });
 
-    it('list returns keys matching prefix', async () => {
-      const store = new Store(DEFAULT_OPTIONS);
-      store.setEntity('task._', 'id1', {});
-      store.setEntity('task.2026-01', 'id2', {});
-      store.setEntity('note._', 'id3', {});
-      const keys = await store.list(undefined, 'task');
-      expect(keys).toHaveLength(2);
-      expect(keys).toContain('task._');
-      expect(keys).toContain('task.2026-01');
-    });
-
-    it('list returns empty for no matches', async () => {
-      const store = new Store(DEFAULT_OPTIONS);
-      const keys = await store.list(undefined, 'missing');
-      expect(keys).toEqual([]);
-    });
-
     it('write ignores key without dot separator', async () => {
       const store = new Store(DEFAULT_OPTIONS);
       await store.write(undefined, 'nodot', { nodot: {}, deleted: {} });

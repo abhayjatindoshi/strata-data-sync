@@ -6,6 +6,7 @@ import type { EntityEvent } from '@strata/reactive';
 import { Store } from '@strata/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 import { SyncEngine } from '@strata/sync';
+import type { SyncEvent } from '@strata/sync';
 
 function makeEngine(opts?: { cloud?: boolean }) {
   const store = new Store(DEFAULT_OPTIONS);
@@ -13,7 +14,8 @@ function makeEngine(opts?: { cloud?: boolean }) {
   const cloud = opts?.cloud !== false ? createDataAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };
   const eventBus = new EventBus<EntityEvent>();
-  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, undefined, DEFAULT_OPTIONS);
+  const syncEventBus = new EventBus<SyncEvent>();
+  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, syncEventBus, undefined, DEFAULT_OPTIONS);
   return { engine, store, local, cloud };
 }
 

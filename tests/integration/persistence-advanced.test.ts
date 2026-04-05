@@ -51,7 +51,6 @@ describe('Persistence advanced integration', () => {
         await rawAdapter.write(cm, key, xor(data));
       },
       async delete(cm, key) { return rawAdapter.delete(cm, key); },
-      async list(cm, prefix) { return rawAdapter.list(cm, prefix); },
     };
 
     // Phase 1: Save through transformed adapter
@@ -108,8 +107,11 @@ describe('Persistence advanced integration', () => {
 
     await strata.dispose();
 
-    const keys = await localAdapter.list(tenant, 'transaction.');
-    expect(keys.sort()).toEqual(['transaction.checking', 'transaction.savings']);
+    // Verify partitioned blobs were flushed
+    const checking = await localAdapter.read(tenant, 'transaction.checking');
+    const savings = await localAdapter.read(tenant, 'transaction.savings');
+    expect(checking).not.toBeNull();
+    expect(savings).not.toBeNull();
   });
 });
 

@@ -70,8 +70,8 @@ describe('Lifecycle advanced integration', () => {
     await strata.dispose();
 
     // After dispose, data should be flushed to local adapter
-    const keys = await innerAdapter.list(tenant, 'task.');
-    expect(keys.length).toBeGreaterThan(0);
+    const blob = await innerAdapter.read(tenant, 'task._');
+    expect(blob).not.toBeNull();
   });
 
   it('tenant load triggers hydrate from cloud automatically', async () => {

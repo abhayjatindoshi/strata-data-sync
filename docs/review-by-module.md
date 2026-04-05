@@ -1,297 +1,298 @@
-# Code Review Issues — Grouped by Module
+# Code Review — By Module
 
-> Reorganized from [consolidated-review.md](consolidated-review.md)  
-> Severity key: **C** = Critical, **SH** = Security-High, **SM** = Security-Medium, **SL** = Security-Low, **W** = Warning, **L** = Low/Info, **S** = Suggestion
+Issues from the consolidated review, reorganized by module and file.
 
----
-
-## `src/strata.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| ~~SH1~~ | ~~Security-High~~ | ~~`changePassword()` never validates old password~~ | ~~All 4~~ |
-| ~~W3~~ | ~~Warning~~ | ~~Magic byte `0x7B` encryption detection is brittle — no longer exists in code~~ | ~~Opus, Sonnet~~ |
-| W4 | Warning | `tombstoneRetentionMs` accepted but never implemented — unbounded growth | Opus |
-| ~~W5~~ | ~~Warning~~ | ~~`unloadCurrentTenant()` leaves `activeTenant$` stale — renamed to `close()`, properly clears~~ | ~~GPT-5.4~~ |
-| ~~W6~~ | ~~Warning~~ | ~~`loadTenant` has no concurrency guard — `open()` now calls `close()` first~~ | ~~Sonnet~~ |
-| W7 | Warning | `sync()` return value only reports `local→cloud`, not full round-trip | Opus |
-| W8 | Warning | Cloud sync failure during `loadTenant()` silently swallowed | Opus |
-| W9 | Warning | `partitionsSynced` double-counts merged partitions | Sonnet |
-| L12 | Low | Non-null assertion `marker.dek!` — opaque error if undefined | Sonnet |
-| L13 | Low | `StrataConfig.entities` typed as `EntityDefinition<any>[]` — weakens type safety | Sonnet |
-| ~~S13~~ | ~~Suggestion~~ | ~~Validate `oldPassword` explicitly before accepting password rotation — now validated via AES-GCM decryption~~ | ~~Codex~~ |
+> Source: [consolidated-review.md](consolidated-review.md) (March 30, 2026)
+> Status updated: April 5, 2026
 
 ---
 
-## `src/adapter/`
+## adapter
 
-### `encryption.ts`
+### encryption.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| SH2 | Security-High | Encryption silently fails open when DEK is null (encode) | Opus, Sonnet, GPT-5.4 |
-| SH3 | Security-High | Silent decode bypass when DEK null returns ciphertext as plaintext | Sonnet |
-| SL1 | Security-Low | Tenant list `__tenants` explicitly unencrypted | Opus |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| SH2 | security-high | OPEN | Encryption silently fails open when DEK is null (encode returns plaintext) | Opus, Sonnet, GPT-5.4 |
+| SH3 | security-high | OPEN | Silent decode bypass when DEK null returns ciphertext as plaintext | Sonnet |
+| SL1 | security-low | OPEN | Tenant list `__tenants` explicitly unencrypted — undocumented | Opus |
 
-### `crypto.ts`
+### local-storage.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| SM1 | Security-Medium | PBKDF2 uses static `appId` as salt | Opus, Sonnet, GPT-5.4 |
-| SM4 | Security-Medium | PBKDF2 iteration count below OWASP recommendation | Opus |
-| SL2 | Security-Low | `decrypt` lacks minimum buffer length guard | Sonnet |
-| SL3 | Security-Low | `exportDek` spread pattern fragile for larger keys | Opus |
-| S1 | Suggestion | Use `crypto.getRandomValues()` for random salt | Opus, Sonnet |
-| S2 | Suggestion | Add minimum buffer length guard in `decrypt` | Sonnet |
-
-### `local-storage.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W1 | Warning | `String.fromCharCode(...data)` stack overflow for large blobs | All 4 |
-| W2 | Warning | No error handling for `localStorage.setItem()` when quota exceeded | Opus |
-| L14 | Low | `list()` O(n) over all `localStorage` keys including unrelated libraries | Sonnet |
-| L15 | Low | No guard for environments without `localStorage` (SSR/worker contexts) | Sonnet |
-| S3 | Suggestion | Replace spread-based base64 with chunked conversion | All 4 |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W1 | warning | OPEN | `String.fromCharCode(...data)` stack overflow for large blobs | All 4 |
+| W2 | warning | OPEN | No error handling for `localStorage.setItem()` when quota exceeded | Opus |
+| L14 | low | ~~FIXED~~ | ~~`list()` O(n) over all `localStorage` keys~~ — `list()` removed from interface | Sonnet |
+| L15 | low | OPEN | No guard for environments without `localStorage` (SSR/worker contexts) | Sonnet |
+| S3 | suggestion | OPEN | Replace spread-based base64 with chunked conversion | All 4 |
 
 ---
 
-## `src/repo/`
+## hlc
 
-### `repository.ts`
+### hlc.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| C1 | **Critical** | `saveMany()`/`deleteMany()` bypass EventBus — dirty tracking broken | All 4 |
-| W33 | Warning | Caller-supplied IDs trusted without verifying they belong to current repository | GPT-5.4 |
-| L23 | Low | `parseEntityKey` silently returns `""` for malformed IDs instead of throwing | Sonnet, Codex |
-| L25 | Low | `observeQuery` re-executes full query on every entity change signal | Sonnet |
-| S9 | Suggestion | `query()` collects all entities before applying `limit` — add early termination | Sonnet |
-| S10 | Suggestion | Emit through `eventBus` in `saveMany`/`deleteMany` — batched event is sufficient | Codex |
-
-### `query.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W34 | Warning | `compareValues` returns 0 for unsupported types — silent no-op sorting | GPT-5.4, Codex |
-| W35 | Warning | `applyOrderBy` inherits `compareValues` silent no-op for unsupported types | Codex |
-| L24 | Low | `applyWhere` uses strict `===` — breaks for `Date` and object field comparisons | Sonnet |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W37 | warning | OPEN | No drift detection or capping — rogue node can corrupt all timestamps | Sonnet |
+| L16 | low | OPEN | Counter unbounded growth in rapid-event scenarios | Sonnet |
 
 ---
 
-## `src/store/`
+## persistence
 
-### `store.ts`
+### hash.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| C3 | **Critical** | Tombstone resurrection inconsistency — `setEntity()` doesn't clear pre-existing tombstones | GPT-5.4 |
-| C4 | **Critical** | `list()` omits tombstone-only partitions — deletions never pushed to remote | Opus, Sonnet |
-| W10 | Warning | `storedMarkerBlob` is dead code — written but never read | Sonnet |
-| W11 | Warning | Marker reads ignore `storedMarkerBlob`, synthesize fresh, drop persisted metadata | GPT-5.4 |
-| W38 | Warning | `write()` through BlobAdapter interface doesn't mark dirty — intentional but undocumented | Opus |
-| L5 | Low | `EntityStore extends BlobAdapter` — tight coupling between store and sync abstractions | Opus |
-| L6 | Low | `buildMarkerBlob` relies on entities having `.hlc` — unsafe type assertion | Opus |
-| L7 | Low | `buildMarkerBlob` sets `updatedAt: Date.now()` on every read even when no data changed | Sonnet |
-| L8 | Low | `count: hlcMap.size` includes tombstones — differs from expected "live entity count" semantics | Sonnet |
-| L9 | Low | `buildMarkerBlob` skips entities without `hlc` — hash diverges from `unified.ts:buildHlcMap` | Sonnet |
-| L10 | Low | `read()` returns null for regular keys when empty, but returns blob for marker key — asymmetry | Opus |
-| S6 | Suggestion | Document that `write()` via BlobAdapter intentionally doesn't track dirty state | Opus |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W25 | warning | OPEN | 32-bit FNV-1a collisions can hide real divergence | GPT-5.4 |
+| L4 | low | OPEN | `charCodeAt` hashes surrogate pairs (UCS-2), diverges from other implementations | Sonnet |
+| S8 | suggestion | OPEN | DRY: `fnv1a()` can delegate to `fnv1aAppend(FNV_OFFSET, input)` | Sonnet |
 
-### `flush.ts`
+### partition-index.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| C5 | **Critical** | Migration scoping bug — entity name not passed to `migrateBlob()` | GPT-5.4, Codex |
-| L11 | Low | `partitionBlobKey` called twice with identical arguments — redundant | Sonnet |
-| S7 | Suggestion | Pass `entityName` to `migrateBlob` during partition load | GPT-5.4, Codex |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W22 | warning | OPEN | `saveAllIndexes` read-modify-write race condition | Opus |
+| W23 | warning | OPEN | Multiple unchecked runtime casts to `Record<string, unknown>` | Sonnet |
+| L3 | low | OPEN | Marker defaults `createdAt: new Date()` on every save when existing is empty | Opus |
 
-### `flush-scheduler.ts`
+### serialize.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| ~~S5~~ | ~~Suggestion~~ | ~~File is empty except for a comment — intentionally cleared, documents removal reason~~ | ~~Opus~~ |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W24 | warning | OPEN | `{ __t: 'D', v: string }` marker collides with user data shapes | Sonnet, GPT-5.4 |
+| SM3 | security-medium | OPEN | No schema validation on deserialization — `JSON.parse` result cast directly to `T` | Sonnet |
+| L2 | low | OPEN | Limited custom type serialization — only `Date` handled | Opus |
 
----
+### types.ts
 
-## `src/sync/`
-
-### `unified.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| C2 | **Critical** | Stale index advancement without data application | GPT-5.4 |
-| W19 | Warning | `buildHlcMap` assumes `.hlc` exists — undefined if missing | Sonnet, GPT-5.4, Codex |
-| W20 | Warning | Index updates not atomic with data writes — crash causes stale indexes | Opus |
-| W21 | Warning | `isStale()` misses concurrent first-partition creation for new entities | GPT-5.4 |
-| L19 | Low | Stale check re-reads all indexes from adapter A — expensive for large index sets | Sonnet |
-| S4 | Suggestion | Parallelize blob reads in `planCopies`/`planMerges` for high-latency adapters | Opus, Sonnet |
-
-### `sync-engine.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W12 | Warning | Queue deduplication ignores tenant context | Opus |
-| W13 | Warning | Deduped sync returns `EMPTY_RESULT` not real result | Sonnet, GPT-5.4, Codex |
-| W14 | Warning | `drain()` can busy-wait with `setTimeout(r, 0)` | Sonnet |
-| W15 | Warning | `processQueue` is fire-and-forget — errors not propagated | Sonnet |
-| L17 | Low | Sync result captured via closure mutation — fragile pattern | Opus |
-| L18 | Low | `emitEntityChanges` assumes key contains a dot — returns `""` if not | Sonnet |
-
-### `sync-scheduler.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W16 | Warning | `setInterval` without in-flight guard; operations pile up | Opus, Codex |
-| W17 | Warning | Cloud timer clears dirty before memory flush | GPT-5.4 |
-| W18 | Warning | Cloud sync scheduler errors only logged via debug, not propagated | Opus |
-| S14 | Suggestion | Add in-flight guards or switch to self-scheduling await loops | Codex |
-
-### `merge.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| C3 | **Critical** | `mergePartition()` copies both entity and tombstone for `localOnly`/`cloudOnly` IDs instead of resolving via HLC | GPT-5.4 |
-
-### `conflict.ts` / `diff.ts` / `dirty-tracker.ts`
-
-No issues flagged.
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| L1 | low | OPEN | `PartitionBlob` index signature creates type ambiguity with fixed fields | Opus, Sonnet |
 
 ---
 
-## `src/persistence/`
+## reactive
 
-### `serialize.ts`
+### event-bus.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| SM3 | Security-Medium | No schema validation on deserialization — `JSON.parse` cast directly to `T` | Sonnet |
-| W24 | Warning | `{ __t: 'D', v: string }` marker collides with user data shapes | Sonnet, GPT-5.4 |
-| L2 | Low | Limited custom type serialization — only `Date` handled; `Map`, `Set`, `RegExp` silently lost | Opus |
-
-### `partition-index.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W22 | Warning | `saveAllIndexes` read-modify-write race condition | Opus |
-| W23 | Warning | Multiple unchecked runtime casts to `Record<string, unknown>` | Sonnet |
-| L3 | Low | Marker defaults `createdAt: new Date()` on every save when existing is empty | Opus |
-
-### `hash.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W25 | Warning | 32-bit FNV-1a collisions can hide real divergence | GPT-5.4 |
-| L4 | Low | `charCodeAt` hashes surrogate pairs (UCS-2), diverges from other FNV-1a implementations | Sonnet |
-| S8 | Suggestion | DRY: `fnv1a()` can delegate to `fnv1aAppend(FNV_OFFSET, input)` | Sonnet |
-
-### `types.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| L1 | Low | `PartitionBlob` index signature creates type ambiguity with fixed fields | Opus, Sonnet |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W36 | warning | ~~FIXED~~ | ~~`emit()` no listener isolation; one throw aborts all~~ — now RxJS Subject-based | GPT-5.4 |
 
 ---
 
-## `src/tenant/`
+## repo
 
-### `tenant-manager.ts`
+### repository.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| SM2 | Security-Medium | `Math.random()` for tenant ID generation (predictable, collisions) | All 4 |
-| SM5 | Security-Medium | TOCTOU window for duplicate ID detection during `create()` | Sonnet |
-| W28 | Warning | `create()` doesn't reject duplicate tenant IDs | GPT-5.4, Codex |
-| W29 | Warning | Persist path `[...tenants, tenant]` lacks duplicate-ID guard | Codex |
-| W30 | Warning | `delete()` non-atomic; data wiped but tenant stays listed on crash | Opus, Sonnet |
-| L22 | Low | Cached tenant list can become stale across tabs/instances | Opus, Sonnet |
-| S15 | Suggestion | Add duplicate ID detection before create persists tenants | Codex |
-| S16 | Suggestion | Consider cache invalidation strategy for multi-tab scenarios | Opus |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| C1 | critical | ~~FIXED~~ | ~~`saveMany()`/`deleteMany()` bypass EventBus~~ — all ops now emit through EventBus | All 4 |
+| W33 | warning | OPEN | Caller-supplied IDs trusted without verifying they belong to current repository | GPT-5.4 |
+| L23 | low | OPEN | `parseEntityKey` silently returns `""` for malformed IDs | Sonnet, Codex |
+| L25 | low | OPEN | `observeQuery` re-executes full query on every entity change signal | Sonnet |
+| S9 | suggestion | OPEN | `query()` collects all entities before applying `limit` — add early termination | Sonnet |
+| S10 | suggestion | ~~FIXED~~ | ~~Emit through `eventBus` in `saveMany`/`deleteMany`~~ — implemented | Codex |
 
-### `tenant-sync.ts`
+### query.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W26 | Warning | `pushTenantList` overwrites cloud list without merging | Opus |
-| ~~W27~~ | ~~Warning~~ | ~~Date comparison in `mergeTenantLists` may fail after deserialization — works correctly, `>` operator on Date objects is valid~~ | ~~Opus~~ |
-
-### `marker-blob.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W31 | Warning | `writeMarkerBlob` resets `createdAt` on every call | Opus, Sonnet |
-| W32 | Warning | `writeMarkerBlob` creates fresh marker with `indexes: {}`, discarding existing index data | Opus |
-| L20 | Low | `readMarkerBlob` performs unchecked cast — no schema validation on stored data | Sonnet |
-
-### `tenant-list.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| L21 | Low | `loadTenantList` unchecked cast `as Tenant[]` — no validation of stored fields | Opus, Sonnet |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W34 | warning | OPEN | `compareValues` returns 0 for unsupported types — silent no-op sorting | GPT-5.4, Codex |
+| W35 | warning | OPEN | `applyOrderBy` inherits `compareValues` silent no-op for unsupported types | Codex |
+| L24 | low | OPEN | `applyWhere` uses strict `===` — breaks for `Date` and object field comparisons | Sonnet |
 
 ---
 
-## `src/schema/`
+## schema
 
-### `id.ts`
+### define-entity.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| SM2 | Security-Medium | `Math.random()` for entity ID generation (predictable, collisions) | All 4 |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| S11 | suggestion | OPEN | `deriveId` should also reject colons and null bytes | Sonnet |
 
-### `define-entity.ts`
+### id.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| S11 | Suggestion | `deriveId` should also reject colons and null bytes (namespace collision risk) | Sonnet |
-
----
-
-## `src/hlc/`
-
-### `hlc.ts`
-
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W37 | Warning | No drift detection or capping — rogue node can corrupt all timestamps | Sonnet |
-| L16 | Low | Counter unbounded growth in rapid-event scenarios — can bloat HLC string | Sonnet |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| SM2 | security-medium | OPEN | `Math.random()` for ID generation — predictable, collision risk | All 4 |
 
 ---
 
-## `src/reactive/`
+## store
 
-### `event-bus.ts`
+### store.ts
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| W36 | Warning | `emit()` no listener isolation; one throwing listener aborts all and bubbles into caller | GPT-5.4 |
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| C3 | critical | OPEN | Tombstone resurrection inconsistency — `setEntity()` doesn't clear tombstones | GPT-5.4 |
+| C4 | critical | OPEN | `getAllPartitionKeys()` omits tombstone-only partitions — deletions never synced | Opus, Sonnet |
+| W10 | warning | OPEN | `storedMarkerBlob` is dead code — written but never read | Sonnet |
+| W11 | warning | OPEN | Marker reads ignore `storedMarkerBlob`, synthesize fresh | GPT-5.4 |
+| W38 | warning | OPEN | `write()` through BlobAdapter doesn't mark dirty — undocumented | Opus |
+| L6 | low | OPEN | `buildMarkerBlob` relies on entities having `.hlc` — unsafe assertion | Opus |
+| L7 | low | OPEN | `buildMarkerBlob` sets `updatedAt: Date.now()` on every read even when unchanged | Sonnet |
+| L8 | low | OPEN | `count: hlcMap.size` includes tombstones | Sonnet |
+| L9 | low | OPEN | `buildMarkerBlob` skips entities without `hlc` — hash diverges from `unified.ts` | Sonnet |
+| L10 | low | OPEN | `read()` returns null for regular keys but blob for marker key — asymmetry | Opus |
+| S6 | suggestion | OPEN | Document that `write()` via BlobAdapter intentionally doesn't track dirty state | Opus |
+
+### flush.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| C5 | critical | OPEN | Migration scoping bug — entity name not passed to `migrateBlob` | GPT-5.4, Codex |
+| L11 | low | OPEN | `partitionBlobKey` called twice with identical arguments — redundant | Sonnet |
+| S7 | suggestion | OPEN | Pass `entityName` to `migrateBlob` during partition load | GPT-5.4, Codex |
+
+### flush-scheduler.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| S5 | suggestion | OPEN | File is empty except for a comment — consider removing | Opus |
+
+### types.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| L5 | low | OPEN | `EntityStore extends DataAdapter` — tight coupling | Opus |
 
 ---
 
-## `src/index.ts`
+## sync
 
-| ID | Severity | Issue | Flagged by |
-|----|----------|-------|-----------|
-| L26 | Low | Barrel re-export exposes all internal types as public API surface | Sonnet |
-| S12 | Suggestion | Restrict barrel exports to consumer-facing types only | Sonnet |
+### sync-engine.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W12 | warning | OPEN | Queue deduplication ignores tenant context | Opus |
+| W13 | warning | OPEN | Deduped sync returns `EMPTY_RESULT` not real result | Sonnet, GPT-5.4, Codex |
+| W14 | warning | OPEN | `drain()` can busy-wait with `setTimeout(r, 0)` | Sonnet |
+| W15 | warning | OPEN | `processQueue` is fire-and-forget — errors not propagated | Sonnet |
+| W16 | warning | OPEN | `setInterval` without in-flight guard; operations pile up | Opus, Codex |
+| W17 | warning | OPEN | Cloud timer clears dirty before memory flush | GPT-5.4 |
+| W18 | warning | OPEN | Cloud sync scheduler errors only logged via debug, not propagated | Opus |
+| L17 | low | OPEN | Sync result captured via closure mutation — fragile pattern | Opus |
+| L18 | low | OPEN | `emitEntityChanges` assumes key contains a dot | Sonnet |
+| S14 | suggestion | OPEN | Add in-flight guards or switch to self-scheduling await loops | Codex |
+
+### unified.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| C2 | critical | OPEN | Stale index advancement without data application | GPT-5.4 |
+| W19 | warning | OPEN | `buildHlcMap` assumes `.hlc` exists — undefined if missing | Sonnet, GPT-5.4, Codex |
+| W20 | warning | OPEN | Index updates not atomic with data writes | Opus |
+| W21 | warning | OPEN | `isStale()` misses concurrent first-partition creation for new entities | GPT-5.4 |
+| L19 | low | OPEN | Stale check re-reads all indexes — expensive for large index sets | Sonnet |
+| S4 | suggestion | OPEN | Parallelize blob reads in `planCopies`/`planMerges` | Opus, Sonnet |
 
 ---
 
-## Summary by Module
+## tenant
 
-| Module | Critical | Sec-High | Sec-Med | Sec-Low | Warnings | Low | Suggestions | **Total** |
-|--------|:--------:|:--------:|:-------:|:-------:|:--------:|:---:|:-----------:|:---------:|
-| `strata.ts` | — | 1 | — | — | 7 | 2 | 1 | **11** |
-| `adapter/` | — | 2 | 2 | 3 | 2 | 2 | 3 | **14** |
-| `repo/` | 1 | — | — | — | 3 | 3 | 2 | **9** |
-| `store/` | 2 | — | — | — | 3 | 7 | 3 | **15** |
-| `sync/` | 1 | — | — | — | 10 | 3 | 2 | **16** |
-| `persistence/` | — | — | 1 | — | 4 | 4 | 1 | **10** |
-| `tenant/` | — | — | 2 | — | 7 | 3 | 2 | **14** |
-| `schema/` | — | — | 1 | — | — | — | 1 | **2** |
-| `hlc/` | — | — | — | — | 1 | 1 | — | **2** |
-| `reactive/` | — | — | — | — | 1 | — | — | **1** |
-| `index.ts` | — | — | — | — | — | 1 | 1 | **2** |
-| **Total** | **4** | **3** | **6** | **3** | **38** | **26** | **16** | **96** |
+### tenant-manager.ts
 
-> Note: Some issues (e.g. C3, SM2) span multiple modules and appear under each relevant module, so the per-module total (96) exceeds the deduplicated count (73 unique + 16 suggestions = 89).
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| SH1 | security-high | OPEN | `changePassword()` never validates old password | All 4 |
+| SM5 | security-medium | OPEN | Tenant create TOCTOU window for duplicate ID detection | Sonnet |
+| W28 | warning | OPEN | `create()` doesn't reject duplicate tenant IDs | GPT-5.4, Codex |
+| W29 | warning | OPEN | Persist path `[...tenants, tenant]` lacks duplicate-ID guard | Codex |
+| W30 | warning | OPEN | `delete()` non-atomic; data wiped but tenant stays listed on crash | Opus, Sonnet |
+| L22 | low | OPEN | Cached tenant list can become stale across tabs/instances | Opus, Sonnet |
+| S15 | suggestion | OPEN | Add duplicate ID detection before create persists tenants | Codex |
+| S16 | suggestion | OPEN | Consider cache invalidation strategy for multi-tab scenarios | Opus |
+
+### tenant-sync.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W26 | warning | OPEN | `pushTenantList` overwrites cloud list without merging | Opus |
+| W27 | warning | OPEN | Date comparison in `mergeTenantLists` may fail after deserialization | Opus |
+
+### marker-blob.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W31 | warning | OPEN | `writeMarkerBlob` resets `createdAt` on every call | Opus, Sonnet |
+| W32 | warning | OPEN | `writeMarkerBlob` creates marker with `indexes: {}`, discarding existing | Opus |
+| L20 | low | OPEN | `readMarkerBlob` performs unchecked cast — no schema validation | Sonnet |
+
+### tenant-list.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| L21 | low | OPEN | `loadTenantList` unchecked cast `as Tenant[]` — no validation | Opus, Sonnet |
+
+---
+
+## strata (root)
+
+### strata.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| W3 | warning | OPEN | Magic byte `0x7B` encryption detection is brittle | Opus, Sonnet |
+| W4 | warning | OPEN | `tombstoneRetentionMs` accepted but never implemented — unbounded growth | Opus |
+| W5 | warning | ~~FIXED~~ | ~~`unloadCurrentTenant()` leaves `activeTenant$` stale~~ — `close()` calls `tenantContext.clear()` | GPT-5.4 |
+| W6 | warning | ~~FIXED~~ | ~~`loadTenant` has no concurrency guard~~ — `open()` calls `close()` first | Sonnet |
+| W7 | warning | OPEN | `sync()` return value only reports `local→cloud`, not full round-trip | Opus |
+| W8 | warning | OPEN | Cloud sync failure during `loadTenant()` silently swallowed | Opus |
+| W9 | warning | OPEN | `partitionsSynced` double-counts merged partitions | Sonnet |
+| L12 | low | ~~FIXED~~ | ~~Non-null assertion `marker.dek!`~~ — removed | Sonnet |
+| L13 | low | OPEN | `StrataConfig.entities` typed as `EntityDefinition<any>[]` — weakens type safety | Sonnet |
+| S13 | suggestion | OPEN | Validate `oldPassword` explicitly before accepting password rotation | Codex |
+
+### index.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| L26 | low | OPEN | Barrel re-export exposes all internal types as public API surface | Sonnet |
+| S12 | suggestion | OPEN | Restrict barrel exports to consumer-facing types only | Sonnet |
+
+---
+
+## utils
+
+### crypto.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| SM1 | security-medium | OPEN | PBKDF2 uses static `appId` as salt | Opus, Sonnet, GPT-5.4 |
+| SM4 | security-medium | OPEN | PBKDF2 iteration count below OWASP recommendation (100k vs 600k+) | Opus |
+| SL2 | security-low | OPEN | `decrypt` lacks minimum buffer length guard | Sonnet |
+| SL3 | security-low | OPEN | `exportDek` spread pattern fragile for larger keys | Opus |
+| S1 | suggestion | OPEN | Use `crypto.getRandomValues()` for random salt | Opus, Sonnet |
+| S2 | suggestion | OPEN | Add minimum buffer length guard in `decrypt` | Sonnet |
+
+### id.ts
+
+| ID | Severity | Status | Issue | Flagged by |
+|----|----------|--------|-------|-----------|
+| SM2 | security-medium | OPEN | `Math.random()` for ID generation — predictable, collision risk | All 4 |
+
+---
+
+## Summary
+
+| Status | Count |
+|--------|-------|
+| ~~FIXED~~ | **7** |
+| OPEN | **82** |
+
+### Fixed Issues
+
+| ID | Module | Issue |
+|----|--------|-------|
+| C1 | repo | `saveMany()`/`deleteMany()` now emit through EventBus |
+| S10 | repo | Batch ops emit through EventBus |
+| W36 | reactive | EventBus now RxJS Subject-based with listener isolation |
+| L14 | adapter | `list()` removed from StorageAdapter interface |
+| W5 | strata | `close()` properly clears `activeTenant$` |
+| W6 | strata | `open()` calls `close()` first, preventing orphaned schedulers |
+| L12 | strata | Non-null assertion removed |

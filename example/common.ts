@@ -60,15 +60,5 @@ export class FsStorageAdapter implements StorageAdapter {
       return false;
     }
   }
-
-  async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-    const dir = tenant ? path.join(this.rootDir, tenant.id) : this.rootDir;
-    try {
-      const entries = await readdir(dir);
-      return entries.filter(e => e.startsWith(prefix));
-    } catch {
-      return [];
-    }
-  }
 }
 

@@ -7,6 +7,7 @@ import type { StorageAdapter, EncryptionService } from '@strata/adapter';
 import {
   noopEncryptionService,
 } from '@strata/adapter';
+import type { Tenant } from '@strata/adapter';
 import type { EntityDefinition } from '@strata/schema';
 import type { BlobMigration } from '@strata/schema/migration';
 import { EventBus } from '@strata/reactive';
@@ -73,11 +74,10 @@ export function validateEntityDefinitions(
 
 export class Strata {
   readonly tenants: TenantManagerType;
-  readonly isDirty$: Observable<boolean>;
-  readonly syncEvents$: Observable<SyncEvent>;
 
   private readonly hlcRef: { current: Hlc };
   private readonly eventBus: EventBus<EntityEvent>;
+  private readonly syncEventBus: EventBus<SyncEvent>;
   private readonly syncEngine: SyncEngineType;
   private readonly dirtyTracker: ReactiveFlag;
   private readonly tenantContext: TenantContext;
@@ -106,14 +106,13 @@ export class Strata {
 
     this.hlcRef = { current: createHlc(config.deviceId) };
     this.eventBus = new EventBus<EntityEvent>();
+    this.syncEventBus = new EventBus<SyncEvent>();
     this.syncEngine = new SyncEngine(
       store, localAdapter, cloudAdapter,
-      config.entities.map(d => d.name), this.hlcRef, this.eventBus,
+      config.entities.map(d => d.name), this.hlcRef, this.eventBus, this.syncEventBus,
       config.migrations, resolvedOptions,
     );
     this.dirtyTracker = new ReactiveFlag();
-    this.isDirty$ = this.dirtyTracker.value$;
-    this.syncEvents$ = this.syncEngine.syncEvents$;
 
     for (const def of config.entities) {
       if (def.keyStrategy.kind === 'singleton') {
@@ -127,6 +126,7 @@ export class Strata {
       adapter: localAdapter,
       cloudAdapter,
       syncEngine: this.syncEngine,
+      syncEventBus: this.syncEventBus,
       store,
       dirtyTracker: this.dirtyTracker,
       encryptionService,
@@ -154,6 +154,27 @@ export class Strata {
 
   get isDirty(): boolean { return this.dirtyTracker.value; }
 
+  observe(channel: 'entity'): Observable<EntityEvent>;
+  observe(channel: 'entity', entityName: string): Observable<EntityEvent>;
+  observe(channel: 'sync'): Observable<SyncEvent>;
+  observe(channel: 'dirty'): Observable<boolean>;
+  observe(channel: 'tenant'): Observable<Tenant | undefined>;
+  observe(channel: 'entity' | 'sync' | 'dirty' | 'tenant', entityName?: string): Observable<unknown> {
+    assertNotDisposed(this.disposed, 'Strata instance');
+    switch (channel) {
+      case 'entity':
+        return entityName
+          ? this.eventBus.all$.pipe(filter((e: EntityEvent) => e.entityName === entityName))
+          : this.eventBus.all$;
+      case 'sync':
+        return this.syncEventBus.all$;
+      case 'dirty':
+        return this.dirtyTracker.value$;
+      case 'tenant':
+        return this.tenantContext.activeTenant$;
+    }
+  }
+
   dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise;
     this.disposed = true;
@@ -162,6 +183,7 @@ export class Strata {
       for (const r of this.repoMap.values()) r.dispose();
       this.dirtySubscription.unsubscribe();
       this.eventBus.dispose();
+      this.syncEventBus.dispose();
       this.syncEngine.dispose();
       log('strata disposed');
     })();

@@ -1,6 +1,5 @@
 import type { Hlc } from '@strata/hlc';
 import type { Tenant } from '@strata/adapter';
-import type { Observable } from 'rxjs';
 import type { ReactiveFlag } from '@strata/utils';
 
 export type PartitionDiffResult = {
@@ -88,8 +87,6 @@ export type SyncEngine = {
     dirtyTracker?: ReactiveFlag,
   ): void;
   stopScheduler(): void;
-  emit(event: SyncEvent): void;
-  syncEvents$: Observable<SyncEvent>;
   drain(): Promise<void>;
   dispose(): void;
 };

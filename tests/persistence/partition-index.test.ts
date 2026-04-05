@@ -46,8 +46,8 @@ describe('Partition Index', () => {
       transaction: { '2026-01': { hash: 1, count: 1, deletedCount: 0, updatedAt: 1 } },
     };
     await saveAllIndexes(adapter, undefined, indexes, DEFAULT_OPTIONS);
-    const keys = await adapter.list(undefined, '__strata');
-    expect(keys).toContain('__strata');
+    const blob = await adapter.read(undefined, '__strata');
+    expect(blob).not.toBeNull();
   });
 
   describe('updatePartitionIndexEntry', () => {

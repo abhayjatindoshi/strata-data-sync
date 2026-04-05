@@ -19,7 +19,6 @@ export function withGzip(adapter: StorageAdapter): StorageAdapter {
       return adapter.write(tenant, key, compressed);
     },
     delete: (t, k) => adapter.delete(t, k),
-    list: (t, p) => adapter.list(t, p),
   };
 }
 

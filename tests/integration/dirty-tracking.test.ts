@@ -69,7 +69,7 @@ describe('Dirty tracking integration', () => {
     await strata.tenants.open(tenant.id);
 
     const emissions: boolean[] = [];
-    const sub = strata.isDirty$.subscribe(v => emissions.push(v));
+    const sub = strata.observe('dirty').subscribe(v => emissions.push(v));
 
     // Save
     const repo = strata.repo(TaskDef) as Repository<Task>;

@@ -39,8 +39,5 @@ export function withRetry(adapter: StorageAdapter, options: RetryOptions = {}): 
     async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
       return withRetries(() => adapter.delete(tenant, key), options);
     },
-    async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-      return withRetries(() => adapter.list(tenant, prefix), options);
-    },
   };
 }

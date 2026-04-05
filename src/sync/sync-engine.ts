@@ -2,7 +2,7 @@ import debug from 'debug';
 import type { Tenant } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import { tick } from '@strata/hlc';
-import { EventBus } from '@strata/reactive';
+import type { EventBus } from '@strata/reactive';
 import type { EntityEvent } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { BlobMigration } from '@strata/schema/migration';
@@ -21,8 +21,6 @@ const log = debug('strata:sync');
 
 export class SyncEngine {
   private readonly queue: SyncQueueItem[] = [];
-  private readonly syncEventBus = new EventBus<SyncEvent>();
-  readonly syncEvents$ = this.syncEventBus.all$;
   private running = false;
   private disposed = false;
 
@@ -32,7 +30,8 @@ export class SyncEngine {
     private readonly cloudAdapter: DataAdapter | undefined,
     private readonly entityNames: ReadonlyArray<string>,
     private readonly hlcRef: { current: Hlc },
-    private readonly eventBus: EventBus<EntityEvent>,
+    private readonly entityEventBus: EventBus<EntityEvent>,
+    private readonly syncEventBus: EventBus<SyncEvent>,
     private readonly migrations?: ReadonlyArray<BlobMigration>,
     private readonly options?: ResolvedStrataOptions,
   ) {}
@@ -114,10 +113,6 @@ export class SyncEngine {
 
     await promise;
     return { result: syncResult, deduplicated: false };
-  }
-
-  emit(event: SyncEvent): void {
-    this.syncEventBus.emit(event);
   }
 
   private async processQueue(): Promise<void> {
@@ -213,7 +208,6 @@ export class SyncEngine {
   dispose(): void {
     this.stopScheduler();
     this.disposed = true;
-    this.syncEventBus.dispose();
     for (const item of this.queue) {
       item.reject(new Error('SyncEngine disposed'));
     }
@@ -233,7 +227,7 @@ export class SyncEngine {
       entry.deletes.push(...c.deletedIds);
     }
     for (const [entityName, { updates, deletes }] of byEntity) {
-      this.eventBus.emit({ entityName, source: 'sync', updates, deletes });
+      this.entityEventBus.emit({ entityName, source: 'sync', updates, deletes });
     }
   }
 }

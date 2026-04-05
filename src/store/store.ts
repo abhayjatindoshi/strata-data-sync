@@ -156,16 +156,6 @@ export class Store implements EntityStore {
     return had;
   }
 
-  async list(_tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-    const keys: string[] = [];
-    for (const key of this.partitions.keys()) {
-      if (key.startsWith(prefix)) {
-        keys.push(key);
-      }
-    }
-    return keys;
-  }
-
   private buildMarkerBlob(): PartitionBlob {
     const indexes: Record<string, Record<string, { hash: number; count: number; deletedCount: number; updatedAt: number }>> = {};
     for (const entityKey of this.partitions.keys()) {

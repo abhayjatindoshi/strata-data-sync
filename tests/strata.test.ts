@@ -80,8 +80,7 @@ describe('Strata', () => {
     expect(strata.tenants.sync).toBeTypeOf('function');
     expect(strata.dispose).toBeTypeOf('function');
     expect(strata.isDirty).toBe(false);
-    expect(strata.isDirty$).toBeDefined();
-    expect(strata.syncEvents$).toBeDefined();
+    expect(strata.observe).toBeTypeOf('function');
   });
 
   describe('repo()', () => {
@@ -272,7 +271,7 @@ describe('Strata', () => {
       });
 
       const events: SyncEvent[] = [];
-      strata.syncEvents$.subscribe(e => events.push(e));
+      strata.observe('sync').subscribe(e => events.push(e));
 
       const tenant = await strata.tenants.create({
         name: 'Test',
@@ -333,7 +332,7 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       const events: SyncEvent[] = [];
-      strata.syncEvents$.subscribe(e => events.push(e));
+      strata.observe('sync').subscribe(e => events.push(e));
 
       const tenant = await strata.tenants.create({
         name: 'Test',
@@ -358,7 +357,7 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       const events: SyncEvent[] = [];
-      strata.syncEvents$.subscribe(e => events.push(e));
+      strata.observe('sync').subscribe(e => events.push(e));
 
       const tenant = await strata.tenants.create({
         name: 'Test',
@@ -429,7 +428,7 @@ describe('Strata', () => {
     it('exposes isDirty$ observable', () => {
       ({ strata } = makeStrata());
       const values: boolean[] = [];
-      strata.isDirty$.subscribe(v => values.push(v));
+      strata.observe('dirty').subscribe(v => values.push(v));
       expect(values[0]).toBe(false);
     });
   });
@@ -446,7 +445,7 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       const events: SyncEvent[] = [];
-      const sub = strata.syncEvents$.subscribe(e => events.push(e));
+      const sub = strata.observe('sync').subscribe(e => events.push(e));
 
       const tenant = await strata.tenants.create({
         name: 'Test',
@@ -531,8 +530,8 @@ describe('Strata', () => {
       await strata.dispose();
 
       // After dispose, the data should be flushed to local adapter
-      const keys = await localAdapter.list(tenant, 'task.');
-      expect(keys.length).toBeGreaterThan(0);
+      const blob = await localAdapter.read(tenant, 'task._');
+      expect(blob).not.toBeNull();
     });
 
     it('disposes all repositories', async () => {

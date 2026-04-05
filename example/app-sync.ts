@@ -36,8 +36,8 @@ async function main() {
   const logEvent = (device: string) => (event: SyncEvent) => {
     console.log(`  [${device} sync-event] ${event.type}`);
   };
-  device1.onSyncEvent(logEvent('device-1'));
-  device2.onSyncEvent(logEvent('device-2'));
+  device1.observe('sync').subscribe(logEvent('device-1'));
+  device2.observe('sync').subscribe(logEvent('device-2'));
 
   // ── Step 1: Device 1 creates a tenant and saves tasks ─
   console.log('=== Step 1: Device 1 creates tenant & saves tasks ===');

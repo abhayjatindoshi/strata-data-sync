@@ -3,9 +3,11 @@ import { describe, it, expect } from 'vitest';
 import { noopEncryptionService } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
+import type { SyncEvent } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
 import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
+import { EventBus } from '@strata/reactive';
 import { loadTenantList, saveTenantList, TenantManager, TenantContext } from '@strata/tenant';
 import type { TenantManagerDeps } from '@strata/tenant';
 
@@ -15,9 +17,6 @@ function stubSyncEngine(): SyncEngineType {
     run: async () => [],
     startScheduler: () => {},
     stopScheduler: () => {},
-    emit: () => {},
-    on: () => {},
-    off: () => {},
     drain: async () => {},
     dispose: () => {},
   };
@@ -27,6 +26,7 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
   return {
     adapter,
     syncEngine: stubSyncEngine(),
+    syncEventBus: new EventBus<SyncEvent>(),
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
     encryptionService: noopEncryptionService,
@@ -121,7 +121,6 @@ describe('TenantManager', () => {
         },
         write: adapter.write.bind(adapter),
         delete: adapter.delete.bind(adapter),
-        list: adapter.list.bind(adapter),
       };
       const tm = new TenantManager(makeDeps(adapter, {
         adapter: failAdapter,
@@ -279,7 +278,6 @@ describe('TenantManager', () => {
         },
         write: adapter.write.bind(adapter),
         delete: adapter.delete.bind(adapter),
-        list: adapter.list.bind(adapter),
       };
       const tm = new TenantManager(makeDeps(adapter, {
         adapter: failAdapter,
@@ -364,7 +362,9 @@ describe('TenantManager', () => {
   describe('open - cloud adapter', () => {
     it('emits sync-failed when cloud sync fails', async () => {
       const adapter = createDataAdapter();
+      const syncEventBus = new EventBus<SyncEvent>();
       const emittedEvents: string[] = [];
+      syncEventBus.all$.subscribe(e => emittedEvents.push(e.type));
       const failingSync = async (source: string) => {
         if (source === 'cloud') throw new Error('network error');
         return { result: { changesForA: [], changesForB: [], stale: false, maxHlc: undefined }, deduplicated: false };
@@ -380,10 +380,9 @@ describe('TenantManager', () => {
           }
           return results;
         },
-        emit: (event: { type: string }) => { emittedEvents.push(event.type); },
       };
       const cloudAdapter = createDataAdapter();
-      const tm = new TenantManager(makeDeps(adapter, { syncEngine: syncEngine as unknown as SyncEngineType, cloudAdapter }));
+      const tm = new TenantManager(makeDeps(adapter, { syncEngine: syncEngine as unknown as SyncEngineType, syncEventBus, cloudAdapter }));
 
       const now = new Date();
       const tenant: Tenant = { id: 'c1', name: 'Cloud', encrypted: false, meta: {}, createdAt: now, updatedAt: now };

@@ -8,7 +8,6 @@ export type DataAdapter = {
   read(tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null>;
   write(tenant: Tenant | undefined, key: string, data: PartitionBlob): Promise<void>;
   delete(tenant: Tenant | undefined, key: string): Promise<boolean>;
-  list(tenant: Tenant | undefined, prefix: string): Promise<string[]>;
 };
 
 export class EncryptedDataAdapter implements DataAdapter {
@@ -33,10 +32,6 @@ export class EncryptedDataAdapter implements DataAdapter {
 
   async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
     return this.adapter.delete(tenant, key);
-  }
-
-  async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-    return this.adapter.list(tenant, prefix);
   }
 }
 

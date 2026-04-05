@@ -99,31 +99,4 @@ describe('LocalStorageAdapter', () => {
       expect(result).toBeNull();
     });
   });
-
-  describe('list', () => {
-    it('returns empty array when no keys match', async () => {
-      const result = await adapter.list(tenant, 'nope');
-      expect(result).toEqual([]);
-    });
-
-    it('lists keys matching prefix with tenant', async () => {
-      await adapter.write(tenant, 'task._', new Uint8Array([1]));
-      await adapter.write(tenant, 'task.2026-01', new Uint8Array([2]));
-      await adapter.write(tenant, 'note._', new Uint8Array([3]));
-
-      const result = await adapter.list(tenant, 'task');
-      expect(result).toHaveLength(2);
-      expect(result).toContain('task._');
-      expect(result).toContain('task.2026-01');
-    });
-
-    it('lists keys without tenant', async () => {
-      await adapter.write(undefined, 'task._', new Uint8Array([1]));
-      await adapter.write(undefined, 'note._', new Uint8Array([2]));
-
-      const result = await adapter.list(undefined, 'task');
-      expect(result).toHaveLength(1);
-      expect(result).toContain('task._');
-    });
-  });
 });

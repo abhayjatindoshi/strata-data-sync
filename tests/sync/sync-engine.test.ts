@@ -15,8 +15,9 @@ function makeEngine(opts?: { cloud?: boolean }) {
   const cloud = opts?.cloud ? createDataAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };
   const eventBus = new EventBus<EntityEvent>();
-  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, undefined, DEFAULT_OPTIONS);
-  return { engine, store, local, cloud, hlcRef, eventBus };
+  const syncEventBus = new EventBus<SyncEvent>();
+  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, syncEventBus, undefined, DEFAULT_OPTIONS);
+  return { engine, store, local, cloud, hlcRef, eventBus, syncEventBus };
 }
 
 function delay(ms: number): Promise<void> {
@@ -52,9 +53,9 @@ describe('SyncEngine', () => {
   });
 
   it('emits sync-started and sync-completed events', async () => {
-    const { engine } = makeEngine();
+    const { engine, syncEventBus } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.syncEvents$.subscribe(e => events.push(e));
+    syncEventBus.all$.subscribe(e => events.push(e));
 
     await engine.sync('memory', 'local', undefined);
 
@@ -64,9 +65,9 @@ describe('SyncEngine', () => {
   });
 
   it('events include source and target', async () => {
-    const { engine } = makeEngine();
+    const { engine, syncEventBus } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.syncEvents$.subscribe(e => events.push(e));
+    syncEventBus.all$.subscribe(e => events.push(e));
 
     await engine.sync('memory', 'local', undefined);
 
@@ -79,9 +80,9 @@ describe('SyncEngine', () => {
   });
 
   it('emits sync-failed on error', async () => {
-    const { engine, local } = makeEngine();
+    const { engine, local, syncEventBus } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.syncEvents$.subscribe(e => events.push(e));
+    syncEventBus.all$.subscribe(e => events.push(e));
 
     local.read = async () => { throw new Error('read failed'); };
 
@@ -89,10 +90,10 @@ describe('SyncEngine', () => {
     expect(events.some(e => e.type === 'sync-failed')).toBe(true);
   });
 
-  it('syncEvents$ subscription can be unsubscribed', async () => {
-    const { engine } = makeEngine();
+  it('syncEvents subscription can be unsubscribed', async () => {
+    const { engine, syncEventBus } = makeEngine();
     const events: SyncEvent[] = [];
-    const sub = engine.syncEvents$.subscribe(e => events.push(e));
+    const sub = syncEventBus.all$.subscribe(e => events.push(e));
 
     await engine.sync('memory', 'local', undefined);
     const count = events.length;
@@ -102,12 +103,12 @@ describe('SyncEngine', () => {
     expect(events.length).toBe(count);
   });
 
-  it('emit sends event to subscribers', () => {
-    const { engine } = makeEngine();
+  it('syncEventBus.emit sends event to subscribers', () => {
+    const { syncEventBus } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.syncEvents$.subscribe(e => events.push(e));
+    syncEventBus.all$.subscribe(e => events.push(e));
 
-    engine.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new Error('Cloud unreachable') });
+    syncEventBus.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new Error('Cloud unreachable') });
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('sync-failed');
   });

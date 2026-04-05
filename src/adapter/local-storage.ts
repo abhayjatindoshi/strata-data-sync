@@ -30,22 +30,5 @@ export class LocalStorageAdapter implements StorageAdapter {
     globalThis.localStorage.removeItem(pk);
     return existed;
   }
-
-  async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-    const ck = compositeKey(tenant, prefix);
-    const pk = this.prefixedKey(ck);
-    const tenantPrefix = tenant ? `${tenant.id}:` : '';
-    const fullTenantPrefix = this.prefixedKey(tenantPrefix);
-    const keys: string[] = [];
-
-    for (let i = 0; i < globalThis.localStorage.length; i++) {
-      const storageKey = globalThis.localStorage.key(i);
-      if (storageKey && storageKey.startsWith(pk)) {
-        // Strip the prefix and tenant prefix to return the bare key
-        keys.push(storageKey.substring(fullTenantPrefix.length));
-      }
-    }
-    return keys;
-  }
 }
 

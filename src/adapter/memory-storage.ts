@@ -16,18 +16,6 @@ export class MemoryStorageAdapter implements StorageAdapter {
   async delete(tenant: Tenant | undefined, key: string): Promise<boolean> {
     return this.store.delete(compositeKey(tenant, key));
   }
-
-  async list(tenant: Tenant | undefined, prefix: string): Promise<string[]> {
-    const keyPrefix = tenant ? `${tenant.id}:` : '';
-    const fullPrefix = `${keyPrefix}${prefix}`;
-    const keys: string[] = [];
-    for (const key of this.store.keys()) {
-      if (key.startsWith(fullPrefix)) {
-        keys.push(key.substring(keyPrefix.length));
-      }
-    }
-    return keys;
-  }
 }
 
 

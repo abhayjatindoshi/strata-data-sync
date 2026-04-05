@@ -6,7 +6,6 @@ export type StorageAdapter = {
   read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null>;
   write(tenant: Tenant | undefined, key: string, data: Uint8Array): Promise<void>;
   delete(tenant: Tenant | undefined, key: string): Promise<boolean>;
-  list(tenant: Tenant | undefined, prefix: string): Promise<string[]>;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters

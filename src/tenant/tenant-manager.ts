@@ -3,9 +3,11 @@ import type { EncryptionService, EncryptionKeys } from '@strata/adapter';
 import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
-import type { SyncEngineType, SyncResult, SyncLocation } from '@strata/sync';
+import type { SyncEngineType, SyncResult, SyncLocation, SyncEvent } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
+import type { EventBus } from '@strata/reactive';
 import { generateId } from '@strata/utils';
+import { partitionBlobKey } from '@strata/adapter';
 import type {
   Tenant,
   ProbeResult,
@@ -24,6 +26,7 @@ export type TenantManagerDeps = {
   readonly adapter: DataAdapter;
   readonly cloudAdapter?: DataAdapter;
   readonly syncEngine: SyncEngineType;
+  readonly syncEventBus: EventBus<SyncEvent>;
   readonly store: EntityStore;
   readonly dirtyTracker: ReactiveFlag;
   readonly encryptionService: EncryptionService;
@@ -203,10 +206,15 @@ export class TenantManager implements TenantManagerType {
     const tenant = tenants.find(t => t.id === tenantId);
 
     if (opts?.purge && tenant) {
-      const keys = await this.deps.adapter.list(tenant, '');
-      for (const key of keys) {
-        await this.deps.adapter.delete(tenant, key);
+      const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
+      if (marker?.indexes) {
+        for (const [entityName, partitions] of Object.entries(marker.indexes)) {
+          for (const partitionKey of Object.keys(partitions)) {
+            await this.deps.adapter.delete(tenant, partitionBlobKey(entityName, partitionKey));
+          }
+        }
       }
+      await this.deps.adapter.delete(tenant, this.deps.options.markerKey);
     }
 
     const filtered = tenants.filter(t => t.id !== tenantId);
@@ -257,7 +265,7 @@ export class TenantManager implements TenantManagerType {
       try {
         await this.deps.syncEngine.run(tenant, [['cloud', 'local']]);
       } catch {
-        this.deps.syncEngine.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new Error('Cloud unreachable') });
+        this.deps.syncEventBus.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new Error('Cloud unreachable') });
       }
     }
     await this.deps.syncEngine.run(tenant, [['local', 'memory']]);
