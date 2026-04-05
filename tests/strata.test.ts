@@ -254,7 +254,7 @@ describe('Strata', () => {
       expect(strata.tenants.activeTenant?.name).toBe('Test');
     });
 
-    it('emits cloud-unreachable when cloud adapter fails during hydrate', async () => {
+    it('emits sync-failed when cloud adapter fails during hydrate', async () => {
       const localAdapter = makeAdapter();
       const failingCloudAdapter = makeAdapter();
       // Sabotage the cloud adapter to simulate unreachable
@@ -280,7 +280,7 @@ describe('Strata', () => {
       });
       await strata.tenants.open(tenant.id);
 
-      expect(events.some(e => e.type === 'cloud-unreachable')).toBe(true);
+      expect(events.some(e => e.type === 'sync-failed' && e.error?.message === 'Cloud unreachable')).toBe(true);
     });
   });
 

@@ -257,7 +257,7 @@ export class TenantManager implements TenantManagerType {
       try {
         await this.deps.syncEngine.run(tenant, [['cloud', 'local']]);
       } catch {
-        this.deps.syncEngine.emit({ type: 'cloud-unreachable' });
+        this.deps.syncEngine.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new Error('Cloud unreachable') });
       }
     }
     await this.deps.syncEngine.run(tenant, [['local', 'memory']]);

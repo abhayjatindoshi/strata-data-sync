@@ -61,8 +61,8 @@ describe('Sync advanced integration', () => {
     // Load tenant — cloud hydrate will fail, should fall back to local
     await strata.tenants.open(tenant.id);
 
-    // Should have emitted cloud-unreachable
-    expect(events.some(e => e.type === 'cloud-unreachable')).toBe(true);
+    // Should have emitted sync-failed for cloud
+    expect(events.some(e => e.type === 'sync-failed' && e.error?.message === 'Cloud unreachable')).toBe(true);
 
     // Should still work in local-only mode
     const repo = strata.repo(TaskDef) as Repository<Task>;

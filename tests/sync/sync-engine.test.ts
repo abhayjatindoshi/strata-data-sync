@@ -107,9 +107,9 @@ describe('SyncEngine', () => {
     const events: SyncEvent[] = [];
     engine.syncEvents$.subscribe(e => events.push(e));
 
-    engine.emit({ type: 'cloud-unreachable' });
+    engine.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new Error('Cloud unreachable') });
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('cloud-unreachable');
+    expect(events[0].type).toBe('sync-failed');
   });
 
   it('drain waits for all queued operations', async () => {

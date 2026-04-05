@@ -362,7 +362,7 @@ describe('TenantManager', () => {
   });
 
   describe('open - cloud adapter', () => {
-    it('emits cloud-unreachable when cloud sync fails', async () => {
+    it('emits sync-failed when cloud sync fails', async () => {
       const adapter = createDataAdapter();
       const emittedEvents: string[] = [];
       const failingSync = async (source: string) => {
@@ -394,7 +394,7 @@ describe('TenantManager', () => {
       });
 
       await tm.open('c1');
-      expect(emittedEvents).toContain('cloud-unreachable');
+      expect(emittedEvents).toContain('sync-failed');
     });
   });
 

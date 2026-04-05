@@ -59,11 +59,13 @@ export type SyncResult = {
   readonly partitionsSynced: number;
 };
 
-export type SyncEvent =
-  | { readonly type: 'sync-started'; readonly source: SyncLocation; readonly target: SyncLocation }
-  | { readonly type: 'sync-completed'; readonly source: SyncLocation; readonly target: SyncLocation; readonly result: SyncResult }
-  | { readonly type: 'sync-failed'; readonly source: SyncLocation; readonly target: SyncLocation; readonly error: Error }
-  | { readonly type: 'cloud-unreachable' };
+export type SyncEvent = {
+  readonly type: 'sync-started' | 'sync-completed' | 'sync-failed';
+  readonly source: SyncLocation;
+  readonly target: SyncLocation;
+  readonly result?: SyncResult;
+  readonly error?: Error;
+};
 
 export type SyncEnqueueResult = {
   readonly result: SyncBetweenResult;
