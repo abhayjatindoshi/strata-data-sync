@@ -51,7 +51,7 @@ describe('Sync advanced integration', () => {
       deviceId: 'dev-1',
     }));
 
-    strata.onSyncEvent(e => events.push(e));
+    strata.syncEvents$.subscribe(e => events.push(e));
 
     const tenant = await strata.tenants.create({
       name: 'Test',

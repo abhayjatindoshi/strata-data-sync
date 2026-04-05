@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createDataAdapter } from '../helpers';
 import { createHlc } from '@strata/hlc';
 import { EventBus } from '@strata/reactive';
+import type { EntityEvent } from '@strata/reactive';
 import { Store } from '@strata/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 import { SyncEngine } from '@strata/sync';
@@ -11,7 +12,7 @@ function makeEngine(opts?: { cloud?: boolean }) {
   const local = createDataAdapter();
   const cloud = opts?.cloud !== false ? createDataAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };
-  const eventBus = new EventBus();
+  const eventBus = new EventBus<EntityEvent>();
   const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, undefined, DEFAULT_OPTIONS);
   return { engine, store, local, cloud };
 }

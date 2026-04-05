@@ -5,6 +5,7 @@ import { createDataAdapter } from '../helpers';
 import { createHlc } from '@strata/hlc';
 import { saveAllIndexes } from '@strata/persistence';
 import { EventBus } from '@strata/reactive';
+import type { EntityEvent } from '@strata/reactive';
 import { Store } from '@strata/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 
@@ -13,7 +14,7 @@ function makeEngine(opts?: { cloud?: boolean }) {
   const local = createDataAdapter();
   const cloud = opts?.cloud ? createDataAdapter() : undefined;
   const hlcRef = { current: createHlc('test') };
-  const eventBus = new EventBus();
+  const eventBus = new EventBus<EntityEvent>();
   const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, undefined, DEFAULT_OPTIONS);
   return { engine, store, local, cloud, hlcRef, eventBus };
 }
@@ -53,7 +54,7 @@ describe('SyncEngine', () => {
   it('emits sync-started and sync-completed events', async () => {
     const { engine } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.on(e => events.push(e));
+    engine.syncEvents$.subscribe(e => events.push(e));
 
     await engine.sync('memory', 'local', undefined);
 
@@ -65,7 +66,7 @@ describe('SyncEngine', () => {
   it('events include source and target', async () => {
     const { engine } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.on(e => events.push(e));
+    engine.syncEvents$.subscribe(e => events.push(e));
 
     await engine.sync('memory', 'local', undefined);
 
@@ -80,7 +81,7 @@ describe('SyncEngine', () => {
   it('emits sync-failed on error', async () => {
     const { engine, local } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.on(e => events.push(e));
+    engine.syncEvents$.subscribe(e => events.push(e));
 
     local.read = async () => { throw new Error('read failed'); };
 
@@ -88,24 +89,23 @@ describe('SyncEngine', () => {
     expect(events.some(e => e.type === 'sync-failed')).toBe(true);
   });
 
-  it('on/off manages listeners', async () => {
+  it('syncEvents$ subscription can be unsubscribed', async () => {
     const { engine } = makeEngine();
     const events: SyncEvent[] = [];
-    const listener = (e: SyncEvent) => events.push(e);
+    const sub = engine.syncEvents$.subscribe(e => events.push(e));
 
-    engine.on(listener);
     await engine.sync('memory', 'local', undefined);
     const count = events.length;
 
-    engine.off(listener);
+    sub.unsubscribe();
     await engine.sync('memory', 'local', undefined);
     expect(events.length).toBe(count);
   });
 
-  it('emit sends event to listeners', () => {
+  it('emit sends event to subscribers', () => {
     const { engine } = makeEngine();
     const events: SyncEvent[] = [];
-    engine.on(e => events.push(e));
+    engine.syncEvents$.subscribe(e => events.push(e));
 
     engine.emit({ type: 'cloud-unreachable' });
     expect(events).toHaveLength(1);
@@ -164,7 +164,7 @@ describe('SyncEngine', () => {
   it('emits entity changes for memory source (memory→local)', async () => {
     const { engine, store, eventBus } = makeEngine();
     const firedEntities: string[] = [];
-    eventBus.on(({ entityName }) => {
+    eventBus.all$.subscribe(({ entityName }) => {
       if (entityName) firedEntities.push(entityName);
     });
 
@@ -217,7 +217,7 @@ describe('SyncEngine', () => {
   it('emits entity changes for memory→local with diverged data', async () => {
     const { engine, store, local, eventBus } = makeEngine();
     const changedEntities: string[] = [];
-    eventBus.on(({ entityName }) => {
+    eventBus.all$.subscribe(({ entityName }) => {
       if (entityName) changedEntities.push(entityName);
     });
 
@@ -251,7 +251,7 @@ describe('SyncEngine', () => {
   it('emits entity changes for local→memory with data', async () => {
     const { engine, local, eventBus } = makeEngine();
     const changedEntities: string[] = [];
-    eventBus.on(({ entityName }) => {
+    eventBus.all$.subscribe(({ entityName }) => {
       if (entityName) changedEntities.push(entityName);
     });
 

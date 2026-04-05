@@ -2,7 +2,8 @@ import debug from 'debug';
 import type { Tenant } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import { tick } from '@strata/hlc';
-import type { EntityEventBus } from '@strata/reactive';
+import { EventBus } from '@strata/reactive';
+import type { EntityEvent } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { BlobMigration } from '@strata/schema/migration';
 import type { DataAdapter } from '@strata/persistence';
@@ -10,7 +11,7 @@ import { parseCompositeKey } from '@strata/utils';
 import type { ReactiveFlag } from '@strata/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type {
-  SyncLocation, SyncQueueItem, SyncEventListener, SyncEvent,
+  SyncLocation, SyncQueueItem, SyncEvent,
   SyncEnqueueResult, SyncEngine as SyncEngineType, SyncBetweenResult,
   SyncEntityChange,
 } from './types';
@@ -20,7 +21,8 @@ const log = debug('strata:sync');
 
 export class SyncEngine {
   private readonly queue: SyncQueueItem[] = [];
-  private readonly listeners: SyncEventListener[] = [];
+  private readonly syncEventBus = new EventBus<SyncEvent>();
+  readonly syncEvents$ = this.syncEventBus.all$;
   private running = false;
   private disposed = false;
 
@@ -30,7 +32,7 @@ export class SyncEngine {
     private readonly cloudAdapter: DataAdapter | undefined,
     private readonly entityNames: ReadonlyArray<string>,
     private readonly hlcRef: { current: Hlc },
-    private readonly eventBus: EntityEventBus,
+    private readonly eventBus: EventBus<EntityEvent>,
     private readonly migrations?: ReadonlyArray<BlobMigration>,
     private readonly options?: ResolvedStrataOptions,
   ) {}
@@ -75,7 +77,7 @@ export class SyncEngine {
     const fn = async () => {
       const sourceAdapter = this.resolveAdapter(source);
       const targetAdapter = this.resolveAdapter(target);
-      this.emitEvent({ type: 'sync-started', source, target });
+      this.syncEventBus.emit({ type: 'sync-started', source, target });
       try {
         syncResult = await syncBetween(
           sourceAdapter, targetAdapter, this.entityNames, tenant, this.migrations,
@@ -91,7 +93,7 @@ export class SyncEngine {
           : target === 'memory' ? syncResult.changesForB : [];
         this.emitEntityChanges(storeChanges);
 
-        this.emitEvent({
+        this.syncEventBus.emit({
           type: 'sync-completed', source, target,
           result: {
             entitiesUpdated: syncResult.changesForB.length,
@@ -102,7 +104,7 @@ export class SyncEngine {
         log('%s→%s sync complete', source, target);
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        this.emitEvent({ type: 'sync-failed', source, target, error });
+        this.syncEventBus.emit({ type: 'sync-failed', source, target, error });
         throw err;
       }
     };
@@ -114,25 +116,8 @@ export class SyncEngine {
     return { result: syncResult, deduplicated: false };
   }
 
-  on(listener: SyncEventListener): void {
-    this.listeners.push(listener);
-  }
-
-  off(listener: SyncEventListener): void {
-    const index = this.listeners.indexOf(listener);
-    if (index !== -1) {
-      this.listeners.splice(index, 1);
-    }
-  }
-
-  private emitEvent(event: SyncEvent): void {
-    for (const listener of [...this.listeners]) {
-      listener(event);
-    }
-  }
-
   emit(event: SyncEvent): void {
-    this.emitEvent(event);
+    this.syncEventBus.emit(event);
   }
 
   private async processQueue(): Promise<void> {
@@ -228,6 +213,7 @@ export class SyncEngine {
   dispose(): void {
     this.stopScheduler();
     this.disposed = true;
+    this.syncEventBus.dispose();
     for (const item of this.queue) {
       item.reject(new Error('SyncEngine disposed'));
     }
@@ -235,12 +221,19 @@ export class SyncEngine {
   }
 
   private emitEntityChanges(changes: ReadonlyArray<SyncEntityChange>): void {
-    const names = new Set<string>();
+    const byEntity = new Map<string, { updates: string[]; deletes: string[] }>();
     for (const c of changes) {
-      names.add(parseCompositeKey(c.key)!.entityName);
+      const entityName = parseCompositeKey(c.key)!.entityName;
+      let entry = byEntity.get(entityName);
+      if (!entry) {
+        entry = { updates: [], deletes: [] };
+        byEntity.set(entityName, entry);
+      }
+      entry.updates.push(...c.updatedIds);
+      entry.deletes.push(...c.deletedIds);
     }
-    for (const name of names) {
-      this.eventBus.emit({ entityName: name, fromSync: true });
+    for (const [entityName, { updates, deletes }] of byEntity) {
+      this.eventBus.emit({ entityName, source: 'sync', updates, deletes });
     }
   }
 }

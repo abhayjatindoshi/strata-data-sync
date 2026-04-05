@@ -3,6 +3,7 @@ import { Store } from '@strata/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 import { createHlc } from '@strata/hlc';
 import { EventBus } from '@strata/reactive';
+import type { EntityEvent } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
 import { Repository } from '@strata/repo';
 
@@ -16,7 +17,7 @@ describe('Repository delete tombstone integration', () => {
   it('delete records tombstone with entity HLC', () => {
     const store = new Store(DEFAULT_OPTIONS);
     const hlc = { current: createHlc('device1') };
-    const eventBus = new EventBus();
+    const eventBus = new EventBus<EntityEvent>();
     const repo = new Repository(taskDef, store, hlc, eventBus);
 
     const id = repo.save({ name: 'Test' } as Task);
@@ -34,7 +35,7 @@ describe('Repository delete tombstone integration', () => {
   it('deleteMany records tombstones for all deleted entities', () => {
     const store = new Store(DEFAULT_OPTIONS);
     const hlc = { current: createHlc('device1') };
-    const eventBus = new EventBus();
+    const eventBus = new EventBus<EntityEvent>();
     const repo = new Repository(taskDef, store, hlc, eventBus);
 
     const id1 = repo.save({ name: 'Test1' } as Task);
@@ -51,7 +52,7 @@ describe('Repository delete tombstone integration', () => {
   it('delete of non-existent entity does not create tombstone', () => {
     const store = new Store(DEFAULT_OPTIONS);
     const hlc = { current: createHlc('device1') };
-    const eventBus = new EventBus();
+    const eventBus = new EventBus<EntityEvent>();
     const repo = new Repository(taskDef, store, hlc, eventBus);
 
     repo.delete('task._.nonexistent');

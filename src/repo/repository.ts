@@ -1,12 +1,13 @@
 import debug from 'debug';
-import { Subject } from 'rxjs';
 import { startWith, map, distinctUntilChanged } from 'rxjs/operators';
 import type { Hlc } from '@strata/hlc';
 import { tick } from '@strata/hlc';
 import type { EntityDefinition, BaseEntity } from '@strata/schema';
 import { formatEntityId } from '@strata/schema';
 import { generateId, parseEntityKey } from '@strata/utils';
-import type { EntityEventBus, EntityEventListener } from '@strata/reactive';
+import type { EventBus } from '@strata/reactive';
+import type { EntityEvent } from '@strata/reactive';
+import { filter } from 'rxjs/operators';
 import type { EntityStore } from '@strata/store';
 import type { Repository as RepositoryType, QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
@@ -35,23 +36,14 @@ function resultsChanged<T extends BaseEntity>(
 }
 
 export class Repository<T> {
-  private readonly changeSignal = new Subject<void>();
-  private readonly listener: EntityEventListener;
   private disposed = false;
 
   constructor(
     private readonly definition: EntityDefinition<T>,
     private readonly store: EntityStore,
     private readonly hlc: { current: Hlc },
-    private readonly eventBus: EntityEventBus,
-  ) {
-    this.listener = (event) => {
-      if (event.entityName === definition.name) {
-        this.changeSignal.next();
-      }
-    };
-    eventBus.on(this.listener);
-  }
+    private readonly eventBus: EventBus<EntityEvent>,
+  ) {}
 
   get(id: string): (T & BaseEntity) | undefined {
     const entityKey = parseEntityKey(id);
@@ -98,7 +90,7 @@ export class Repository<T> {
   save(partial: T & Partial<BaseEntity>): string {
     assertNotDisposed(this.disposed, 'Repository');
     const id = this.saveToStore(partial);
-    this.eventBus.emit({ entityName: this.definition.name });
+    this.eventBus.emit({ entityName: this.definition.name, source: 'user', updates: [id], deletes: [] });
     return id;
   }
 
@@ -108,7 +100,7 @@ export class Repository<T> {
     assertNotDisposed(this.disposed, 'Repository');
     const ids = entities.map(entity => this.saveToStore(entity));
     if (ids.length > 0) {
-      this.changeSignal.next();
+      this.eventBus.emit({ entityName: this.definition.name, source: 'user', updates: [...ids], deletes: [] });
     }
     return ids;
   }
@@ -130,21 +122,21 @@ export class Repository<T> {
     assertNotDisposed(this.disposed, 'Repository');
     const deleted = this.deleteFromStore(id);
     if (deleted) {
-      this.eventBus.emit({ entityName: this.definition.name });
+      this.eventBus.emit({ entityName: this.definition.name, source: 'user', updates: [], deletes: [id] });
     }
     return deleted;
   }
 
   deleteMany(ids: ReadonlyArray<string>): void {
     assertNotDisposed(this.disposed, 'Repository');
-    let anyDeleted = false;
+    const deletedIds: string[] = [];
     for (const id of ids) {
       if (this.deleteFromStore(id)) {
-        anyDeleted = true;
+        deletedIds.push(id);
       }
     }
-    if (anyDeleted) {
-      this.changeSignal.next();
+    if (deletedIds.length > 0) {
+      this.eventBus.emit({ entityName: this.definition.name, source: 'user', updates: [], deletes: deletedIds });
     }
   }
 
@@ -187,7 +179,8 @@ export class Repository<T> {
 
   observe(id: string) {
     assertNotDisposed(this.disposed, 'Repository');
-    return this.changeSignal.pipe(
+    return this.eventBus.all$.pipe(
+      filter((e: EntityEvent) => e.entityName === this.definition.name),
       startWith(undefined as void),
       map(() => this.get(id)),
       distinctUntilChanged(entityComparator),
@@ -196,7 +189,8 @@ export class Repository<T> {
 
   observeQuery(opts?: QueryOptions<T>) {
     assertNotDisposed(this.disposed, 'Repository');
-    return this.changeSignal.pipe(
+    return this.eventBus.all$.pipe(
+      filter((e: EntityEvent) => e.entityName === this.definition.name),
       startWith(undefined as void),
       map(() => this.query(opts)),
       distinctUntilChanged((prev, next) => !resultsChanged(prev, next)),
@@ -206,8 +200,6 @@ export class Repository<T> {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.changeSignal.complete();
-    this.eventBus.off(this.listener);
     log('disposed %s repository', this.definition.name);
   }
 }

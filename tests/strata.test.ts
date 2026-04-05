@@ -81,8 +81,7 @@ describe('Strata', () => {
     expect(strata.dispose).toBeTypeOf('function');
     expect(strata.isDirty).toBe(false);
     expect(strata.isDirty$).toBeDefined();
-    expect(strata.onSyncEvent).toBeTypeOf('function');
-    expect(strata.offSyncEvent).toBeTypeOf('function');
+    expect(strata.syncEvents$).toBeDefined();
   });
 
   describe('repo()', () => {
@@ -273,7 +272,7 @@ describe('Strata', () => {
       });
 
       const events: SyncEvent[] = [];
-      strata.onSyncEvent(e => events.push(e));
+      strata.syncEvents$.subscribe(e => events.push(e));
 
       const tenant = await strata.tenants.create({
         name: 'Test',
@@ -334,7 +333,7 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       const events: SyncEvent[] = [];
-      strata.onSyncEvent(e => events.push(e));
+      strata.syncEvents$.subscribe(e => events.push(e));
 
       const tenant = await strata.tenants.create({
         name: 'Test',
@@ -359,7 +358,7 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       const events: SyncEvent[] = [];
-      strata.onSyncEvent(e => events.push(e));
+      strata.syncEvents$.subscribe(e => events.push(e));
 
       const tenant = await strata.tenants.create({
         name: 'Test',
@@ -436,7 +435,7 @@ describe('Strata', () => {
   });
 
   describe('sync events', () => {
-    it('onSyncEvent/offSyncEvent manages listeners', async () => {
+    it('syncEvents$ delivers events and unsubscribe stops delivery', async () => {
       const cloudAdapter = makeAdapter();
       const taskDef = defineEntity<Task>('task');
       strata = new Strata({
@@ -447,9 +446,8 @@ describe('Strata', () => {
         deviceId: 'dev',
       });
       const events: SyncEvent[] = [];
-      const listener = (e: SyncEvent) => events.push(e);
+      const sub = strata.syncEvents$.subscribe(e => events.push(e));
 
-      strata.onSyncEvent(listener);
       const tenant = await strata.tenants.create({
         name: 'Test',
         meta: { bucket: 'test' },
@@ -459,7 +457,7 @@ describe('Strata', () => {
       expect(events.length).toBeGreaterThan(0);
 
       const countBefore = events.length;
-      strata.offSyncEvent(listener);
+      sub.unsubscribe();
       await strata.tenants.sync();
       expect(events.length).toBe(countBefore);
     });

@@ -10,7 +10,6 @@ export type {
   SyncQueueItem,
   SyncResult,
   SyncEvent,
-  SyncEventListener,
   SyncEnqueueResult,
   SyncEngine as SyncEngineType,
 } from './types';

@@ -1,5 +1,6 @@
 import debug from 'debug';
-import type { Observable } from 'rxjs';
+import type { Observable, Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { createHlc } from '@strata/hlc';
 import type { Hlc } from '@strata/hlc';
 import type { StorageAdapter, EncryptionService } from '@strata/adapter';
@@ -9,6 +10,7 @@ import {
 import type { EntityDefinition } from '@strata/schema';
 import type { BlobMigration } from '@strata/schema/migration';
 import { EventBus } from '@strata/reactive';
+import type { EntityEvent } from '@strata/reactive';
 import { EncryptedDataAdapter } from '@strata/persistence';
 import { Store } from '@strata/store';
 import { Repository, SingletonRepository } from '@strata/repo';
@@ -19,7 +21,7 @@ import {
   SyncEngine,
 } from '@strata/sync';
 import type {
-  SyncEventListener,
+  SyncEvent,
   SyncEngineType,
 } from '@strata/sync';
 import { assertNotDisposed, ReactiveFlag } from '@strata/utils';
@@ -72,16 +74,17 @@ export function validateEntityDefinitions(
 export class Strata {
   readonly tenants: TenantManagerType;
   readonly isDirty$: Observable<boolean>;
+  readonly syncEvents$: Observable<SyncEvent>;
 
   private readonly hlcRef: { current: Hlc };
-  private readonly eventBus: EventBus;
+  private readonly eventBus: EventBus<EntityEvent>;
   private readonly syncEngine: SyncEngineType;
   private readonly dirtyTracker: ReactiveFlag;
   private readonly tenantContext: TenantContext;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly repoMap = new Map<string, RepositoryType<unknown> | SingletonRepositoryType<unknown>>();
   private readonly config: StrataConfig;
-  private readonly dirtyFlushListener: (event: { fromSync?: boolean }) => void;
+  private readonly dirtySubscription: Subscription;
 
   private disposed = false;
   private disposePromise: Promise<void> | null = null;
@@ -102,7 +105,7 @@ export class Strata {
       : undefined;
 
     this.hlcRef = { current: createHlc(config.deviceId) };
-    this.eventBus = new EventBus();
+    this.eventBus = new EventBus<EntityEvent>();
     this.syncEngine = new SyncEngine(
       store, localAdapter, cloudAdapter,
       config.entities.map(d => d.name), this.hlcRef, this.eventBus,
@@ -110,6 +113,7 @@ export class Strata {
     );
     this.dirtyTracker = new ReactiveFlag();
     this.isDirty$ = this.dirtyTracker.value$;
+    this.syncEvents$ = this.syncEngine.syncEvents$;
 
     for (const def of config.entities) {
       if (def.keyStrategy.kind === 'singleton') {
@@ -133,13 +137,9 @@ export class Strata {
       deriveTenantId: config.deriveTenantId,
     });
 
-    const dirtyFlushListener = (event: { fromSync?: boolean }) => {
-      if (!event.fromSync) {
-        this.dirtyTracker.set();
-      }
-    };
-    this.dirtyFlushListener = dirtyFlushListener;
-    this.eventBus.on(dirtyFlushListener);
+    this.dirtySubscription = this.eventBus.all$.pipe(
+      filter(e => e.source !== 'sync'),
+    ).subscribe(() => this.dirtyTracker.set());
   }
 
   repo<T>(def: EntityDefinition<T, 'singleton'>): SingletonRepositoryType<T>;
@@ -154,17 +154,14 @@ export class Strata {
 
   get isDirty(): boolean { return this.dirtyTracker.value; }
 
-  onSyncEvent(listener: SyncEventListener): void { this.syncEngine.on(listener); }
-
-  offSyncEvent(listener: SyncEventListener): void { this.syncEngine.off(listener); }
-
   dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise;
     this.disposed = true;
     this.disposePromise = (async () => {
       await this.tenants.close();
       for (const r of this.repoMap.values()) r.dispose();
-      this.eventBus.off(this.dirtyFlushListener);
+      this.dirtySubscription.unsubscribe();
+      this.eventBus.dispose();
       this.syncEngine.dispose();
       log('strata disposed');
     })();

@@ -1,5 +1,7 @@
 import type { Hlc } from '@strata/hlc';
 import type { Tenant } from '@strata/adapter';
+import type { Observable } from 'rxjs';
+import type { ReactiveFlag } from '@strata/utils';
 
 export type PartitionDiffResult = {
   readonly localOnly: ReadonlyArray<string>;
@@ -63,8 +65,6 @@ export type SyncEvent =
   | { readonly type: 'sync-failed'; readonly source: SyncLocation; readonly target: SyncLocation; readonly error: Error }
   | { readonly type: 'cloud-unreachable' };
 
-export type SyncEventListener = (event: SyncEvent) => void;
-
 export type SyncEnqueueResult = {
   readonly result: SyncBetweenResult;
   readonly deduplicated: boolean;
@@ -87,10 +87,7 @@ export type SyncEngine = {
   ): void;
   stopScheduler(): void;
   emit(event: SyncEvent): void;
-  on(listener: SyncEventListener): void;
-  off(listener: SyncEventListener): void;
+  syncEvents$: Observable<SyncEvent>;
   drain(): Promise<void>;
   dispose(): void;
 };
-
-import type { ReactiveFlag } from '@strata/utils';

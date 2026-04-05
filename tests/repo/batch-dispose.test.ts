@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { Store } from '@strata/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 import { EventBus } from '@strata/reactive';
-import type { EntityEventBus } from '@strata/reactive';
+import type { EntityEvent } from '@strata/reactive';
 import { defineEntity } from '@strata/schema';
 import { Repository } from '@strata/repo';
 import { SingletonRepository } from '@strata/repo';
@@ -21,7 +21,7 @@ const SettingsDef = defineEntity<Settings>('settings', { keyStrategy: 'singleton
 describe('Batch writes', () => {
   it('saveMany emits exactly one signal, not N', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let signalCount = 0;
@@ -44,7 +44,7 @@ describe('Batch writes', () => {
 
   it('deleteMany emits exactly one signal', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const id1 = repo.save({ name: 'A', category: 'c', price: 1 });
@@ -67,7 +67,7 @@ describe('Batch writes', () => {
 
   it('observers re-scan once per saveMany batch', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const results: number[] = [];
@@ -88,7 +88,7 @@ describe('Batch writes', () => {
 
   it('individual save still emits immediately', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let emitCount = 0;
@@ -110,7 +110,7 @@ describe('Batch writes', () => {
 
   it('individual delete still emits immediately', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const id = repo.save({ name: 'A', category: 'c', price: 1 });
@@ -131,7 +131,7 @@ describe('Batch writes', () => {
 
   it('deleteMany with no actual deletions does not signal', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let signalCount = 0;
@@ -149,7 +149,7 @@ describe('Batch writes', () => {
 
   it('saveMany returns all generated IDs', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     const ids = repo.saveMany([
@@ -164,9 +164,9 @@ describe('Batch writes', () => {
 });
 
 describe('Dispose', () => {
-  it('dispose() completes active Observable subscriptions', () => {
+  it('dispose() completes active Observable subscriptions when bus is disposed', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
 
     let completed = false;
@@ -174,14 +174,15 @@ describe('Dispose', () => {
       complete: () => { completed = true; },
     });
 
-    repo.dispose();
+    // Observables complete when EventBus is disposed, not individual repos
+    bus.dispose();
     expect(completed).toBe(true);
     sub.unsubscribe();
   });
 
   it('disposed Repository rejects save', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
@@ -190,7 +191,7 @@ describe('Dispose', () => {
 
   it('disposed Repository rejects saveMany', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
@@ -199,7 +200,7 @@ describe('Dispose', () => {
 
   it('disposed Repository rejects delete', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     const id = repo.save({ name: 'A', category: 'c', price: 1 });
     repo.dispose();
@@ -209,7 +210,7 @@ describe('Dispose', () => {
 
   it('disposed Repository rejects deleteMany', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
@@ -218,7 +219,7 @@ describe('Dispose', () => {
 
   it('disposed Repository rejects observe', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
@@ -227,31 +228,16 @@ describe('Dispose', () => {
 
   it('disposed Repository rejects observeQuery', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
 
     expect(() => repo.observeQuery()).toThrow('Repository is disposed');
   });
 
-  it('event bus listener is removed after dispose', () => {
-    const store = new Store(DEFAULT_OPTIONS);
-    const innerBus = new EventBus();
-    const offCalls: unknown[] = [];
-    const bus: EntityEventBus = {
-      on: (l) => innerBus.on(l),
-      off: (l) => { offCalls.push(l); innerBus.off(l); },
-      emit: (e) => innerBus.emit(e),
-    };
-
-    const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
-    repo.dispose();
-    expect(offCalls).toHaveLength(1);
-  });
-
   it('dispose is idempotent', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new Repository(ItemDef, store, makeHlcRef(), bus);
     repo.dispose();
     expect(() => repo.dispose()).not.toThrow();
@@ -259,19 +245,20 @@ describe('Dispose', () => {
 
   it('SingletonRepository dispose delegates correctly', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), bus);
 
     let completed = false;
     repo.observe().subscribe({ complete: () => { completed = true; } });
 
-    repo.dispose();
+    // Observables complete when EventBus is disposed, not repo
+    bus.dispose();
     expect(completed).toBe(true);
   });
 
   it('disposed SingletonRepository rejects save', () => {
     const store = new Store(DEFAULT_OPTIONS);
-    const bus = new EventBus();
+    const bus = new EventBus<EntityEvent>();
     const repo = new SingletonRepository(SettingsDef, store, makeHlcRef(), bus);
     repo.dispose();
 
