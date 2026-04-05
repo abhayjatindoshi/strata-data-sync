@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { MemoryBlobAdapter } from '@strata/adapter';
+import { MemoryStorageAdapter } from '@strata/adapter';
 
-describe('MemoryBlobAdapter', () => {
+describe('MemoryStorageAdapter', () => {
   it('read returns null for missing key', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     const result = await adapter.read(undefined, 'missing');
     expect(result).toBeNull();
   });
 
   it('read/write round-trip', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     const data = new Uint8Array([1, 2, 3, 4, 5]);
     await adapter.write(undefined, 'test-key', data);
     const result = await adapter.read(undefined, 'test-key');
@@ -17,7 +17,7 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('write stores defensive copy (mutation isolation)', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     const data = new Uint8Array([10, 20, 30]);
     await adapter.write(undefined, 'key', data);
     data[0] = 99;
@@ -26,7 +26,7 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('read returns defensive copy', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     await adapter.write(undefined, 'key', new Uint8Array([1, 2, 3]));
     const r1 = await adapter.read(undefined, 'key');
     r1![0] = 99;
@@ -35,18 +35,18 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('delete returns true when key exists', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     await adapter.write(undefined, 'key', new Uint8Array([1]));
     expect(await adapter.delete(undefined, 'key')).toBe(true);
   });
 
   it('delete returns false when key missing', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     expect(await adapter.delete(undefined, 'missing')).toBe(false);
   });
 
   it('list filters by prefix', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     await adapter.write(undefined, 'foo.a', new Uint8Array([1]));
     await adapter.write(undefined, 'foo.b', new Uint8Array([2]));
     await adapter.write(undefined, 'bar.c', new Uint8Array([3]));
@@ -55,7 +55,7 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('tenant isolation', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     const now = new Date();
     const t1 = { id: 't1', name: 'T1', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
     const t2 = { id: 't2', name: 'T2', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
@@ -68,7 +68,7 @@ describe('MemoryBlobAdapter', () => {
   });
 
   it('list with tenant scopes by tenant id', async () => {
-    const adapter = new MemoryBlobAdapter();
+    const adapter = new MemoryStorageAdapter();
     const now = new Date();
     const t1 = { id: 't1', name: 'T1', encrypted: false, meta: {}, createdAt: now, updatedAt: now } as const;
     await adapter.write(t1, 'foo.a', new Uint8Array([1]));
@@ -78,3 +78,6 @@ describe('MemoryBlobAdapter', () => {
     expect(result.sort()).toEqual(['foo.a', 'foo.b']);
   });
 });
+
+
+

@@ -1,35 +1,46 @@
 import debug from 'debug';
-import type { BlobAdapter, EncryptionStrategy, EncryptionService } from './types';
+import type { EncryptionStrategy, EncryptionService, EncryptionKeys } from './types';
 import {
-  deriveKey, generateDek, exportDek, importDek,
-  encrypt as encryptData, decrypt as decryptData,
-  InvalidEncryptionKeyError,
-} from './crypto';
+  pbkdf2DeriveKey, aesGcmGenerateKey, exportCryptoKey, importAesGcmKey,
+  aesGcmEncrypt, aesGcmDecrypt,
+} from '@strata/utils';
 
 const log = debug('strata:encryption');
+
+export class InvalidEncryptionKeyError extends Error {
+  constructor(message = 'Invalid encryption key') {
+    super(message);
+    this.name = 'InvalidEncryptionKeyError';
+  }
+}
 
 // ── Strategy: stateless AES-GCM crypto ───────────────────
 
 export class AesGcmEncryptionStrategy implements EncryptionStrategy<CryptoKey> {
   async encrypt(data: Uint8Array, key: CryptoKey): Promise<Uint8Array> {
-    return encryptData(data, key);
+    return aesGcmEncrypt(data, key);
   }
 
   async decrypt(data: Uint8Array, key: CryptoKey): Promise<Uint8Array> {
     try {
-      return await decryptData(data, key);
+      return await aesGcmDecrypt(data, key);
     } catch {
       throw new InvalidEncryptionKeyError();
     }
   }
 }
 
-// ── Service: PBKDF2 key derivation + KEK/DEK management ─
+// ── Keys type for Pbkdf2 implementation ──────────────────
+
+type Pbkdf2Keys = {
+  readonly kek: CryptoKey;
+  readonly dek: CryptoKey | null;
+};
+
+// ── Service: stateless PBKDF2 key derivation + KEK/DEK ───
 
 export class Pbkdf2EncryptionService implements EncryptionService {
   readonly targets: ReadonlyArray<'local' | 'cloud'>;
-  private kek: CryptoKey | null = null;
-  private dek: CryptoKey | null = null;
   private readonly strategy: EncryptionStrategy<CryptoKey>;
   private readonly tenantKey: string;
   private readonly markerKey: string;
@@ -46,84 +57,67 @@ export class Pbkdf2EncryptionService implements EncryptionService {
     this.markerKey = options.markerKey ?? '__strata';
   }
 
-  // ── Encrypt / Decrypt (delegates to strategy) ──────────
-
-  async encrypt(blobKey: string, data: Uint8Array): Promise<Uint8Array> {
-    if (blobKey === this.tenantKey) return data;
-    if (blobKey === this.markerKey) {
-      if (!this.kek) return data;
-      return this.strategy.encrypt(data, this.kek);
-    }
-    if (!this.dek) return data;
-    return this.strategy.encrypt(data, this.dek);
+  private castKeys(keys: EncryptionKeys | null): Pbkdf2Keys | null {
+    return keys as Pbkdf2Keys | null;
   }
 
-  async decrypt(blobKey: string, data: Uint8Array): Promise<Uint8Array> {
+  // ── Encrypt / Decrypt (stateless — keys passed in) ─────
+
+  async encrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys | null): Promise<Uint8Array> {
+    const k = this.castKeys(keys);
     if (blobKey === this.tenantKey) return data;
     if (blobKey === this.markerKey) {
-      if (!this.kek) return data;
-      return this.strategy.decrypt(data, this.kek);
+      if (!k?.kek) return data;
+      return this.strategy.encrypt(data, k.kek);
     }
-    if (!this.dek) return data;
-    return this.strategy.decrypt(data, this.dek);
+    if (!k?.dek) return data;
+    return this.strategy.encrypt(data, k.dek);
   }
 
-  // ── Lifecycle ──────────────────────────────────────────
+  async decrypt(blobKey: string, data: Uint8Array, keys: EncryptionKeys | null): Promise<Uint8Array> {
+    const k = this.castKeys(keys);
+    if (blobKey === this.tenantKey) return data;
+    if (blobKey === this.markerKey) {
+      if (!k?.kek) return data;
+      return this.strategy.decrypt(data, k.kek);
+    }
+    if (!k?.dek) return data;
+    return this.strategy.decrypt(data, k.dek);
+  }
 
-  async activate(credential: string, appId: string): Promise<void> {
-    this.kek = await deriveKey(credential, appId);
-    this.dek = null;
+  // ── Key management (stateless — returns new keys) ──────
+
+  async deriveKeys(credential: string, appId: string): Promise<EncryptionKeys> {
+    const kek = await pbkdf2DeriveKey(credential, appId);
     log('KEK derived for app %s', appId);
+    return { kek, dek: null } satisfies Pbkdf2Keys;
   }
 
-  async generateKeyData(): Promise<Record<string, unknown>> {
-    const dek = await generateDek();
-    this.dek = dek;
-    const dekBase64 = await exportDek(dek);
-    return { dek: dekBase64 };
+  async generateKeyData(keys: EncryptionKeys): Promise<{ keys: EncryptionKeys; keyData: Record<string, unknown> }> {
+    const k = keys as Pbkdf2Keys;
+    const dek = await aesGcmGenerateKey();
+    const dekBase64 = await exportCryptoKey(dek);
+    return {
+      keys: { kek: k.kek, dek } satisfies Pbkdf2Keys,
+      keyData: { dek: dekBase64 },
+    };
   }
 
-  async loadKeyData(data: Record<string, unknown>): Promise<void> {
-    this.dek = await importDek(data.dek as string);
+  async loadKeyData(keys: EncryptionKeys, data: Record<string, unknown>): Promise<EncryptionKeys> {
+    const k = keys as Pbkdf2Keys;
+    const dek = await importAesGcmKey(data.dek as string);
+    return { kek: k.kek, dek } satisfies Pbkdf2Keys;
   }
 
-  async rekey(credential: string, appId: string): Promise<Record<string, unknown>> {
-    const currentDek = this.dek;
-    if (!currentDek) throw new Error('No DEK loaded — cannot rekey');
-    this.kek = await deriveKey(credential, appId);
-    const dekBase64 = await exportDek(currentDek);
-    return { dek: dekBase64 };
-  }
-
-  deactivate(): void {
-    this.kek = null;
-    this.dek = null;
-  }
-
-  get isActive(): boolean {
-    return this.kek !== null;
+  async rekey(keys: EncryptionKeys, credential: string, appId: string): Promise<{ keys: EncryptionKeys; keyData: Record<string, unknown> }> {
+    const k = keys as Pbkdf2Keys;
+    if (!k.dek) throw new Error('No DEK loaded — cannot rekey');
+    const newKek = await pbkdf2DeriveKey(credential, appId);
+    const dekBase64 = await exportCryptoKey(k.dek);
+    return {
+      keys: { kek: newKek, dek: k.dek } satisfies Pbkdf2Keys,
+      keyData: { dek: dekBase64 },
+    };
   }
 }
 
-// ── withEncryption decorator ─────────────────────────────
-
-export function withEncryption(
-  adapter: BlobAdapter,
-  service: EncryptionService,
-): BlobAdapter {
-  return {
-    async read(tenant, key) {
-      const raw = await adapter.read(tenant, key);
-      if (!raw) return null;
-      return service.decrypt(key, raw);
-    },
-    async write(tenant, key, data) {
-      const encrypted = await service.encrypt(key, data);
-      await adapter.write(tenant, key, encrypted);
-    },
-    delete: (t, k) => adapter.delete(t, k),
-    list: (t, p) => adapter.list(t, p),
-  };
-}
-
-export { importDek, exportDek };

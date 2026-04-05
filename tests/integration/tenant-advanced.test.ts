@@ -1,15 +1,15 @@
+import { wrapAdapter } from '../helpers';
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   saveTenantPrefs,
   loadTenantPrefs,
   pushTenantList,
   pullTenantList,
   loadTenantList,
   resolveOptions,
-  toDataAdapter,
 } from '@strata/index';
 import type { Tenant } from '@strata/index';
 
@@ -33,7 +33,7 @@ describe('Tenant advanced integration', () => {
   }
 
   it('tenant preferences sync — save prefs on A, load on B via shared cloud', async () => {
-    const sharedCloud = toDataAdapter(new MemoryBlobAdapter());
+    const sharedCloud = wrapAdapter(new MemoryStorageAdapter());
     const now = new Date();
     const tenant: Tenant = { id: 'prefs-test', name: 'Test', encrypted: false, meta: { folder: 'shared' }, createdAt: now, updatedAt: now };
 
@@ -50,13 +50,13 @@ describe('Tenant advanced integration', () => {
   });
 
   it('tenant list multi-device merge — A creates X, B creates Y, both end up with both', async () => {
-    const sharedCloudRaw = new MemoryBlobAdapter();
-    const localARaw = new MemoryBlobAdapter();
-    const localBRaw = new MemoryBlobAdapter();
+    const sharedCloudRaw = new MemoryStorageAdapter();
+    const localARaw = new MemoryStorageAdapter();
+    const localBRaw = new MemoryStorageAdapter();
 
-    const sharedCloud = toDataAdapter(sharedCloudRaw);
-    const localADa = toDataAdapter(localARaw);
-    const localBDa = toDataAdapter(localBRaw);
+    const sharedCloud = wrapAdapter(sharedCloudRaw);
+    const localADa = wrapAdapter(localARaw);
+    const localBDa = wrapAdapter(localBRaw);
 
     // Device A creates tenant X
     const strataA = track(new Strata({
@@ -103,3 +103,8 @@ describe('Tenant advanced integration', () => {
     expect(namesB).toEqual(['Tenant X', 'Tenant Y']);
   });
 });
+
+
+
+
+

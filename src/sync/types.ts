@@ -76,22 +76,21 @@ export type SyncEngine = {
     target: SyncLocation,
     tenant: Tenant | undefined,
   ): Promise<SyncEnqueueResult>;
+  run(
+    tenant: Tenant | undefined,
+    steps: ReadonlyArray<[SyncLocation, SyncLocation]>,
+  ): Promise<SyncBetweenResult[]>;
+  startScheduler(
+    tenant: Tenant | undefined,
+    hasCloud: boolean,
+    dirtyTracker?: ReactiveFlag,
+  ): void;
+  stopScheduler(): void;
   emit(event: SyncEvent): void;
   on(listener: SyncEventListener): void;
   off(listener: SyncEventListener): void;
   drain(): Promise<void>;
   dispose(): void;
-};
-
-export type SyncSchedulerOptions = {
-  readonly localFlushIntervalMs: number;
-  readonly cloudSyncIntervalMs: number;
-  readonly dirtyTracker?: ReactiveFlag;
-};
-
-export type SyncScheduler = {
-  start(): void;
-  stop(): void;
 };
 
 import type { ReactiveFlag } from '@strata/utils';

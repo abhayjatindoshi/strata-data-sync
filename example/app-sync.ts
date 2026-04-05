@@ -1,4 +1,4 @@
-import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, MemoryStorageAdapter, defineEntity } from 'strata-data-sync';
 import type { SyncEvent } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
@@ -11,7 +11,7 @@ async function main() {
   await cleanTmpDir(dataDir);
 
   // Shared cloud adapter simulates remote storage both devices sync to
-  const cloudAdapter = new MemoryBlobAdapter();
+  const cloudAdapter = new MemoryStorageAdapter();
 
   const storage1 = new FsStorageAdapter(dataDir + '-device1');
   const storage2 = new FsStorageAdapter(dataDir + '-device2');
@@ -52,7 +52,7 @@ async function main() {
   console.log('Device 1 tasks:', tasks1.query().map(t => t.title));
 
   console.log(`Device 1 isDirty before sync: ${device1.isDirty}`);
-  const result1 = await device1.sync();
+  const result1 = await device1.tenants.sync();
   console.log(`Device 1 synced — entities updated: ${result1.entitiesUpdated}`);
   console.log(`Device 1 isDirty after sync: ${device1.isDirty}`);
 
@@ -70,13 +70,13 @@ async function main() {
   console.log('Device 2 tasks:', tasks2.query().map(t => t.title));
 
   console.log(`Device 2 isDirty before sync: ${device2.isDirty}`);
-  const result2 = await device2.sync();
+  const result2 = await device2.tenants.sync();
   console.log(`Device 2 synced — entities updated: ${result2.entitiesUpdated}`);
   console.log(`Device 2 isDirty after sync: ${device2.isDirty}`);
 
   // ── Step 4: Device 1 syncs again to pull device 2's task
   console.log('\n=== Step 4: Device 1 syncs again ===');
-  const result3 = await device1.sync();
+  const result3 = await device1.tenants.sync();
   console.log(`Device 1 synced — entities updated: ${result3.entitiesUpdated}`);
   console.log('Device 1 tasks after re-sync:', tasks1.query().map(t => t.title));
 
@@ -88,3 +88,7 @@ async function main() {
 }
 
 main().catch(console.error);
+
+
+
+

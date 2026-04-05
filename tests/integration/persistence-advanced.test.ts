@@ -2,10 +2,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   partitioned,
 } from '@strata/index';
-import type { BlobAdapter } from '@strata/index';
+import type { StorageAdapter } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Item = { name: string; category: string };
@@ -32,7 +32,7 @@ describe('Persistence advanced integration', () => {
   }
 
   it('transform pipeline end-to-end — custom adapter decorator applied on flush and reversed on reload', async () => {
-    const rawAdapter = new MemoryBlobAdapter();
+    const rawAdapter = new MemoryStorageAdapter();
 
     // Create a XOR decorator adapter that transforms bytes
     const xorKey = 0x42;
@@ -41,7 +41,7 @@ describe('Persistence advanced integration', () => {
       for (let i = 0; i < data.length; i++) result[i] = data[i] ^ xorKey;
       return result;
     };
-    const transformedAdapter: BlobAdapter = {
+    const transformedAdapter: StorageAdapter = {
       async read(cm, key) {
         const data = await rawAdapter.read(cm, key);
         if (!data) return null;
@@ -90,7 +90,7 @@ describe('Persistence advanced integration', () => {
   });
 
   it('adapter list() discovers partition keys after flush', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
 
     const strata = track(new Strata({
       appId: 'test',
@@ -112,3 +112,6 @@ describe('Persistence advanced integration', () => {
     expect(keys.sort()).toEqual(['transaction.checking', 'transaction.savings']);
   });
 });
+
+
+

@@ -3,7 +3,7 @@ import { firstValueFrom, take, toArray, skip } from 'rxjs';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
 } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import type { BaseEntity } from '@strata/schema';
@@ -25,7 +25,7 @@ describe('Repository + Reactive integration', () => {
     strata = new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     });
     return strata.repo(TaskDef) as Repository<Task>;
@@ -221,3 +221,6 @@ describe('Repository + Reactive integration', () => {
     sub.unsubscribe();
   });
 });
+
+
+

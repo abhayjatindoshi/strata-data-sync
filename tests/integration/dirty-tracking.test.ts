@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
 } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
@@ -29,8 +29,8 @@ describe('Dirty tracking integration', () => {
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
-      cloudAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
+      cloudAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     }));
 
@@ -49,7 +49,7 @@ describe('Dirty tracking integration', () => {
     expect(strata.isDirty).toBe(true);
 
     // Sync clears dirty
-    await strata.sync();
+    await strata.tenants.sync();
     expect(strata.isDirty).toBe(false);
   });
 
@@ -57,8 +57,8 @@ describe('Dirty tracking integration', () => {
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
-      cloudAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
+      cloudAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     }));
 
@@ -76,7 +76,7 @@ describe('Dirty tracking integration', () => {
     repo.save({ title: 'Test', done: false });
 
     // Sync
-    await strata.sync();
+    await strata.tenants.sync();
 
     sub.unsubscribe();
 
@@ -86,3 +86,7 @@ describe('Dirty tracking integration', () => {
     expect(emissions[emissions.length - 1]).toBe(false);
   });
 });
+
+
+
+

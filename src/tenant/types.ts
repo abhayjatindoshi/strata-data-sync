@@ -1,4 +1,5 @@
-import type { BehaviorSubject } from 'rxjs';
+import type { Observable } from 'rxjs';
+import type { SyncResult } from '@strata/sync';
 
 export type Tenant = {
   readonly id: string;
@@ -34,6 +35,8 @@ export type TenantManager = {
   remove(tenantId: string, opts?: { purge?: boolean }): Promise<void>;
   open(tenantId: string, opts?: { credential?: string }): Promise<void>;
   close(): Promise<void>;
+  sync(): Promise<SyncResult>;
   changeCredential(oldCredential: string, newCredential: string): Promise<void>;
-  readonly activeTenant$: BehaviorSubject<Tenant | undefined>;
+  readonly activeTenant$: Observable<Tenant | undefined>;
+  readonly activeTenant: Tenant | undefined;
 };

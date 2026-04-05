@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { withGzip, MemoryBlobAdapter } from '@strata/adapter';
+import { withGzip, MemoryStorageAdapter } from '@strata/adapter';
 
 describe('withGzip', () => {
   it('round-trips data through write/read', async () => {
-    const inner = new MemoryBlobAdapter();
+    const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const input = new TextEncoder().encode('Hello, Strata!');
     await adapter.write(undefined, 'test', input);
@@ -12,7 +12,7 @@ describe('withGzip', () => {
   });
 
   it('compressed data on inner adapter differs from input', async () => {
-    const inner = new MemoryBlobAdapter();
+    const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const input = new TextEncoder().encode('Hello, Strata!');
     await adapter.write(undefined, 'test', input);
@@ -21,7 +21,7 @@ describe('withGzip', () => {
   });
 
   it('compresses repetitive data smaller than input', async () => {
-    const inner = new MemoryBlobAdapter();
+    const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const input = new TextEncoder().encode('A'.repeat(1000));
     await adapter.write(undefined, 'test', input);
@@ -30,7 +30,7 @@ describe('withGzip', () => {
   });
 
   it('round-trips empty data', async () => {
-    const inner = new MemoryBlobAdapter();
+    const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const input = new Uint8Array(0);
     await adapter.write(undefined, 'test', input);
@@ -39,7 +39,7 @@ describe('withGzip', () => {
   });
 
   it('round-trips large data', async () => {
-    const inner = new MemoryBlobAdapter();
+    const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const input = new Uint8Array(10_000);
     for (let i = 0; i < input.length; i++) {
@@ -51,7 +51,7 @@ describe('withGzip', () => {
   });
 
   it('produces valid gzip on inner adapter (starts with gzip magic bytes)', async () => {
-    const inner = new MemoryBlobAdapter();
+    const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const input = new TextEncoder().encode('test');
     await adapter.write(undefined, 'test', input);
@@ -61,9 +61,12 @@ describe('withGzip', () => {
   });
 
   it('read returns null for missing key', async () => {
-    const inner = new MemoryBlobAdapter();
+    const inner = new MemoryStorageAdapter();
     const adapter = withGzip(inner);
     const result = await adapter.read(undefined, 'missing');
     expect(result).toBeNull();
   });
 });
+
+
+

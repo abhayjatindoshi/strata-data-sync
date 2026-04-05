@@ -1,7 +1,7 @@
-import type { BlobAdapter, Tenant } from './types';
+import type { StorageAdapter, Tenant } from './types';
 import { compositeKey } from '@strata/utils';
 
-export class MemoryBlobAdapter implements BlobAdapter {
+export class MemoryStorageAdapter implements StorageAdapter {
   private readonly store = new Map<string, Uint8Array>();
 
   async read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null> {
@@ -29,3 +29,6 @@ export class MemoryBlobAdapter implements BlobAdapter {
     return keys;
   }
 }
+
+
+

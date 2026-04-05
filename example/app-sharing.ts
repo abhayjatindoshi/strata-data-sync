@@ -1,9 +1,12 @@
 import {
   Strata,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   defineEntity,
   saveTenantPrefs,
+  noopEncryptionService,
 } from 'strata-data-sync';
+import { EncryptedDataAdapter, type DataAdapter } from 'strata-data-sync';
+import { TenantContext } from 'strata-data-sync';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir } from './common';
 
 // ── Entity ───────────────────────────────────────────────
@@ -13,7 +16,8 @@ const TaskDef = defineEntity<Task>('task');
 
 // ── Shared cloud adapter (simulates a remote backend) ───
 
-const sharedCloud = new MemoryBlobAdapter();
+const sharedCloud = new MemoryStorageAdapter();
+const sharedCloudDa: DataAdapter = new EncryptedDataAdapter(sharedCloud, noopEncryptionService, new TenantContext());
 
 // Both users derive the same tenant ID from the folder metadata
 const deriveTenantId = (meta: Record<string, unknown>) =>
@@ -56,13 +60,13 @@ async function main() {
   console.log(`  Saved ${tasks.query().length} tasks`);
 
   // Save tenant prefs to the shared cloud so User B can pick them up
-  await saveTenantPrefs(sharedCloud, tenantA, {
+  await saveTenantPrefs(sharedCloudDa, tenantA, {
     name: 'Project X',
   });
   console.log('  Saved tenant prefs (name: "Project X")');
 
   // Sync to cloud
-  const syncResult = await strataA.sync();
+  const syncResult = await strataA.tenants.sync();
   console.log(`  Synced to cloud (${syncResult.entitiesUpdated} entities pushed)`);
 
   await strataA.dispose();
@@ -106,3 +110,7 @@ async function main() {
 }
 
 main().catch(console.error);
+
+
+
+

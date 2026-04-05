@@ -7,6 +7,7 @@ import type { EntityStore } from '@strata/store';
 import type { BlobMigration } from '@strata/schema/migration';
 import type { DataAdapter } from '@strata/persistence';
 import { parseCompositeKey } from '@strata/utils';
+import type { ReactiveFlag } from '@strata/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type {
   SyncLocation, SyncQueueItem, SyncEventListener, SyncEvent,
@@ -161,7 +162,71 @@ export class SyncEngine {
     }
   }
 
+  // ── Pipeline ───────────────────────────────────────────
+
+  async run(
+    tenant: Tenant | undefined,
+    steps: ReadonlyArray<[SyncLocation, SyncLocation]>,
+  ): Promise<SyncBetweenResult[]> {
+    const results: SyncBetweenResult[] = [];
+    for (const [source, target] of steps) {
+      const { result } = await this.sync(source, target, tenant);
+      results.push(result);
+    }
+    return results;
+  }
+
+  // ── Scheduler ──────────────────────────────────────────
+
+  private localTimer: ReturnType<typeof setInterval> | null = null;
+  private cloudTimer: ReturnType<typeof setInterval> | null = null;
+
+  startScheduler(
+    tenant: Tenant | undefined,
+    hasCloud: boolean,
+    dirtyTracker?: ReactiveFlag,
+  ): void {
+    this.stopScheduler();
+
+    this.localTimer = setInterval(() => {
+      this.sync('memory', 'local', tenant).catch((err: unknown) => {
+        log.extend('error')('local flush failed: %O', err);
+      });
+    }, this.options?.localFlushIntervalMs ?? 2_000);
+
+    if (hasCloud) {
+      this.cloudTimer = setInterval(() => {
+        (async () => {
+          try {
+            await this.sync('local', 'cloud', tenant);
+            await this.sync('local', 'memory', tenant);
+            dirtyTracker?.clear();
+          } catch (err) {
+            log.extend('error')('cloud sync failed: %O', err);
+          }
+        })();
+      }, this.options?.cloudSyncIntervalMs ?? 300_000);
+    }
+
+    log('scheduler started (local=%dms, cloud=%dms)',
+      this.options?.localFlushIntervalMs ?? 2_000,
+      this.options?.cloudSyncIntervalMs ?? 300_000,
+    );
+  }
+
+  stopScheduler(): void {
+    if (this.localTimer !== null) {
+      clearInterval(this.localTimer);
+      this.localTimer = null;
+    }
+    if (this.cloudTimer !== null) {
+      clearInterval(this.cloudTimer);
+      this.cloudTimer = null;
+    }
+  }
+
   dispose(): void {
+    this.stopScheduler();
     this.disposed = true;
     for (const item of this.queue) {
       item.reject(new Error('SyncEngine disposed'));

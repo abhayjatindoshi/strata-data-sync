@@ -1,13 +1,13 @@
+import { wrapAdapter } from '../helpers';
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   partitioned,
   serialize,
   deserialize,
   partitionHash,
-  toDataAdapter,
 } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import type { Hlc } from '@strata/hlc';
@@ -37,7 +37,7 @@ describe('Persistence round-trip integration', () => {
   }
 
   it('Date fields survive save → flush → reload cycle', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
 
     const strata1 = track(new Strata({
       appId: 'test',
@@ -77,7 +77,7 @@ describe('Persistence round-trip integration', () => {
   });
 
   it('multiple partition keys → flush → each partition blob written separately', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
 
     const strata = track(new Strata({
       appId: 'test',
@@ -96,7 +96,7 @@ describe('Persistence round-trip integration', () => {
     await strata.dispose();
 
     // Verify separate partition blobs exist
-    const da = toDataAdapter(localAdapter);
+    const da = wrapAdapter(localAdapter);
     const checkingBlob = await da.read(tenant, 'transaction.checking');
     const savingsBlob = await da.read(tenant, 'transaction.savings');
 
@@ -162,7 +162,7 @@ describe('Persistence round-trip integration', () => {
   });
 
   it('entity version increments on re-save and persists', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
 
     const strata1 = track(new Strata({
       appId: 'test',
@@ -200,7 +200,7 @@ describe('Persistence round-trip integration', () => {
   });
 
   it('tombstones included in partition blob after delete', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
 
     const strata = track(new Strata({
       appId: 'test',
@@ -218,7 +218,7 @@ describe('Persistence round-trip integration', () => {
     await strata.dispose();
 
     // Verify the partition blob contains tombstone
-    const da2 = toDataAdapter(localAdapter);
+    const da2 = wrapAdapter(localAdapter);
     const blob = await da2.read(tenant, 'item._');
     expect(blob).not.toBeNull();
 
@@ -229,3 +229,8 @@ describe('Persistence round-trip integration', () => {
     expect(itemTombstones[id]).toBeDefined();
   });
 });
+
+
+
+
+

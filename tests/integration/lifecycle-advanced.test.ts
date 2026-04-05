@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
 } from '@strata/index';
-import type { BlobAdapter } from '@strata/index';
+import type { StorageAdapter } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean };
@@ -30,7 +30,7 @@ describe('Lifecycle advanced integration', () => {
     expect(() => new Strata({
       appId: 'test',
       entities: [],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     })).toThrow('At least one entity definition is required');
   });
@@ -41,13 +41,13 @@ describe('Lifecycle advanced integration', () => {
     expect(() => new Strata({
       appId: 'test',
       entities: [TaskDef, TaskDef2],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     })).toThrow('Duplicate entity name: task');
   });
 
   it('data persists to local adapter on dispose', async () => {
-    const innerAdapter = new MemoryBlobAdapter();
+    const innerAdapter = new MemoryStorageAdapter();
 
     const strata = track(new Strata({
       appId: 'test',
@@ -75,10 +75,10 @@ describe('Lifecycle advanced integration', () => {
   });
 
   it('tenant load triggers hydrate from cloud automatically', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     // Device A: create, save, sync
-    const localA = new MemoryBlobAdapter();
+    const localA = new MemoryStorageAdapter();
     const strataA = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -94,10 +94,10 @@ describe('Lifecycle advanced integration', () => {
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B: load tenant → auto-hydrate from cloud (no explicit sync needed)
-    const localB = new MemoryBlobAdapter();
+    const localB = new MemoryStorageAdapter();
     const strataB = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -118,3 +118,7 @@ describe('Lifecycle advanced integration', () => {
     expect(entity!.title).toBe('From A');
   });
 });
+
+
+
+

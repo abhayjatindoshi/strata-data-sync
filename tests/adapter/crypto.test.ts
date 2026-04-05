@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
-  deriveKey, generateDek, exportDek, importDek,
-  encrypt, decrypt, InvalidEncryptionKeyError,
-} from '@strata/adapter/crypto';
+  pbkdf2DeriveKey as deriveKey,
+  aesGcmGenerateKey as generateDek,
+  exportCryptoKey as exportDek,
+  importAesGcmKey as importDek,
+  aesGcmEncrypt as encrypt,
+  aesGcmDecrypt as decrypt,
+} from '@strata/utils';
+import { InvalidEncryptionKeyError } from '@strata/adapter';
 
 describe('Encryption primitives', () => {
   const appId = 'test-app';

@@ -7,6 +7,8 @@ export type {
 } from './types';
 export type { TenantPrefs } from './tenant-prefs';
 export type { MarkerData } from './marker-blob';
+export { TenantContext } from './tenant-context';
+export type { TenantSession } from './tenant-context';
 export { loadTenantList, saveTenantList } from './tenant-list';
 export { TenantManager } from './tenant-manager';
 export type { TenantManagerDeps } from './tenant-manager';

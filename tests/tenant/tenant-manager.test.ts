@@ -6,12 +6,15 @@ import type { SyncEngineType } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
 import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
-import { loadTenantList, saveTenantList, TenantManager } from '@strata/tenant';
+import { loadTenantList, saveTenantList, TenantManager, TenantContext } from '@strata/tenant';
 import type { TenantManagerDeps } from '@strata/tenant';
 
 function stubSyncEngine(): SyncEngineType {
   return {
     sync: async () => ({ result: { changesForA: [], changesForB: [], stale: false, maxHlc: undefined }, deduplicated: false }),
+    run: async () => [],
+    startScheduler: () => {},
+    stopScheduler: () => {},
     emit: () => {},
     on: () => {},
     off: () => {},
@@ -27,6 +30,7 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
     encryptionService: noopEncryptionService,
+    tenantContext: new TenantContext(),
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
     entityTypes: [],
@@ -182,7 +186,7 @@ describe('TenantManager', () => {
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T1', meta: {}, id: 't1' });
       await tm.open('t1');
-      expect(tm.activeTenant$.getValue()!.id).toBe('t1');
+      expect(tm.activeTenant!.id).toBe('t1');
     });
 
     it('throws for unknown tenant ID', async () => {
@@ -301,9 +305,9 @@ describe('TenantManager', () => {
       const tm = new TenantManager(makeDeps(adapter));
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.open('t1');
-      expect(tm.activeTenant$.getValue()?.id).toBe('t1');
+      expect(tm.activeTenant?.id).toBe('t1');
       await tm.remove('t1');
-      expect(tm.activeTenant$.getValue()).toBeUndefined();
+      expect(tm.activeTenant).toBeUndefined();
     });
 
     it('does not delete cloud data', async () => {
@@ -333,7 +337,7 @@ describe('TenantManager', () => {
       await tm.create({ name: 'T', meta: {}, id: 't1' });
       await tm.open('t1');
       await tm.remove('t1', { purge: true });
-      expect(tm.activeTenant$.getValue()).toBeUndefined();
+      expect(tm.activeTenant).toBeUndefined();
     });
 
     it('is a no-op for unknown tenant ID', async () => {
@@ -353,7 +357,7 @@ describe('TenantManager', () => {
       await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
 
       await expect(tm.open('enc2')).rejects.toThrow('Credential required');
-      expect(tm.activeTenant$.getValue()).toBeUndefined();
+      expect(tm.activeTenant).toBeUndefined();
     });
   });
 
@@ -361,11 +365,20 @@ describe('TenantManager', () => {
     it('emits cloud-unreachable when cloud sync fails', async () => {
       const adapter = createDataAdapter();
       const emittedEvents: string[] = [];
+      const failingSync = async (source: string) => {
+        if (source === 'cloud') throw new Error('network error');
+        return { result: { changesForA: [], changesForB: [], stale: false, maxHlc: undefined }, deduplicated: false };
+      };
       const syncEngine = {
         ...stubSyncEngine(),
-        sync: async (source: string, target: string) => {
-          if (source === 'cloud') throw new Error('network error');
-          return { result: { changesForA: [], changesForB: [], stale: false, maxHlc: undefined }, deduplicated: false };
+        sync: failingSync,
+        run: async (_tenant: unknown, steps: [string, string][]) => {
+          const results = [];
+          for (const [source, target] of steps) {
+            const { result } = await failingSync(source);
+            results.push(result);
+          }
+          return results;
         },
         emit: (event: { type: string }) => { emittedEvents.push(event.type); },
       };
@@ -400,7 +413,7 @@ describe('TenantManager', () => {
       await expect(tm.changeCredential('old', 'new')).rejects.toThrow('Current tenant is not encrypted');
     });
 
-    it('error recovery restores encryption lifecycle on failure', async () => {
+    it('error recovery restores encryption on failure', async () => {
       const adapter = createDataAdapter();
       const now = new Date();
       const tenant: Tenant = { id: 'enc-cp', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
@@ -412,31 +425,31 @@ describe('TenantManager', () => {
         deleted: {},
       });
 
-      let activateCallCount = 0;
+      let deriveCallCount = 0;
       const mockService = {
         targets: ['local'] as const,
-        activate: async () => { activateCallCount++; },
-        generateKeyData: async () => undefined,
+        deriveKeys: async () => { deriveCallCount++; return null; },
+        generateKeyData: async (keys: unknown) => ({ keys }),
         loadKeyData: async () => { throw new Error('invalid key data'); },
-        rekey: async () => undefined,
-        deactivate: () => {},
-        get isActive() { return false; },
+        rekey: async (keys: unknown) => ({ keys }),
         encrypt: async (_blobKey: string, data: Uint8Array) => data,
         decrypt: async (_blobKey: string, data: Uint8Array) => data,
       };
 
-      const tm = new TenantManager(makeDeps(adapter, { encryptionService: mockService }));
+      const ctx = new TenantContext();
+      const tm = new TenantManager(makeDeps(adapter, { encryptionService: mockService as any, tenantContext: ctx }));
 
-      // Manually set active tenant to encrypted tenant (bypass open which needs real crypto)
-      (tm as any).subject.next(tenant);
+      // Set active tenant via context (bypass open which needs real crypto)
+      ctx.set(tenant, null);
 
       // loadKeyData will throw → enters catch block
       await expect(tm.changeCredential('old', 'new')).rejects.toThrow();
 
-      // Verify error recovery called activate again (restore with old credential)
-      expect(activateCallCount).toBeGreaterThanOrEqual(2); // activate(old), activate(old) recovery
+      // Verify error recovery called deriveKeys again (restore with old credential)
+      expect(deriveCallCount).toBeGreaterThanOrEqual(2); // deriveKeys(old), deriveKeys(old) recovery
     });
   });
 });
+
 
 

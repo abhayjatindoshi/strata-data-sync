@@ -1,10 +1,10 @@
+import { wrapAdapter } from '../helpers';
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   resolveOptions,
-  toDataAdapter,
 } from '@strata/index';
 import type { Tenant } from '@strata/index';
 import type { Repository } from '@strata/repo';
@@ -35,7 +35,7 @@ describe('Tenant integration', () => {
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     }));
 
@@ -45,7 +45,7 @@ describe('Tenant integration', () => {
     });
 
     await strata.tenants.open(tenant.id);
-    expect(strata.tenants.activeTenant$.getValue()?.id).toBe(tenant.id);
+    expect(strata.tenants.activeTenant?.id).toBe(tenant.id);
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     const id = repo.save({ title: 'Hello', done: false });
@@ -55,7 +55,7 @@ describe('Tenant integration', () => {
   });
 
   it('tenant list persists across instances', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
 
     const strata1 = track(new Strata({
       appId: 'test',
@@ -82,8 +82,8 @@ describe('Tenant integration', () => {
 
   it('multiple tenants → entity data isolation via separate contexts', async () => {
     // Each tenant context uses its own local adapter (simulating scoped local storage)
-    const localA = new MemoryBlobAdapter();
-    const localB = new MemoryBlobAdapter();
+    const localA = new MemoryStorageAdapter();
+    const localB = new MemoryStorageAdapter();
 
     const strataA = track(new Strata({
       appId: 'test',
@@ -114,7 +114,7 @@ describe('Tenant integration', () => {
   });
 
   it('delink removes tenant from list without deleting data', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -137,12 +137,12 @@ describe('Tenant integration', () => {
   });
 
   it('setup detects existing workspace via marker blob', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const meta = { folder: 'shared-folder' };
     const deriveFn = () => 'setup-id';
     const tempTenant: Tenant = { id: 'setup-id', name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };
 
-    await writeMarkerBlob(toDataAdapter(localAdapter), tempTenant, ['task'], resolveOptions());
+    await writeMarkerBlob(wrapAdapter(localAdapter), tempTenant, ['task'], resolveOptions());
 
     const strata = track(new Strata({
       appId: 'test',
@@ -160,7 +160,7 @@ describe('Tenant integration', () => {
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     }));
 
@@ -176,7 +176,7 @@ describe('Tenant integration', () => {
     const meta = { folderId: 'abc123xyz' };
 
     // Device A creates
-    const localA = new MemoryBlobAdapter();
+    const localA = new MemoryStorageAdapter();
     const strataA2 = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -187,9 +187,9 @@ describe('Tenant integration', () => {
     const tenantA = await strataA2.tenants.create({ name: 'Shared', meta });
 
     // Device B sets up (needs marker in its adapter with matching tenant ID)
-    const localB = new MemoryBlobAdapter();
+    const localB = new MemoryStorageAdapter();
     const tenantRefB: Tenant = { id: deriveFn(meta), name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };
-    await writeMarkerBlob(toDataAdapter(localB), tenantRefB, ['task'], resolveOptions());
+    await writeMarkerBlob(wrapAdapter(localB), tenantRefB, ['task'], resolveOptions());
     const strataB2 = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -207,12 +207,12 @@ describe('Tenant integration', () => {
     await strataA2.tenants.open(tenantA.id);
     await strataB2.tenants.open(tenantB.id);
 
-    expect(strataA2.tenants.activeTenant$.getValue()?.name).toBe('Shared');
-    expect(strataB2.tenants.activeTenant$.getValue()).toBeDefined();
+    expect(strataA2.tenants.activeTenant?.name).toBe('Shared');
+    expect(strataB2.tenants.activeTenant).toBeDefined();
   });
 
   it('delete removes tenant and all data at cloudMeta location', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -231,3 +231,9 @@ describe('Tenant integration', () => {
     expect(list).toHaveLength(0);
   });
 });
+
+
+
+
+
+

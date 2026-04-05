@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
 } from '@strata/index';
 import type { Repository, SingletonRepository } from '@strata/repo';
 import type { BaseEntity } from '@strata/schema';
@@ -32,7 +32,7 @@ describe('Repository advanced integration', () => {
     strata = new Strata({
       appId: 'test',
       entities,
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     });
   }
@@ -173,3 +173,6 @@ describe('Repository advanced integration', () => {
     expect(callCount).toBe(2);
   });
 });
+
+
+

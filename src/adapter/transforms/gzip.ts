@@ -1,7 +1,7 @@
-import type { BlobAdapter, Tenant } from './types';
+import type { StorageAdapter, Tenant } from '../types';
 import { toArrayBuffer, streamToUint8Array } from '@strata/utils';
 
-export function withGzip(adapter: BlobAdapter): BlobAdapter {
+export function withGzip(adapter: StorageAdapter): StorageAdapter {
   return {
     async read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null> {
       const data = await adapter.read(tenant, key);
@@ -22,3 +22,4 @@ export function withGzip(adapter: BlobAdapter): BlobAdapter {
     list: (t, p) => adapter.list(t, p),
   };
 }
+

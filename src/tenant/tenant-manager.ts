@@ -1,12 +1,10 @@
 import debug from 'debug';
-import { BehaviorSubject } from 'rxjs';
-import type { EncryptionService } from '@strata/adapter';
+import type { EncryptionService, EncryptionKeys } from '@strata/adapter';
 import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
-import type { SyncEngineType, SyncScheduler as SyncSchedulerType } from '@strata/sync';
+import type { SyncEngineType, SyncResult, SyncLocation } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
-import { SyncScheduler } from '@strata/sync';
 import { generateId } from '@strata/utils';
 import type {
   Tenant,
@@ -15,6 +13,7 @@ import type {
   JoinTenantOptions,
   TenantManager as TenantManagerType,
 } from './types';
+import type { TenantContext } from './tenant-context';
 import { loadTenantList, saveTenantList } from './tenant-list';
 import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-blob';
 import { loadTenantPrefs } from './tenant-prefs';
@@ -28,6 +27,7 @@ export type TenantManagerDeps = {
   readonly store: EntityStore;
   readonly dirtyTracker: ReactiveFlag;
   readonly encryptionService: EncryptionService;
+  readonly tenantContext: TenantContext;
   readonly options: ResolvedStrataOptions;
   readonly appId: string;
   readonly entityTypes: readonly string[];
@@ -35,15 +35,16 @@ export type TenantManagerDeps = {
 };
 
 export class TenantManager implements TenantManagerType {
-  private readonly subject: BehaviorSubject<Tenant | undefined>;
   private cachedList: Tenant[] | null = null;
-  private syncScheduler: SyncSchedulerType | null = null;
 
-  readonly activeTenant$: BehaviorSubject<Tenant | undefined>;
+  readonly activeTenant$;
+
+  get activeTenant(): Tenant | undefined {
+    return this.deps.tenantContext.activeTenant;
+  }
 
   constructor(private readonly deps: TenantManagerDeps) {
-    this.subject = new BehaviorSubject<Tenant | undefined>(undefined);
-    this.activeTenant$ = this.subject;
+    this.activeTenant$ = deps.tenantContext.activeTenant$;
   }
 
   // ─── Internals ───────────────────────────────────────────
@@ -117,10 +118,14 @@ export class TenantManager implements TenantManagerType {
 
     let keyData: Record<string, unknown> | undefined;
     if (opts.encryption) {
-      await this.deps.encryptionService.activate(
+      let keys = await this.deps.encryptionService.deriveKeys(
         opts.encryption.credential, this.deps.appId,
       );
-      keyData = await this.deps.encryptionService.generateKeyData();
+      const result = await this.deps.encryptionService.generateKeyData(keys);
+      keys = result.keys;
+      keyData = result.keyData;
+      // Temporarily set context so writeMarkerBlob can encrypt
+      this.deps.tenantContext.set(tenant, keys);
     }
 
     await writeMarkerBlob(
@@ -128,7 +133,7 @@ export class TenantManager implements TenantManagerType {
     );
 
     if (opts.encryption) {
-      this.deps.encryptionService.deactivate();
+      this.deps.tenantContext.clear();
     }
 
     await this.persistList([...tenants, tenant]);
@@ -207,8 +212,8 @@ export class TenantManager implements TenantManagerType {
     const filtered = tenants.filter(t => t.id !== tenantId);
     await this.persistList(filtered);
 
-    if (this.subject.getValue()?.id === tenantId) {
-      this.subject.next(undefined);
+    if (this.deps.tenantContext.activeTenant?.id === tenantId) {
+      this.deps.tenantContext.clear();
     }
     log('%s tenant %s', opts?.purge ? 'deleted' : 'removed', tenantId);
   }
@@ -224,98 +229,117 @@ export class TenantManager implements TenantManagerType {
       throw new Error(`Tenant not found: ${tenantId}`);
     }
 
-    this.subject.next(tenant);
+    let keys: EncryptionKeys | null = null;
 
     // Encryption setup
     if (tenant.encrypted) {
       if (!opts?.credential) {
-        this.subject.next(undefined);
         throw new Error('Credential required for encrypted tenant');
       }
       try {
-        await this.deps.encryptionService.activate(opts.credential, this.deps.appId);
+        keys = await this.deps.encryptionService.deriveKeys(opts.credential, this.deps.appId);
+        this.deps.tenantContext.set(tenant, keys);
         const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
         if (marker?.keyData) {
-          await this.deps.encryptionService.loadKeyData(marker.keyData);
+          keys = await this.deps.encryptionService.loadKeyData(keys, marker.keyData);
         }
       } catch (err) {
-        this.deps.encryptionService.deactivate();
-        this.subject.next(undefined);
+        this.deps.tenantContext.clear();
         throw err;
       }
     }
 
-    // Sync: cloud → local → memory
-    if (this.deps.cloudAdapter) {
+    this.deps.tenantContext.set(tenant, keys);
+
+    // Hydrate: cloud → local → memory
+    const hasCloud = !!this.deps.cloudAdapter;
+    if (hasCloud) {
       try {
-        await this.deps.syncEngine.sync('cloud', 'local', tenant);
+        await this.deps.syncEngine.run(tenant, [['cloud', 'local']]);
       } catch {
         this.deps.syncEngine.emit({ type: 'cloud-unreachable' });
       }
-      await this.deps.syncEngine.sync('local', 'memory', tenant);
-    } else {
-      await this.deps.syncEngine.sync('local', 'memory', tenant);
     }
+    await this.deps.syncEngine.run(tenant, [['local', 'memory']]);
 
     // Start scheduler
-    this.syncScheduler = new SyncScheduler(
-      this.deps.syncEngine, tenant, !!this.deps.cloudAdapter, {
-        ...this.deps.options,
-        dirtyTracker: this.deps.dirtyTracker,
-      },
-    );
-    this.syncScheduler.start();
+    this.deps.syncEngine.startScheduler(tenant, hasCloud, this.deps.dirtyTracker);
 
     log('tenant %s opened', tenant.id);
   }
 
   async close(): Promise<void> {
-    this.syncScheduler?.stop();
-    this.syncScheduler = null;
+    this.deps.syncEngine.stopScheduler();
 
-    const tenant = this.subject.getValue();
+    const tenant = this.deps.tenantContext.activeTenant;
     if (tenant) {
-      await this.deps.syncEngine.sync('memory', 'local', tenant);
+      await this.deps.syncEngine.run(tenant, [['memory', 'local']]);
     }
     await this.deps.syncEngine.drain();
 
     this.deps.store.clear();
     this.deps.dirtyTracker.clear();
-    this.deps.encryptionService.deactivate();
-    this.subject.next(undefined);
+    this.deps.tenantContext.clear();
 
     log('tenant closed');
   }
 
+  async sync(): Promise<SyncResult> {
+    const tenant = this.deps.tenantContext.activeTenant;
+    if (!tenant) throw new Error('No tenant loaded');
+    if (!this.deps.cloudAdapter) throw new Error('No cloud adapter configured');
+
+    const results = await this.deps.syncEngine.run(tenant, [
+      ['memory', 'local'],
+      ['local', 'cloud'],
+      ['local', 'memory'],
+    ]);
+    this.deps.dirtyTracker.clear();
+    const cloudResult = results[1];
+    return {
+      entitiesUpdated: cloudResult.changesForB.length,
+      conflictsResolved: cloudResult.changesForA.length,
+      partitionsSynced: cloudResult.changesForA.length + cloudResult.changesForB.length,
+    };
+  }
+
   async changeCredential(oldCredential: string, newCredential: string): Promise<void> {
-    const tenant = this.subject.getValue();
+    const tenant = this.deps.tenantContext.activeTenant;
     if (!tenant) throw new Error('No tenant loaded');
     if (!tenant.encrypted) throw new Error('Current tenant is not encrypted');
 
     try {
-      await this.deps.encryptionService.activate(oldCredential, this.deps.appId);
+      // Verify old credential by deriving keys and reading marker
+      let keys = await this.deps.encryptionService.deriveKeys(oldCredential, this.deps.appId);
+      this.deps.tenantContext.set(tenant, keys);
       const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
       if (!marker) throw new Error('Failed to read marker blob');
       if (marker.keyData) {
-        await this.deps.encryptionService.loadKeyData(marker.keyData);
+        keys = await this.deps.encryptionService.loadKeyData(keys, marker.keyData);
+        this.deps.tenantContext.set(tenant, keys);
       }
 
       // Old credential verified — rekey with new credential
-      const newKeyData = await this.deps.encryptionService.rekey(
-        newCredential, this.deps.appId,
+      const result = await this.deps.encryptionService.rekey(
+        keys, newCredential, this.deps.appId,
       );
+      this.deps.tenantContext.set(tenant, result.keys);
 
       await writeMarkerBlob(
-        this.deps.adapter, tenant, marker.entityTypes, this.deps.options, newKeyData,
+        this.deps.adapter, tenant, marker.entityTypes, this.deps.options, result.keyData,
       );
 
       log('encryption credential changed');
     } catch (err) {
-      // Restore encryption lifecycle to current state
-      await this.deps.encryptionService.activate(oldCredential, this.deps.appId).catch(() => {});
-      const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options).catch(() => null);
-      if (marker?.keyData) {
-        await this.deps.encryptionService.loadKeyData(marker.keyData).catch(() => {});
+      // Restore to old credential state
+      const oldKeys = await this.deps.encryptionService.deriveKeys(oldCredential, this.deps.appId).catch(() => null);
+      if (oldKeys) {
+        this.deps.tenantContext.set(tenant, oldKeys);
+        const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options).catch(() => null);
+        if (marker?.keyData) {
+          const fullKeys = await this.deps.encryptionService.loadKeyData(oldKeys, marker.keyData).catch(() => oldKeys);
+          this.deps.tenantContext.set(tenant, fullKeys);
+        }
       }
       throw err;
     }

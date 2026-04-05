@@ -1,7 +1,7 @@
-import type { BlobAdapter, Tenant } from './types';
+import type { StorageAdapter, Tenant } from './types';
 import { compositeKey, toBase64, fromBase64 } from '@strata/utils';
 
-export class LocalStorageAdapter implements BlobAdapter {
+export class LocalStorageAdapter implements StorageAdapter {
 
   constructor(private readonly prefix: string = 'strata') {}
 
@@ -48,3 +48,4 @@ export class LocalStorageAdapter implements BlobAdapter {
     return keys;
   }
 }
+

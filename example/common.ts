@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile, unlink, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BlobAdapter, Tenant } from 'strata-data-sync';
+import type { StorageAdapter, Tenant } from 'strata-data-sync';
 
 // ─── __dirname for ESM ───────────────────────────────────
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +28,7 @@ export async function printTree(dir: string, indent = ''): Promise<void> {
   }
 }
 
-export class FsStorageAdapter implements BlobAdapter {
+export class FsStorageAdapter implements StorageAdapter {
 
   constructor(private readonly rootDir: string) {}
 
@@ -71,3 +71,4 @@ export class FsStorageAdapter implements BlobAdapter {
     }
   }
 }
+

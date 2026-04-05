@@ -1,10 +1,10 @@
+import { wrapAdapter } from '../helpers';
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   resolveOptions,
-  toDataAdapter,
 } from '@strata/index';
 import type { Repository } from '@strata/repo';
 import { loadAllIndexes } from '@strata/persistence';
@@ -30,9 +30,9 @@ describe('syncBetween integration', () => {
 
   async function createDevice(
     deviceId: string,
-    cloudAdapter: InstanceType<typeof MemoryBlobAdapter>,
+    cloudAdapter: InstanceType<typeof MemoryStorageAdapter>,
   ) {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -44,7 +44,7 @@ describe('syncBetween integration', () => {
   }
 
   it('deletedCount is tracked in partition index after flush and sync', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     const { strata: strataA, localAdapter } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
@@ -58,9 +58,9 @@ describe('syncBetween integration', () => {
     const id2 = repo.save({ title: 'Task 2', done: false });
     repo.delete(id2);
 
-    await strataA.sync();
+    await strataA.tenants.sync();
 
-    const indexes = await loadAllIndexes(toDataAdapter(localAdapter), tenant, resolveOptions());
+    const indexes = await loadAllIndexes(wrapAdapter(localAdapter), tenant, resolveOptions());
     const taskIndex = indexes['task'];
     expect(taskIndex).toBeDefined();
     const partitionEntry = Object.values(taskIndex)[0];
@@ -69,7 +69,7 @@ describe('syncBetween integration', () => {
   });
 
   it('syncBetween propagates data bidirectionally through full lifecycle', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     // Device A saves data and syncs
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -81,7 +81,7 @@ describe('syncBetween integration', () => {
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const idA = repoA.save({ title: 'From A', done: false });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B saves different data and syncs
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
@@ -94,10 +94,10 @@ describe('syncBetween integration', () => {
 
     const repoB = strataB.repo(TaskDef) as Repository<Task>;
     const idB = repoB.save({ title: 'From B', done: true });
-    await strataB.sync();
+    await strataB.tenants.sync();
 
     // Device A syncs again — should get B's data
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     expect(repoA.get(idB)).toBeDefined();
     expect(repoA.get(idB)!.title).toBe('From B');
@@ -108,7 +108,7 @@ describe('syncBetween integration', () => {
   });
 
   it('indexes are consistent on both local and cloud after sync', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     const { strata, localAdapter } = await createDevice('device-A', sharedCloud);
     const tenant = await strata.tenants.create({
@@ -119,10 +119,10 @@ describe('syncBetween integration', () => {
 
     const repo = strata.repo(TaskDef) as Repository<Task>;
     repo.save({ title: 'Task 1', done: false });
-    await strata.sync();
+    await strata.tenants.sync();
 
-    const localIndexes = await loadAllIndexes(toDataAdapter(localAdapter), tenant, resolveOptions());
-    const cloudIndexes = await loadAllIndexes(toDataAdapter(sharedCloud), tenant, resolveOptions());
+    const localIndexes = await loadAllIndexes(wrapAdapter(localAdapter), tenant, resolveOptions());
+    const cloudIndexes = await loadAllIndexes(wrapAdapter(sharedCloud), tenant, resolveOptions());
 
     const localEntry = localIndexes['task']?.['_'];
     const cloudEntry = cloudIndexes['task']?.['_'];
@@ -133,3 +133,9 @@ describe('syncBetween integration', () => {
     expect(localEntry.count).toBe(cloudEntry.count);
   });
 });
+
+
+
+
+
+

@@ -8,6 +8,7 @@ import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
 import {
   TenantManager,
+  TenantContext,
   writeMarkerBlob,
   saveTenantPrefs,
 } from '@strata/tenant';
@@ -20,6 +21,9 @@ function makeTenant(id: string, meta: Record<string, unknown>): Tenant {
 function stubSyncEngine(): SyncEngineType {
   return {
     sync: async () => ({ result: { changesForA: [], changesForB: [], stale: false, maxHlc: undefined }, deduplicated: false }),
+    run: async () => [],
+    startScheduler: () => {},
+    stopScheduler: () => {},
     emit: () => {},
     on: () => {},
     off: () => {},
@@ -35,6 +39,7 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
     encryptionService: noopEncryptionService,
+    tenantContext: new TenantContext(),
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
     entityTypes: [],

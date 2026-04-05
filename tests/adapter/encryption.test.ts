@@ -1,118 +1,102 @@
 import { describe, it, expect } from 'vitest';
 import { Pbkdf2EncryptionService, AesGcmEncryptionStrategy } from '@strata/adapter/encryption';
-import { InvalidEncryptionKeyError } from '@strata/adapter/crypto';
+import { InvalidEncryptionKeyError } from '@strata/adapter';
 
 describe('Pbkdf2EncryptionService', () => {
   const appId = 'test-app';
 
-  function createService(): Pbkdf2EncryptionService {
-    const svc = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
-    ;
-    return svc;
+  function createService() {
+    return new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
   }
 
-  it('passthrough when not activated', async () => {
+  it('passthrough when no keys provided', async () => {
     const svc = createService();
     const data = new Uint8Array([1, 2, 3]);
-    const encoded = await svc.encrypt('task.global', data);
+    const encoded = await svc.encrypt('task.global', data, null);
     expect(encoded).toEqual(data);
-    const decoded = await svc.decrypt('task.global', encoded);
+    const decoded = await svc.decrypt('task.global', encoded, null);
     expect(decoded).toEqual(data);
   });
 
   it('always passes through __tenants key', async () => {
     const svc = createService();
-    await svc.activate('password', appId);
+    const keys = await svc.deriveKeys('password', appId);
     const data = new Uint8Array([1, 2, 3]);
-    const encoded = await svc.encrypt('__tenants', data);
+    const encoded = await svc.encrypt('__tenants', data, keys);
     expect(encoded).toEqual(data);
   });
 
   it('encrypts/decrypts __strata with KEK', async () => {
     const svc = createService();
-    await svc.activate('password', appId);
+    const keys = await svc.deriveKeys('password', appId);
     const data = new TextEncoder().encode('marker data');
-    const encrypted = await svc.encrypt('__strata', data);
+    const encrypted = await svc.encrypt('__strata', data, keys);
     expect(encrypted).not.toEqual(data);
     expect(encrypted[0]).toBe(1); // version byte
-    const decrypted = await svc.decrypt('__strata', encrypted);
+    const decrypted = await svc.decrypt('__strata', encrypted, keys);
     expect(decrypted).toEqual(data);
   });
 
   it('wrong credential fails to decrypt __strata', async () => {
-    const svc1 = createService();
-    await svc1.activate('correct', appId);
+    const svc = createService();
+    const keys1 = await svc.deriveKeys('correct', appId);
     const data = new TextEncoder().encode('secret');
-    const encrypted = await svc1.encrypt('__strata', data);
+    const encrypted = await svc.encrypt('__strata', data, keys1);
 
-    const svc2 = createService();
-    await svc2.activate('wrong', appId);
-    await expect(svc2.decrypt('__strata', encrypted))
+    const keys2 = await svc.deriveKeys('wrong', appId);
+    await expect(svc.decrypt('__strata', encrypted, keys2))
       .rejects.toThrow(InvalidEncryptionKeyError);
   });
 
   it('encrypts/decrypts data blobs with DEK', async () => {
     const svc = createService();
-    await svc.activate('password', appId);
-    const keyData = await svc.generateKeyData();
-    expect(keyData).toBeDefined();
+    let keys = await svc.deriveKeys('password', appId);
+    const result = await svc.generateKeyData(keys);
+    keys = result.keys;
     const data = new TextEncoder().encode('entity data');
-    const encrypted = await svc.encrypt('task.global', data);
+    const encrypted = await svc.encrypt('task.global', data, keys);
     expect(encrypted).not.toEqual(data);
-    const decrypted = await svc.decrypt('task.global', encrypted);
+    const decrypted = await svc.decrypt('task.global', encrypted, keys);
     expect(decrypted).toEqual(data);
-  });
-
-  it('deactivate resets state', async () => {
-    const svc = createService();
-    await svc.activate('password', appId);
-    expect(svc.isActive).toBe(true);
-    svc.deactivate();
-    expect(svc.isActive).toBe(false);
-    const data = new Uint8Array([1, 2, 3]);
-    const encoded = await svc.encrypt('__strata', data);
-    expect(encoded).toEqual(data);
   });
 
   it('generateKeyData produces loadable key data', async () => {
     const svc = createService();
-    await svc.activate('password', appId);
-    const keyData = await svc.generateKeyData();
-    expect(keyData).toBeDefined();
-    expect(typeof keyData!.dek).toBe('string');
-    expect((keyData!.dek as string).length).toBeGreaterThan(0);
+    const keys = await svc.deriveKeys('password', appId);
+    const result = await svc.generateKeyData(keys);
+    expect(result.keyData).toBeDefined();
+    expect(typeof result.keyData!.dek).toBe('string');
+    expect((result.keyData!.dek as string).length).toBeGreaterThan(0);
   });
 
   it('loadKeyData restores DEK from key data', async () => {
-    const svc1 = createService();
-    await svc1.activate('password', appId);
-    const keyData = await svc1.generateKeyData();
+    const svc = createService();
+    const keys1 = await svc.deriveKeys('password', appId);
+    const { keys: fullKeys1, keyData } = await svc.generateKeyData(keys1);
 
     const data = new TextEncoder().encode('test data');
-    const encrypted = await svc1.encrypt('task.global', data);
+    const encrypted = await svc.encrypt('task.global', data, fullKeys1);
 
-    // New service instance loads the same key data
-    const svc2 = createService();
-    await svc2.activate('password', appId);
-    await svc2.loadKeyData(keyData!);
-    const decrypted = await svc2.decrypt('task.global', encrypted);
+    // Load same key data on fresh keys
+    const keys2 = await svc.deriveKeys('password', appId);
+    const fullKeys2 = await svc.loadKeyData(keys2, keyData!);
+    const decrypted = await svc.decrypt('task.global', encrypted, fullKeys2);
     expect(decrypted).toEqual(data);
   });
 
   it('rekey re-wraps DEK under new credential', async () => {
     const svc = createService();
-    await svc.activate('old-password', appId);
-    const keyData = await svc.generateKeyData();
+    let keys = await svc.deriveKeys('old-password', appId);
+    const { keys: fullKeys } = await svc.generateKeyData(keys);
 
     const data = new TextEncoder().encode('important data');
-    const encrypted = await svc.encrypt('task.global', data);
+    const encrypted = await svc.encrypt('task.global', data, fullKeys);
 
     // Rekey with new password
-    const newKeyData = await svc.rekey('new-password', appId);
-    expect(newKeyData).toBeDefined();
+    const { keys: rekeyedKeys } = await svc.rekey(fullKeys, 'new-password', appId);
 
     // Data still decryptable (same DEK)
-    const decrypted = await svc.decrypt('task.global', encrypted);
+    const decrypted = await svc.decrypt('task.global', encrypted, rekeyedKeys);
     expect(decrypted).toEqual(data);
   });
 });

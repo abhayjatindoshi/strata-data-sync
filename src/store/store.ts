@@ -96,7 +96,7 @@ export class Store implements EntityStore {
     this.storedMarkerBlob = null;
   }
 
-  // ─── BlobAdapter interface ─────────────────────────────
+  // ─── StorageAdapter interface ─────────────────────────────
 
   async read(_tenant: Tenant | undefined, key: string): Promise<PartitionBlob | null> {
     if (key === this.markerKey) {
@@ -208,3 +208,4 @@ export class Store implements EntityStore {
     };
   }
 }
+

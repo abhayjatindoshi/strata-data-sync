@@ -11,9 +11,9 @@
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  deriveKey,
-  importDek,
-  decrypt,
+  pbkdf2DeriveKey,
+  importAesGcmKey,
+  aesGcmDecrypt,
 } from 'strata-data-sync';
 
 // ─── Args ────────────────────────────────────────────────
@@ -43,7 +43,7 @@ async function tryDecryptFile(filePath: string, key: CryptoKey): Promise<boolean
   }
 
   try {
-    const decrypted = await decrypt(bytes, key);
+    const decrypted = await aesGcmDecrypt(bytes, key);
     await writeFile(filePath, decrypted);
     return true;
   } catch {
@@ -58,7 +58,7 @@ async function main() {
   console.log(`App ID: ${appId}\n`);
 
   // 1. Derive KEK from credential
-  const kek = await deriveKey(credential, appId);
+  const kek = await pbkdf2DeriveKey(credential, appId);
   console.log('KEK derived from credential');
 
   // 2. Find all subdirectories containing a __strata marker
@@ -89,7 +89,7 @@ async function main() {
   for (const { name: tenantId, dir: tenantDir } of tenantDirs) {
     console.log(`── Tenant: ${tenantId} ──`);
 
-    // 3a. Decrypt marker blob with KEK to get DEK
+    // 3a. aesGcmDecrypt marker blob with KEK to get DEK
     const markerPath = path.join(tenantDir, '__strata');
     let dek: CryptoKey;
     try {
@@ -101,7 +101,7 @@ async function main() {
         continue;
       }
 
-      const decryptedMarker = await decrypt(markerBytes, kek);
+      const decryptedMarker = await aesGcmDecrypt(markerBytes, kek);
       await writeFile(markerPath, decryptedMarker);
       console.log('  ✓ __strata decrypted');
 
@@ -115,14 +115,14 @@ async function main() {
         continue;
       }
 
-      dek = await importDek(keyData.dek as string);
+      dek = await importAesGcmKey(keyData.dek as string);
     } catch (err) {
-      console.error(`  ✗ Failed to decrypt marker: ${(err as Error).message}`);
+      console.error(`  ✗ Failed to aesGcmDecrypt marker: ${(err as Error).message}`);
       console.error('    Check your credential and app ID');
       continue;
     }
 
-    // 3b. Decrypt all other files with DEK
+    // 3b. aesGcmDecrypt all other files with DEK
     const entries = await readdir(tenantDir);
     for (const entry of entries) {
       if (entry === '__strata') continue; // already decrypted
@@ -149,3 +149,4 @@ main().catch(err => {
   console.error(err);
   process.exit(1);
 });
+

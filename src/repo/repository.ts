@@ -5,7 +5,7 @@ import type { Hlc } from '@strata/hlc';
 import { tick } from '@strata/hlc';
 import type { EntityDefinition, BaseEntity } from '@strata/schema';
 import { formatEntityId } from '@strata/schema';
-import { generateId } from '@strata/utils';
+import { generateId, parseEntityKey } from '@strata/utils';
 import type { EntityEventBus, EntityEventListener } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
 import type { Repository as RepositoryType, QueryOptions } from './types';
@@ -13,11 +13,6 @@ import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
 import { assertNotDisposed } from '@strata/utils';
 
 const log = debug('strata:repo');
-
-function parseEntityKey(id: string): string {
-  const lastDot = id.lastIndexOf('.');
-  return id.substring(0, lastDot);
-}
 
 function entityComparator<T extends BaseEntity>(
   a: (T & BaseEntity) | undefined,

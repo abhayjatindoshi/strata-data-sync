@@ -34,7 +34,7 @@ async function main() {
   // ── 3. Load Work tenant & save work tasks ──────────────
   console.log('\n=== Loading Work Tenant ===');
   await strata.tenants.open(work.id);
-  console.log(`Active tenant: ${strata.tenants.activeTenant$.getValue()?.name}`);
+  console.log(`Active tenant: ${strata.tenants.activeTenant?.name}`);
 
   const taskRepo = strata.repo(TaskDef);
   taskRepo.save({ title: 'Finish quarterly report', done: false });
@@ -45,7 +45,7 @@ async function main() {
   // ── 4. Load Personal tenant & save personal tasks ──────
   console.log('\n=== Loading Personal Tenant ===');
   await strata.tenants.open(personal.id);
-  console.log(`Active tenant: ${strata.tenants.activeTenant$.getValue()?.name}`);
+  console.log(`Active tenant: ${strata.tenants.activeTenant?.name}`);
 
   taskRepo.save({ title: 'Buy groceries', done: false });
   taskRepo.save({ title: 'Book dentist appointment', done: true });
@@ -62,7 +62,7 @@ async function main() {
   // ── 6. Switch back to Work tenant ──────────────────────
   console.log('\n=== Switching back to Work Tenant ===');
   await strata.tenants.open(work.id);
-  console.log(`Active tenant: ${strata.tenants.activeTenant$.getValue()?.name}`);
+  console.log(`Active tenant: ${strata.tenants.activeTenant?.name}`);
 
   const workTasks = taskRepo.query();
   console.log(`Found ${workTasks.length} task(s):`);
@@ -76,4 +76,5 @@ async function main() {
 }
 
 main();
+
 

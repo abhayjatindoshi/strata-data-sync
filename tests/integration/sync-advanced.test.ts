@@ -3,18 +3,18 @@ import { firstValueFrom } from 'rxjs';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   serialize,
   mergePartition,
 } from '@strata/index';
-import type { SyncEvent, BlobAdapter } from '@strata/index';
+import type { SyncEvent, StorageAdapter } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
 type Task = { title: string; done: boolean; priority: number };
 
 const TaskDef = defineEntity<Task>('task');
 
-function createFailingAdapter(): BlobAdapter {
+function createFailingAdapter(): StorageAdapter {
   return {
     async read() { throw new Error('Cloud unreachable'); },
     async write() { throw new Error('Cloud unreachable'); },
@@ -39,7 +39,7 @@ describe('Sync advanced integration', () => {
   }
 
   it('cloud unreachable fallback — hydrate falls back to local-only', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const failingCloud = createFailingAdapter();
     const events: SyncEvent[] = [];
 
@@ -71,8 +71,8 @@ describe('Sync advanced integration', () => {
   });
 
   it('sync lock dedup — concurrent sync() calls both resolve without error', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
-    const localAdapter = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
+    const localAdapter = new MemoryStorageAdapter();
 
     const strata = track(new Strata({
       appId: 'test',
@@ -93,8 +93,8 @@ describe('Sync advanced integration', () => {
 
     // Call sync() twice concurrently — sync lock should dedup
     const [r1, r2] = await Promise.all([
-      strata.sync(),
-      strata.sync(),
+      strata.tenants.sync(),
+      strata.tenants.sync(),
     ]);
 
     expect(r1).toBeDefined();
@@ -152,10 +152,10 @@ describe('Sync advanced integration', () => {
   });
 
   it('sync + reactive end-to-end — A saves → syncs → B hydrates → B observe emits', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     // Device A
-    const localA = new MemoryBlobAdapter();
+    const localA = new MemoryStorageAdapter();
     const strataA = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -171,10 +171,10 @@ describe('Sync advanced integration', () => {
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false, priority: 1 });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B — hydrate from cloud via tenant load
-    const localB = new MemoryBlobAdapter();
+    const localB = new MemoryStorageAdapter();
     const strataB = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -199,3 +199,7 @@ describe('Sync advanced integration', () => {
     expect(entity!.priority).toBe(1);
   });
 });
+
+
+
+

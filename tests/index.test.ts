@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createHlc,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   defineEntity,
   EventBus,
 } from '@strata/index';
@@ -12,7 +12,7 @@ describe('index barrel exports', () => {
   });
 
   it('exports adapter module', () => {
-    expect(MemoryBlobAdapter).toBeDefined();
+    expect(MemoryStorageAdapter).toBeDefined();
   });
 
   it('exports schema module', () => {
@@ -23,3 +23,6 @@ describe('index barrel exports', () => {
     expect(EventBus).toBeDefined();
   });
 });
+
+
+

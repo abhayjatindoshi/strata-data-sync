@@ -123,7 +123,7 @@ describe('EntityStore', () => {
     });
   });
 
-  describe('BlobAdapter interface', () => {
+  describe('StorageAdapter interface', () => {
     it('read returns null for key without dot separator', async () => {
       const store = new Store(DEFAULT_OPTIONS);
       const result = await store.read(undefined, 'nodot');
@@ -260,3 +260,4 @@ describe('EntityStore', () => {
     });
   });
 });
+

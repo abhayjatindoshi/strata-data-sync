@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
 } from '@strata/index';
 import type { Repository } from '@strata/repo';
 
@@ -27,9 +27,9 @@ describe('Two-device sync integration', () => {
 
   async function createDevice(
     deviceId: string,
-    cloudAdapter: InstanceType<typeof MemoryBlobAdapter>,
+    cloudAdapter: InstanceType<typeof MemoryStorageAdapter>,
   ) {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
@@ -41,7 +41,7 @@ describe('Two-device sync integration', () => {
   }
 
   it('save on A → sync A → hydrate B → B has A data', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     // Device A: create tenant, save data, sync to cloud
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -53,7 +53,7 @@ describe('Two-device sync integration', () => {
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'From A', done: false, priority: 1 });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B: create tenant with same meta, load → hydrate from cloud
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
@@ -74,7 +74,7 @@ describe('Two-device sync integration', () => {
   });
 
   it('concurrent edits → sync both → HLC conflict resolution (last writer wins)', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     // Device A setup
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -86,7 +86,7 @@ describe('Two-device sync integration', () => {
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'Original', done: false, priority: 1 });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B: hydrate from cloud to get the original entity
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
@@ -102,17 +102,17 @@ describe('Two-device sync integration', () => {
 
     // Device A edits (earlier timestamp)
     repoA.save({ title: 'Edit from A', done: false, priority: 2, id } as Task & { id: string });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B edits (later timestamp — should win)
     // Small delay to ensure B has a later timestamp
     await new Promise(r => setTimeout(r, 5));
     repoB.save({ title: 'Edit from B', done: true, priority: 3, id } as Task & { id: string });
-    await strataB.sync();
+    await strataB.tenants.sync();
 
     // B synced last, so B's version should win in cloud
     // Now re-sync A to get B's version
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // After sync, both should have B's version (last writer wins)
     const resultB = repoB.get(id);
@@ -121,7 +121,7 @@ describe('Two-device sync integration', () => {
   });
 
   it('delete on A → sync → B sees deletion via tombstone', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     // Device A: create, save, sync
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -133,7 +133,7 @@ describe('Two-device sync integration', () => {
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'Will delete', done: false, priority: 1 });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B hydrates
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
@@ -149,17 +149,17 @@ describe('Two-device sync integration', () => {
 
     // A deletes entity, syncs
     repoA.delete(id);
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // B syncs to pick up tombstone
-    await strataB.sync();
+    await strataB.tenants.sync();
 
     const afterSync = repoB.get(id);
     expect(afterSync).toBeUndefined();
   });
 
   it('save on A, delete on B → sync → tombstone wins when B deleted later', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     // Device A: create entity, sync
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
@@ -171,7 +171,7 @@ describe('Two-device sync integration', () => {
 
     const repoA = strataA.repo(TaskDef) as Repository<Task>;
     const id = repoA.save({ title: 'Contested', done: false, priority: 1 });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // Device B: hydrate, then delete, sync
     const { strata: strataB } = await createDevice('device-B', sharedCloud);
@@ -188,18 +188,18 @@ describe('Two-device sync integration', () => {
     // B deletes (later HLC)
     await new Promise(r => setTimeout(r, 5));
     repoB.delete(id);
-    await strataB.sync();
+    await strataB.tenants.sync();
 
     // A edits the entity (but A's HLC for the entity is older than B's tombstone)
     // Actually, A syncs → picks up tombstone from B → entity should be gone
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     const resultA = repoA.get(id);
     expect(resultA).toBeUndefined();
   });
 
   it('bidirectional saves: A saves X, B saves Y → sync → both have X and Y', async () => {
-    const sharedCloud = new MemoryBlobAdapter();
+    const sharedCloud = new MemoryStorageAdapter();
 
     const { strata: strataA } = await createDevice('device-A', sharedCloud);
     const tenant = await strataA.tenants.create({
@@ -221,14 +221,14 @@ describe('Two-device sync integration', () => {
 
     // A saves entity X
     const idX = repoA.save({ title: 'X from A', done: false, priority: 1 });
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     // B saves entity Y
     const idY = repoB.save({ title: 'Y from B', done: true, priority: 2 });
-    await strataB.sync();
+    await strataB.tenants.sync();
 
     // A syncs again to get Y
-    await strataA.sync();
+    await strataA.tenants.sync();
 
     expect(repoA.get(idX)?.title).toBe('X from A');
     expect(repoA.get(idY)?.title).toBe('Y from B');
@@ -236,3 +236,7 @@ describe('Two-device sync integration', () => {
     expect(repoB.get(idY)?.title).toBe('Y from B');
   });
 });
+
+
+
+

@@ -3,7 +3,7 @@ import {
   Strata,
   validateEntityDefinitions,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   Pbkdf2EncryptionService,
   AesGcmEncryptionStrategy,
   resolveOptions,
@@ -16,13 +16,13 @@ type Task = { title: string; done: boolean };
 type Settings = { theme: string };
 
 function makeAdapter() {
-  return new MemoryBlobAdapter();
+  return new MemoryStorageAdapter();
 }
 
 function makeStrata(overrides?: {
-  cloudAdapter?: MemoryBlobAdapter;
+  cloudAdapter?: MemoryStorageAdapter;
   entities?: ReturnType<typeof defineEntity>[];
-}): { strata: Strata; localAdapter: MemoryBlobAdapter } {
+}): { strata: Strata; localAdapter: MemoryStorageAdapter } {
   const taskDef = defineEntity<Task>('task');
   const localAdapter = makeAdapter();
   const strata = new Strata({
@@ -77,7 +77,7 @@ describe('Strata', () => {
     ({ strata } = makeStrata());
     expect(strata.tenants).toBeDefined();
     expect(strata.repo).toBeTypeOf('function');
-    expect(strata.sync).toBeTypeOf('function');
+    expect(strata.tenants.sync).toBeTypeOf('function');
     expect(strata.dispose).toBeTypeOf('function');
     expect(strata.isDirty).toBe(false);
     expect(strata.isDirty$).toBeDefined();
@@ -208,7 +208,7 @@ describe('Strata', () => {
         meta: { bucket: 'test' },
       });
       await strata.tenants.open(tenant.id);
-      expect(strata.tenants.activeTenant$.getValue()?.id).toBe(tenant.id);
+      expect(strata.tenants.activeTenant?.id).toBe(tenant.id);
     });
 
     it('stops previous sync scheduler when loading a new tenant', async () => {
@@ -235,7 +235,7 @@ describe('Strata', () => {
       // Load a second tenant — should stop the first scheduler
       await strata.tenants.open(t2.id);
 
-      expect(strata.tenants.activeTenant$.getValue()?.id).toBe(t2.id);
+      expect(strata.tenants.activeTenant?.id).toBe(t2.id);
     });
 
     it('hydrates from local on tenant load without cloud adapter', async () => {
@@ -252,7 +252,7 @@ describe('Strata', () => {
         meta: { bucket: 'test' },
       });
       await strata.tenants.open(tenant.id);
-      expect(strata.tenants.activeTenant$.getValue()?.name).toBe('Test');
+      expect(strata.tenants.activeTenant?.name).toBe('Test');
     });
 
     it('emits cloud-unreachable when cloud adapter fails during hydrate', async () => {
@@ -289,7 +289,7 @@ describe('Strata', () => {
     it('rejects when no tenant loaded', async () => {
       const cloudAdapter = makeAdapter();
       ({ strata } = makeStrata({ cloudAdapter }));
-      await expect(strata.sync()).rejects.toThrow('No tenant loaded');
+      await expect(strata.tenants.sync()).rejects.toThrow('No tenant loaded');
     });
 
     it('rejects when no cloud adapter configured', async () => {
@@ -299,7 +299,7 @@ describe('Strata', () => {
         meta: { bucket: 'test' },
       });
       await strata.tenants.open(tenant.id);
-      await expect(strata.sync()).rejects.toThrow('No cloud adapter configured');
+      await expect(strata.tenants.sync()).rejects.toThrow('No cloud adapter configured');
     });
 
     it('succeeds with cloud adapter and loaded tenant', async () => {
@@ -318,7 +318,7 @@ describe('Strata', () => {
       });
       await strata.tenants.open(tenant.id);
 
-      const result = await strata.sync();
+      const result = await strata.tenants.sync();
       expect(result).toBeDefined();
       expect(result.entitiesUpdated).toBe(0);
     });
@@ -341,7 +341,7 @@ describe('Strata', () => {
         meta: { bucket: 'test' },
       });
       await strata.tenants.open(tenant.id);
-      await strata.sync();
+      await strata.tenants.sync();
 
       const types = events.map(e => e.type);
       expect(types).toContain('sync-started');
@@ -372,7 +372,7 @@ describe('Strata', () => {
         throw new Error('Sync failure');
       };
 
-      await expect(strata.sync()).rejects.toThrow('Sync failure');
+      await expect(strata.tenants.sync()).rejects.toThrow('Sync failure');
       expect(events.some(e => e.type === 'sync-failed')).toBe(true);
     });
   });
@@ -423,7 +423,7 @@ describe('Strata', () => {
       repo.save({ title: 'Test', done: false });
       expect(strata.isDirty).toBe(true);
 
-      await strata.sync();
+      await strata.tenants.sync();
       expect(strata.isDirty).toBe(false);
     });
 
@@ -455,12 +455,12 @@ describe('Strata', () => {
         meta: { bucket: 'test' },
       });
       await strata.tenants.open(tenant.id);
-      await strata.sync();
+      await strata.tenants.sync();
       expect(events.length).toBeGreaterThan(0);
 
       const countBefore = events.length;
       strata.offSyncEvent(listener);
-      await strata.sync();
+      await strata.tenants.sync();
       expect(events.length).toBe(countBefore);
     });
   });
@@ -497,7 +497,7 @@ describe('Strata', () => {
       const cloudAdapter = makeAdapter();
       ({ strata } = makeStrata({ cloudAdapter }));
       await strata.dispose();
-      await expect(strata.sync()).rejects.toThrow('Strata instance is disposed');
+      await expect(strata.tenants.sync()).rejects.toThrow('No tenant loaded');
     });
 
     it('open() rejects after dispose', async () => {
@@ -561,7 +561,7 @@ describe('Strata', () => {
       strata = new Strata({
         appId: 'test-app',
         entities: [taskDef],
-        localAdapter: makeAdapter(), // BlobAdapter, not StorageAdapter
+        localAdapter: makeAdapter(), // StorageAdapter, not StorageAdapter
         deviceId: 'dev',
       });
       await expect(strata.tenants.changeCredential('old', 'new')).rejects.toThrow();
@@ -569,7 +569,7 @@ describe('Strata', () => {
 
     it('throws when no tenant is loaded', async () => {
       const taskDef = defineEntity<Task>('task');
-      const storage = new MemoryBlobAdapter();
+      const storage = new MemoryStorageAdapter();
       const encService = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
         appId: 'test-app',
@@ -584,7 +584,7 @@ describe('Strata', () => {
     });
 
     it('throws when current tenant is not encrypted', async () => {
-      const storage = new MemoryBlobAdapter();
+      const storage = new MemoryStorageAdapter();
       const taskDef = defineEntity<Task>('task');
       const encService = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
@@ -602,7 +602,7 @@ describe('Strata', () => {
     });
 
     it('changes password on an encrypted tenant', async () => {
-      const storage = new MemoryBlobAdapter();
+      const storage = new MemoryStorageAdapter();
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant with data
@@ -646,7 +646,7 @@ describe('Strata', () => {
 
     it('throws after dispose', async () => {
       const taskDef = defineEntity<Task>('task');
-      const storage = new MemoryBlobAdapter();
+      const storage = new MemoryStorageAdapter();
       const encService = new Pbkdf2EncryptionService({ targets: ['local'], strategy: new AesGcmEncryptionStrategy() });
       strata = new Strata({
         appId: 'test-app',
@@ -673,7 +673,7 @@ describe('Strata', () => {
       });
       const tenant = await strata.tenants.create({ name: 'T', meta: {} });
       await strata.tenants.open(tenant.id);
-      expect(strata.tenants.activeTenant$.getValue()).toBeDefined();
+      expect(strata.tenants.activeTenant).toBeDefined();
 
       await strata.tenants.close();
       // After close, no tenant should be active
@@ -682,7 +682,7 @@ describe('Strata', () => {
 
   describe('open() encryption error paths', () => {
     it('clears encryption and resets tenant on wrong password (catch block)', async () => {
-      const storage = new MemoryBlobAdapter();
+      const storage = new MemoryStorageAdapter();
       const taskDef = defineEntity<Task>('task');
 
       // Phase 1: Create encrypted tenant
@@ -717,10 +717,15 @@ describe('Strata', () => {
       ).rejects.toThrow();
 
       // After error, active tenant should be cleared
-      expect(strata.tenants.activeTenant$.getValue()).toBeUndefined();
+      expect(strata.tenants.activeTenant).toBeUndefined();
     });
   });
 });
+
+
+
+
+
 
 
 

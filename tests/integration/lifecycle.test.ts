@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   Strata,
   defineEntity,
-  MemoryBlobAdapter,
+  MemoryStorageAdapter,
   partitioned,
 } from '@strata/index';
 import type { Repository, SingletonRepository } from '@strata/repo';
@@ -33,7 +33,7 @@ describe('Full lifecycle integration', () => {
   }
 
   it('save → dispose → reload from same local adapter → data persisted', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const meta = { bucket: 'test' };
 
     // Phase 1: Create, save data, dispose
@@ -75,7 +75,7 @@ describe('Full lifecycle integration', () => {
   });
 
   it('dispose flushes all dirty data before shutting down', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const meta = { bucket: 'test' };
 
     const strata = track(new Strata({
@@ -112,7 +112,7 @@ describe('Full lifecycle integration', () => {
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     }));
     await strata.dispose();
@@ -121,11 +121,11 @@ describe('Full lifecycle integration', () => {
   });
 
   it('post-dispose: sync() rejects', async () => {
-    const cloudAdapter = new MemoryBlobAdapter();
+    const cloudAdapter = new MemoryStorageAdapter();
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       cloudAdapter,
       deviceId: 'dev-1',
     }));
@@ -133,14 +133,14 @@ describe('Full lifecycle integration', () => {
     await strata.tenants.open(tenant.id);
     await strata.dispose();
 
-    await expect(strata.sync()).rejects.toThrow('disposed');
+    await expect(strata.tenants.sync()).rejects.toThrow('No tenant loaded');
   });
 
   it('post-dispose: loadTenant() rejects', async () => {
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     }));
     const tenant = await strata.tenants.create({ name: 'T', meta: { b: 1 } });
@@ -153,7 +153,7 @@ describe('Full lifecycle integration', () => {
     const strata = new Strata({
       appId: 'test',
       entities: [TaskDef],
-      localAdapter: new MemoryBlobAdapter(),
+      localAdapter: new MemoryStorageAdapter(),
       deviceId: 'dev-1',
     });
     const p1 = strata.dispose();
@@ -163,7 +163,7 @@ describe('Full lifecycle integration', () => {
   });
 
   it('multiple entity types survive dispose → reload', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const meta = { bucket: 'test' };
 
     const strata1 = track(new Strata({
@@ -200,7 +200,7 @@ describe('Full lifecycle integration', () => {
   });
 
   it('partitioned entities survive dispose → reload', async () => {
-    const localAdapter = new MemoryBlobAdapter();
+    const localAdapter = new MemoryStorageAdapter();
     const meta = { bucket: 'test' };
 
     const strata1 = track(new Strata({
@@ -236,3 +236,7 @@ describe('Full lifecycle integration', () => {
     expect(loaded2?.category).toBe('tech');
   });
 });
+
+
+
+
