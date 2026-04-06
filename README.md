@@ -1,6 +1,7 @@
 # Strata
 
 [![CI](https://github.com/abhayjatindoshi/strata-data-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/abhayjatindoshi/strata-data-sync/actions/workflows/ci.yml)
+[![Publish](https://github.com/abhayjatindoshi/strata-data-sync/actions/workflows/publish.yml/badge.svg)](https://github.com/abhayjatindoshi/strata-data-sync/actions/workflows/publish.yml)
 [![codecov](https://codecov.io/gh/abhayjatindoshi/strata-data-sync/branch/main/graph/badge.svg)](https://codecov.io/gh/abhayjatindoshi/strata-data-sync)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![License](https://img.shields.io/badge/license-MIT-blue)
