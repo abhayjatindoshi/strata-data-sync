@@ -118,7 +118,7 @@ describe('Encryption primitives', () => {
 
     it('unsupported version throws', async () => {
       const dek = await generateDek();
-      const data = new Uint8Array(14); // minimum length, version 0 → unsupported
+      const data = new Uint8Array(29); // minimum length (1 + 12 IV + 16 GCM tag), version 0 → unsupported
       data[0] = 99;
       await expect(decrypt(data, dek)).rejects.toThrow('Unsupported encryption version');
     });

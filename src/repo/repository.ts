@@ -69,6 +69,10 @@ export class Repository<T> {
       entityKey = `${this.definition.name}.${partitionKey}`;
     }
 
+    if (id.length > 256) {
+      throw new Error(`Entity ID exceeds maximum length of 256 characters (got ${id.length})`);
+    }
+
     const existing = this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;
 
     const nextHlc = tick(this.hlc.current);

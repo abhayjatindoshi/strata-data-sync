@@ -223,11 +223,12 @@ export class SyncEngine {
   private emitEntityChanges(changes: ReadonlyArray<SyncEntityChange>): void {
     const byEntity = new Map<string, { updates: string[]; deletes: string[] }>();
     for (const c of changes) {
-      const entityName = parseCompositeKey(c.key)!.entityName;
-      let entry = byEntity.get(entityName);
+      const parsed = parseCompositeKey(c.key);
+      if (!parsed) continue;
+      let entry = byEntity.get(parsed.entityName);
       if (!entry) {
         entry = { updates: [], deletes: [] };
-        byEntity.set(entityName, entry);
+        byEntity.set(parsed.entityName, entry);
       }
       entry.updates.push(...c.updatedIds);
       entry.deletes.push(...c.deletedIds);

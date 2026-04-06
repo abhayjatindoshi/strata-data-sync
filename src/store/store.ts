@@ -12,11 +12,13 @@ export class Store implements EntityStore {
   private readonly dirtyKeys = new Set<string>();
   private readonly markerKey: string;
   private readonly tombstoneRetentionMs: number;
+  private readonly systemEntityKey: string;
   private cachedMarkerBlob: PartitionBlob | null = null;
 
   constructor(options: ResolvedStrataOptions) {
     this.markerKey = options.markerKey;
     this.tombstoneRetentionMs = options.tombstoneRetentionMs;
+    this.systemEntityKey = options.systemEntityKey;
   }
 
   getEntity(entityKey: string, id: string): unknown | undefined {
@@ -202,7 +204,7 @@ export class Store implements EntityStore {
     }
 
     return {
-      __system: {
+      [this.systemEntityKey]: {
         marker: {
           version: 1,
           createdAt: new Date(),

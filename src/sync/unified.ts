@@ -282,16 +282,20 @@ export async function syncBetween(
   }
 
   // Update indexes — each adapter only gets updates for changes actually written to it
-  // Reuse existingIdxA from stale check to avoid redundant read
-  const appliedToA = stale ? [] : plan.applyToA;
-  const indexUpdatesA = computeIndexUpdates(deduplicateChanges(appliedToA));
+  // Skip A index save when stale — another process may have updated A's indexes
   const indexUpdatesB = computeIndexUpdates(deduplicateChanges(plan.applyToB));
   const existingIdxB = await loadAllIndexes(adapterB, tenant, options!);
-  await Promise.all([
-    saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdatesA), options!),
-    saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options!),
-  ]);
+  if (stale) {
+    await saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options!);
+  } else {
+    const indexUpdatesA = computeIndexUpdates(deduplicateChanges(plan.applyToA));
+    await Promise.all([
+      saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdatesA), options!),
+      saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options!),
+    ]);
+  }
 
+  const appliedToA = stale ? [] : plan.applyToA;
   const allApplied = deduplicateChanges([...appliedToA, ...plan.applyToB]);
   const maxHlc = findMaxHlc(allApplied);
 

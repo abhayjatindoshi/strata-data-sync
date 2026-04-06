@@ -99,6 +99,14 @@ describe('Repository', () => {
         .toThrow('does not belong to repository "item"');
     });
 
+    it('throws when entity ID exceeds 256 characters', () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus<EntityEvent>());
+      const longId = 'item._.' + 'x'.repeat(250);
+      expect(() => repo.save({ id: longId, name: 'A', category: 'c', price: 1 } as any))
+        .toThrow('Entity ID exceeds maximum length of 256 characters');
+    });
+
     it('uses partitioned key strategy for partition key', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
       const store = new Store(DEFAULT_OPTIONS);

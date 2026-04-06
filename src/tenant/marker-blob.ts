@@ -30,7 +30,7 @@ export async function writeMarkerBlob(
     ...(keyData ? { keyData } : {}),
   };
   const blob: PartitionBlob = {
-    [MARKER_ENTITY_KEY]: { marker },
+    [options.systemEntityKey]: { marker },
     deleted: {},
   };
   await adapter.write(tenant, options.markerKey, blob);
@@ -44,7 +44,7 @@ export async function readMarkerBlob(
 ): Promise<MarkerData | undefined> {
   const blob = await adapter.read(tenant, options.markerKey);
   if (!blob) return undefined;
-  const systemEntities = blob[MARKER_ENTITY_KEY] as Record<string, unknown> | undefined;
+  const systemEntities = blob[options.systemEntityKey] as Record<string, unknown> | undefined;
   if (!systemEntities) return undefined;
   return systemEntities['marker'] as MarkerData | undefined;
 }

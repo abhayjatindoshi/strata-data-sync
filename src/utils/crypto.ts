@@ -88,7 +88,8 @@ export async function aesGcmDecrypt(
   data: Uint8Array,
   key: CryptoKey,
 ): Promise<Uint8Array> {
-  const minLength = 1 + IV_LENGTH + 1; // version + IV + at least 1 byte ciphertext
+  const GCM_TAG_LENGTH = 16;
+  const minLength = 1 + IV_LENGTH + GCM_TAG_LENGTH; // version + IV + GCM auth tag
   if (data.length < minLength) {
     throw new Error(`Encrypted data too short (${data.length} bytes, minimum ${minLength})`);
   }

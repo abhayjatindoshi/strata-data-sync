@@ -773,6 +773,23 @@ describe('Strata', () => {
       expect(strata.tenants.activeTenant).toBeUndefined();
     });
   });
+
+  describe('options validation', () => {
+    it('rejects negative tombstoneRetentionMs', () => {
+      expect(() => resolveOptions({ tombstoneRetentionMs: -1 }))
+        .toThrow('Invalid tombstoneRetentionMs');
+    });
+
+    it('rejects Infinity tombstoneRetentionMs', () => {
+      expect(() => resolveOptions({ tombstoneRetentionMs: Infinity }))
+        .toThrow('Invalid tombstoneRetentionMs');
+    });
+
+    it('accepts zero tombstoneRetentionMs', () => {
+      const opts = resolveOptions({ tombstoneRetentionMs: 0 });
+      expect(opts.tombstoneRetentionMs).toBe(0);
+    });
+  });
 });
 
 

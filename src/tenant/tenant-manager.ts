@@ -137,6 +137,10 @@ export class TenantManager implements TenantManagerType {
       this.deps.tenantContext.set(tenant, keys);
     }
 
+    // Persist list first — if marker write fails, tenant is listed but recoverable on open().
+    // Reverse order would leave an invisible orphaned marker blob.
+    await this.persistList([...tenants, tenant]);
+
     await writeMarkerBlob(
       this.deps.adapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
     );
@@ -145,7 +149,6 @@ export class TenantManager implements TenantManagerType {
       this.deps.tenantContext.clear();
     }
 
-    await this.persistList([...tenants, tenant]);
     log('created tenant %s', id);
 
     return tenant;
