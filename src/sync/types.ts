@@ -88,5 +88,5 @@ export type SyncEngine = {
   ): void;
   stopScheduler(): void;
   drain(): Promise<void>;
-  dispose(): void;
+  dispose(): Promise<void>;
 };

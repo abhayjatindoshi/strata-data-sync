@@ -1,62 +1,28 @@
 # Consolidated Code Review — strata-data-sync-v3
 
-> **Date**: March 30, 2026  
-> **Reviewers**: Claude Opus 4.6, Claude Sonnet 4.6, GPT-5.4, GPT-5.3 Codex  
-> **Scope**: All source files under `src/`  
-> **Total unique issues**: 73 (5 critical, 3 security-high, 5 security-medium, 3 security-low, 38 warnings, 26 low/informational, + 16 suggestions)
-
----
-
-## Table of Contents
-
-- [Cross-Model Consensus Summary](#cross-model-consensus-summary)
-- [Issues by Severity](#issues-by-severity)
-  - [Critical](#critical)
-  - [Security — High](#security--high)
-  - [Security — Medium](#security--medium)
-  - [Security — Low](#security--low)
-  - [Warnings](#warnings)
-  - [Low / Informational](#low--informational)
-  - [Suggestions](#suggestions)
-- [Positive Observations](#positive-observations)
-- [Individual Model Reports](#individual-model-reports)
+> **Date**: April 6, 2026
+> **Reviewers**: Opus (architecture), Sonnet (types & quality), GPT-5.4 (correctness), Codex (security)
+> **Scope**: All source files under `src/` (excluding `index.ts` barrels and test files)
 
 ---
 
 ## Cross-Model Consensus Summary
 
-All four models independently converged on these findings (ordered by consensus count):
-
 | # | Finding | Opus | Sonnet | GPT-5.4 | Codex | Consensus |
 |---|---------|:----:|:------:|:-------:|:-----:|:---------:|
-| 1 | `saveMany()`/`deleteMany()` bypass EventBus — dirty tracking missed | ✅ | ✅ | ✅ | ✅ | **4/4** |
-| 2 | `changePassword()` never validates old password | ✅ | ✅ | ✅ | ✅ | **4/4** |
-| 3 | `Math.random()` for ID generation (entity + tenant) | ✅ | ✅ | ✅ | ✅ | **4/4** |
-| 4 | `localStorage` base64 encoding stack overflow on large blobs | ✅ | ✅ | ✅ | ✅ | **4/4** |
-| 5 | Encryption silently fails open when DEK is null | ✅ | ✅ | ✅ | — | **3/4** |
-| 6 | PBKDF2 salt is static `appId`, not random per-user | ✅ | ✅ | ✅ | — | **3/4** |
-| 7 | `buildHlcMap` assumes `.hlc` exists — undefined if missing | — | ✅ | ✅ | ✅ | **3/4** |
-| 8 | Deduped sync returns `EMPTY_RESULT` not real result | — | ✅ | ✅ | ✅ | **3/4** |
-| 9 | `compareValues` returns 0 for unsupported types — silent no-op | — | ✅ | ✅ | ✅ | **3/4** |
-| 10 | `list()` omits tombstone-only partitions | ✅ | ✅ | — | — | **2/4** |
-| 11 | Tenant create allows duplicate IDs | — | ✅ | ✅ | ✅ | **3/4** |
-| 12 | Migration scoping bug (entity name not passed) | — | — | ✅ | ✅ | **2/4** |
-| 13 | `setInterval` without in-flight guard; operations pile up | ✅ | — | — | ✅ | **2/4** |
-| 14 | Magic byte `0x7B` encryption detection is brittle | ✅ | ✅ | — | — | **2/4** |
-| 15 | `writeMarkerBlob` resets `createdAt` on every call | ✅ | ✅ | — | — | **2/4** |
-| 16 | `delete()` non-atomic; data wiped but tenant stays listed on crash | ✅ | ✅ | — | — | **2/4** |
-| 17 | `__t:'D'` serialization marker collides with user data shapes | — | ✅ | ✅ | — | **2/4** |
-| 18 | `parseEntityKey` silently returns `""` for malformed IDs | — | ✅ | — | ✅ | **2/4** |
-| 19 | No schema validation on deserialization | — | ✅ | — | — | **1/4** |
-| 20 | No HLC clock-drift detection or capping | — | ✅ | — | — | **1/4** |
-| 21 | Tombstone + entity resurrection inconsistency | — | — | ✅ | — | **1/4** |
-| 22 | Stale index advancement without data write | — | — | ✅ | — | **1/4** |
-| 23 | Queue dedup ignores tenant context | ✅ | — | — | — | **1/4** |
-| 24 | `emit()` no listener isolation; one throw aborts all | — | — | ✅ | — | **1/4** |
-| 25 | Caller-supplied IDs not validated against current repo | — | — | ✅ | — | **1/4** |
-| 26 | `pushTenantList` overwrites cloud without merging | ✅ | — | — | — | **1/4** |
-| 27 | 32-bit FNV-1a collisions can hide real divergence | — | — | ✅ | — | **1/4** |
-| 28 | PBKDF2 iteration count below OWASP recommendation | ✅ | — | — | — | **1/4** |
+| 1 | Sync stale-check TOCTOU race condition | ✅ | — | ✅ | ✅ | 3/4 |
+| 2 | Unchecked type casts / missing deserialization validation | — | ✅ | ✅ | ✅ | 3/4 |
+| 3 | Tenant manager cache concurrent access race | ✅ | ✅ | ✅ | — | 3/4 |
+| 4 | Non-atomic index + data write in sync | ✅ | — | ✅ | — | 2/4 |
+| 5 | SyncEngine dispose doesn't abort in-flight ops | ✅ | — | ✅ | — | 2/4 |
+| 6 | Credential change partial failure / non-atomic | ✅ | — | ✅ | — | 2/4 |
+| 7 | Non-atomic encryption lifecycle in tenant open | ✅ | — | ✅ | — | 2/4 |
+| 8 | Tombstone retention parameter issues | — | — | ✅ | ✅ | 2/4 |
+| 9 | Repository query O(n) for large datasets | — | ✅ | ✅ | — | 2/4 |
+| 10 | Resource leak in stream handling (gzip/buffer) | — | ✅ | — | — | 1/4 |
+| 11 | HLC race condition in repository save | ✅ | — | — | — | 1/4 |
+| 12 | Migration version gap not enforced | — | — | ✅ | — | 1/4 |
+| 13 | Unvalidated base64 decoding in crypto path | — | — | — | ✅ | 1/4 |
 
 ---
 
@@ -64,97 +30,131 @@ All four models independently converged on these findings (ordered by consensus 
 
 ### Critical
 
-#### C1. `saveMany()`/`deleteMany()` bypass EventBus — dirty tracking broken
-**File**: `src/repo/repository.ts` ~L108-142  
-**Flagged by**: All 4 models  
-**Impact**: Batch mutations call `this.changeSignal.next()` instead of `this.eventBus.emit()`. The `DirtyTracker` is never notified, so batch-saved/deleted data won't be flagged for sync. Data accumulates in memory without being persisted until an unrelated single `save()`/`delete()` triggers a flush.
+#### C1. Sync Stale-Check TOCTOU Race Condition
+**File**: `src/sync/unified.ts`
+**Flagged by**: Opus, GPT-5.4, Codex
+**Impact**: Index snapshot is captured early in `buildPlan()`, but the stale check happens after `applyChanges(adapterB)`. Between these operations, another process could modify adapterA. If the stale check incorrectly passes, concurrent modifications are overwritten without merging — causing data loss or permanent replica divergence.
+**Recommendation**: Use optimistic locking or snapshot-based isolation at the adapter layer. Consider making stale check acquire an advisory lock.
 
-#### C2. Stale index advancement without data application
-**File**: `src/sync/unified.ts` ~L257-283  
-**Flagged by**: GPT-5.4  
-**Impact**: `syncBetween()` skips writing `applyToA` when adapter A is stale, but still advances indexes on both sides. A stale replica advertises hashes for data it never received, permanently suppressing later reconciliation.
+#### C2. Non-Atomic Index Update + Data Write in Sync
+**File**: `src/sync/unified.ts`
+**Flagged by**: Opus, GPT-5.4
+**Impact**: Data is written to adapters, then indexes are read and saved in a separate step. If the process crashes between data write and index save, the index is permanently stale — causing ghost reads and failed future syncs. Partition detection in subsequent sync rounds becomes unreliable.
+**Recommendation**: Save index atomically with data, implement two-phase commit, or compute indexes on-demand rather than caching.
 
-#### C3. Tombstone resurrection inconsistency
-**Files**: `src/store/store.ts` ~L19, `src/sync/merge.ts` ~L89  
-**Flagged by**: GPT-5.4  
-**Impact**: `setEntity()` doesn't clear pre-existing tombstones. `mergePartition()` copies both entity and tombstone for `localOnly`/`cloudOnly` IDs instead of resolving via HLC. Can re-delete legitimately recreated records.
+#### ~~C3. HLC Race Condition in Repository Save~~ ✅ Fixed
+**File**: `src/repo/repository.ts`
+**Flagged by**: Opus
+~~**Impact**: The HLC is advanced with `tick()` before the entity is persisted to the store. If `store.setEntity()` throws, the HLC has been incremented but the entity wasn't saved, violating HLC monotonicity. Future entities may have identical or lower HLC values, breaking conflict resolution and causality ordering.~~
+**Fix**: HLC is now computed before store operation but only assigned to `this.hlc.current` after `setEntity()` succeeds.
 
-#### C4. `list()` omits tombstone-only partitions
-**File**: `src/store/store.ts` ~L154-161  
-**Flagged by**: Opus, Sonnet  
-**Impact**: Partitions with all entities deleted exist only in `this.tombstones`. `list()` iterates only `this.partitions.keys()`, so tombstone-only partitions are invisible to sync — deletions are never pushed to remote peers.
+#### ~~C4. SyncEngine Dispose Doesn't Abort In-Flight Operations~~ ✅ Fixed
+**File**: `src/sync/sync-engine.ts`
+**Flagged by**: GPT-5.4, Opus
+~~**Impact**: When `dispose()` is called, pending queue items are rejected but in-flight `fn()` calls continue to execute. The sync operation may still be accessing store/adapters after disposal. This causes use-after-dispose errors, memory leaks, and race conditions if adapters are destroyed while operations access them.~~
+**Fix**: `dispose()` is now async and awaits the tracked `inFlight` promise before returning.
 
-#### C5. Migration scoping bug — entity name not passed
-**File**: `src/store/flush.ts` ~L23  
-**Flagged by**: GPT-5.4, Codex  
-**Impact**: `loadPartitionFromAdapter()` calls `migrateBlob()` without the current `entityName`, so entity-specific migrations may apply to unrelated blobs, corrupting data during hydration.
+#### ~~C5. Unchecked Type Casts / Missing Deserialization Validation~~ ✅ Accepted
+**Files**: `src/utils/serialize.ts`, `src/sync/merge.ts`, `src/sync/unified.ts`, `src/persistence/partition-index.ts`, `src/adapter/encryption.ts`
+**Flagged by**: Sonnet, GPT-5.4, Codex
+~~**Impact**: `deserialize<T>()` casts `JSON.parse` result to T without runtime validation. Pattern is repeated across sync/merge, unified sync, partition-index, and encryption modules. After deserialization from JSON, blobs may have missing `hlc` fields or corrupted structure. The type system provides zero protection against malformed data from adapters. A corrupted or malicious cloud adapter could inject invalid data that propagates through merge and corrupts local state.~~
+**Resolution**: Non-issue — blob shape is framework-controlled at the adapter boundary. Comment added explaining the intentional unchecked cast.
+
+#### ~~C6. Migration Version Gap Not Enforced~~ ✅ Fixed
+**File**: `src/schema/migration.ts`
+**Flagged by**: GPT-5.4
+~~**Impact**: Migration version continuity is not validated. If migrations array contains versions [1, 2, 5] and current blob version is 1, migrations 3 and 4 are silently skipped. If these contain required data transformations, data integrity is silently violated.~~
+**Fix**: Added `validateMigrations()` that asserts contiguous 1-based version sequence. Called at Strata construction time.
 
 ---
 
 ### Security — High
 
-#### SH1. `changePassword()` never validates old password
-**File**: `src/strata.ts` ~L258  
-**Flagged by**: All 4 models  
-**Impact**: `oldPassword` is accepted but never used. Any caller with a reference to an unlocked `Strata` instance can rotate the encryption password without proving knowledge of the current one.
+#### ~~S1. Unvalidated Base64 Decoding in Cryptographic Functions~~ ✅ Fixed
+**File**: `src/utils/crypto.ts`, `src/utils/buffer.ts`
+**Flagged by**: Codex
+~~**Impact**: `importAesGcmKey()` calls `atob(base64)` without try-catch. `atob()` throws on invalid input. In the decryption path, malformed base64 key material causes uncaught exceptions that could crash the app or leak error stacks — potential DoS vector.~~
+**Fix**: Consolidated to single `fromBase64()` with try-catch. `importAesGcmKey()` now uses `fromBase64()`.
 
-#### SH2. Encryption silently fails open when DEK is null (encode)
-**File**: `src/adapter/encryption.ts` ~L44-50  
-**Flagged by**: Opus, Sonnet, GPT-5.4  
-**Impact**: When `this.dek === null`, `encode` returns plaintext silently. Partition blobs written while the DEK is unset are persisted unencrypted with no warning or error. `isConfigured` checks only `markerKey`, not `dek`.
+#### ~~S2. Resource Leak in Stream Handling~~ ✅ Fixed
+**Files**: `src/adapter/transforms/gzip.ts`, `src/utils/buffer.ts`
+**Flagged by**: Sonnet
+~~**Impact**: `streamToUint8Array()` doesn't release the reader lock on error. If decompression fails mid-stream (corrupted gzip, quota exceeded), ReadableStream and DecompressionStream remain open, leaking resources. On repeated failures, memory accumulates.~~
+**Fix**: Added try-finally with `reader.releaseLock()` in `streamToUint8Array()`.
 
-#### SH3. Silent decode bypass when DEK null returns ciphertext as plaintext
-**File**: `src/adapter/encryption.ts` ~L60-64  
-**Flagged by**: Sonnet  
-**Impact**: When `!this.dek` and encrypted data arrives during decoding, raw ciphertext bytes are returned. The deserializer receives garbage bytes and throws an opaque error rather than `InvalidEncryptionKeyError`.
+#### ~~S3. Credential Change Non-Atomic — Partial Failure Leaves Inconsistent State~~ ✅ Fixed
+**File**: `src/tenant/tenant-manager.ts`
+**Flagged by**: Opus, GPT-5.4
+~~**Impact**: `changeCredential()` derives new keys, rekeys data, sets new keys in context, then writes marker blob. If failure occurs after rekeying but before writing marker blob, memory has new keys but storage has old keys. Recovery logic attempts to restore old credentials, but if restore also fails the tenant is permanently corrupted.~~
+**Fix**: Infallible rollback using pre-saved key snapshot. On failure, old keys are restored from snapshot with no I/O.
+
+#### ~~S4. Tenant Probe Masks Real I/O Errors as Encryption~~ ✅ Fixed
+**File**: `src/tenant/tenant-manager.ts`
+**Flagged by**: GPT-5.4
+~~**Impact**: During `join()`, if reading the marker blob fails with ANY error (network timeout, permission denied), the catch block assumes it's an encrypted tenant. This masks real I/O failures and could lead to confusing authentication prompts for non-existent tenants.~~
+**Fix**: `probe()` and `join()` catch blocks now only handle `InvalidEncryptionKeyError`. All other errors are re-thrown.
+
+#### ~~S5. Missing Blob Validation on Flush/Load~~ ✅ Fixed
+**File**: `src/store/flush.ts`
+**Flagged by**: Sonnet
+~~**Impact**: No blob schema validation when loading partition data from adapter. Entities silently default to `{}` if blob is malformed. A remote adapter could inject fake HLC data into merge, corrupting local state.~~
+**Fix**: Added `validateBlob()` that checks blob structure and HLC fields before extracting entities.
 
 ---
 
 ### Security — Medium
 
-#### SM1. PBKDF2 uses static `appId` as salt
-**File**: `src/adapter/crypto.ts` ~L36-41  
-**Flagged by**: Opus, Sonnet, GPT-5.4  
-**Impact**: All users of the same app sharing a password derive identical keys. Enables precomputed dictionary attacks and cross-user rainbow tables.
+#### ~~S6. ID Generation Modulo Bias~~ ✅ Fixed
+**File**: `src/utils/id.ts`
+**Flagged by**: Codex
+~~**Impact**: `generateId()` uses `crypto.getRandomValues()` (good) but applies modulo to map to the 62-character alphabet, introducing non-uniform distribution. Effective entropy drops from 64 bits to ~61 bits. IDs are slightly more predictable than intended.~~
+**Fix**: Alphabet expanded to 64 characters (added `-` and `_`). `256 % 64 === 0` eliminates modulo bias entirely.
 
-#### SM2. `Math.random()` for ID generation
-**Files**: `src/schema/id.ts` ~L4-9, `src/tenant/tenant-manager.ts` ~L22-27  
-**Flagged by**: All 4 models  
-**Impact**: Entity and tenant IDs are predictable. Collision could silently overwrite data; enumerable IDs in shared-workspace scenarios.
+#### ~~S7. PBKDF2 Salt Uses Only App ID~~ ✅ Fixed
+**File**: `src/utils/crypto.ts`, `src/adapter/encryption.ts`
+**Flagged by**: Codex
+~~**Impact**: PBKDF2 salt is `textEncoder.encode(appId)`. If two apps share the same password + appId, they derive identical KEK values. App ID is typically public metadata, so the salt provides limited value against precomputation attacks.~~
+**Fix**: Per-tenant 16-byte random salt prepended to marker blob. PBKDF2 now uses `salt + appId` as salt material.
 
-#### SM3. No schema validation on deserialization
-**File**: `src/persistence/serialize.ts` ~L31-33  
-**Flagged by**: Sonnet  
-**Impact**: `JSON.parse` result cast directly to `T` without runtime validation. Malformed or attacker-controlled storage data propagates as valid typed objects (OWASP A08).
+#### ~~S8. Non-Atomic Encryption Lifecycle in Tenant Open~~ ✅ Fixed
+**File**: `src/tenant/tenant-manager.ts`
+**Flagged by**: Opus, GPT-5.4
+~~**Impact**: Keys are derived, tenant context is set, then marker is read to load DEK, and context is re-set. If error occurs between steps, context may have incomplete keys (KEK but no DEK). Subsequent operations may fail with "DEK not loaded" at unpredictable points.~~
+**Fix**: Final `tenantContext.set()` with full keys moved inside try block. Unencrypted path uses else branch.
 
-#### SM4. PBKDF2 iteration count below OWASP recommendation
-**File**: `src/adapter/crypto.ts` ~L11  
-**Flagged by**: Opus  
-**Impact**: 100,000 iterations is below the OWASP-recommended 600,000+ for SHA-256, reducing resistance to brute-force key derivation.
-
-#### SM5. Tenant create TOCTOU window for duplicate ID detection
-**File**: `src/tenant/tenant-manager.ts` ~L65-75  
-**Flagged by**: Sonnet  
-**Impact**: Between `getList()` and `persistList()`, a concurrent `create` with the same derived ID could pass the duplicate check, creating two entries.
+#### ~~S9. Credential Not Cleared from Memory~~ ✅ Documented
+**File**: `src/tenant/tenant-manager.ts`
+**Flagged by**: Codex
+~~**Impact**: `oldCredential` and `newCredential` remain as plain strings in JavaScript memory. Exploitable via memory dump attacks, debugger inspection, or process snapshots. This is a fundamental JavaScript limitation.~~
+**Resolution**: Fundamental JS limitation — strings are immutable and GC-managed. Documented in `docs/guides/encryption.md` (Security Considerations) and code comments on `open()` / `changeCredential()`.
 
 ---
 
 ### Security — Low
 
-#### SL1. Tenant list `__tenants` explicitly unencrypted
-**File**: `src/adapter/encryption.ts` ~L43  
-**Flagged by**: Opus  
-**Impact**: Tenant metadata (names, meta fields) may contain sensitive information. Intentional for pre-auth listing but undocumented.
+#### S10. Query Object Keys Not Validated for Prototype Pollution
+**File**: `src/repo/query.ts`
+**Flagged by**: Codex
+**Impact**: `applyWhere()` iterates `Object.keys(where)` and directly accesses `entity[key]`. If `where` includes `__proto__` or `constructor`, prototype pollution could occur in vulnerable browser contexts.
+**Recommendation**: Filter dangerous keys: `Object.keys(where).filter(k => !k.startsWith('__') && k !== 'constructor')`.
 
-#### SL2. `decrypt` lacks minimum buffer length guard
-**File**: `src/adapter/crypto.ts` ~L92-107  
-**Flagged by**: Sonnet  
-**Impact**: Calling with fewer than 13 bytes produces an opaque WebCrypto error rather than a clear `InvalidEncryptionKeyError`.
+#### S11. Entity ID Length Not Validated
+**File**: `src/repo/repository.ts`
+**Flagged by**: Codex
+**Impact**: No length limit on entity IDs. Pathologically long IDs could cause memory exhaustion. Composite keys concatenate entity name, partition key, and unique ID with no size checks.
+**Recommendation**: Add entity ID length validation (e.g., `id.length <= 256`).
 
-#### SL3. `exportDek` spread pattern fragile for larger keys
-**File**: `src/adapter/crypto.ts` ~L62  
-**Flagged by**: Opus (sub-agent)  
-**Impact**: `btoa(String.fromCharCode(...new Uint8Array(raw)))` is safe for 32-byte AES keys, but the pattern is replicated in `local-storage.ts` where it's a real bug.
+#### S12. Partition Key Derivation Not Validated
+**File**: `src/schema/define-entity.ts`
+**Flagged by**: Codex
+**Impact**: `keyStrategy.partitionFn()` result is not validated for null bytes, path traversal (`../../admin`), or excessive length. Malformed partition keys could target same storage location on certain backends.
+**Recommendation**: Validate partition key with a safe character set pattern (e.g., `/^[a-zA-Z0-9_-]{1,64}$/`).
+
+#### S13. AES-GCM Minimum Length Check Doesn't Account for GCM Tag
+**File**: `src/utils/crypto.ts`
+**Flagged by**: GPT-5.4
+**Impact**: Minimum length check allows data shorter than `1 + IV_LENGTH + 16` (GCM tag). While `decrypt()` would fail anyway, the misleading check could be bypassed if logic is refactored.
+**Recommendation**: Update minimum to `1 + IV_LENGTH + 16` to include GCM tag requirement.
 
 ---
 
@@ -162,44 +162,14 @@ All four models independently converged on these findings (ordered by consensus 
 
 | # | File | Issue | Flagged by |
 |---|------|-------|-----------|
-| W1 | `src/adapter/local-storage.ts:8` | `String.fromCharCode(...data)` stack overflow for large blobs | All 4 |
-| W2 | `src/adapter/local-storage.ts:34` | No error handling for `localStorage.setItem()` when quota exceeded | Opus |
-| W3 | `src/strata.ts:168` | Magic byte `0x7B` encryption detection is brittle | Opus, Sonnet |
-| W4 | `src/strata.ts:57` | `tombstoneRetentionMs` accepted but never implemented — unbounded growth | Opus |
-| W5 | `src/strata.ts:148` | `unloadCurrentTenant()` leaves `activeTenant$` stale | GPT-5.4 |
-| W6 | `src/strata.ts:160` | `loadTenant` has no concurrency guard — orphaned schedulers possible | Sonnet |
-| W7 | `src/strata.ts:219-225` | `sync()` return value only reports `local→cloud`, not full round-trip | Opus |
-| W8 | `src/strata.ts:189-191` | Cloud sync failure during `loadTenant()` silently swallowed | Opus |
-| W9 | `src/strata.ts:244-248` | `partitionsSynced` double-counts merged partitions | Sonnet |
-| W10 | `src/store/store.ts:122-123` | `storedMarkerBlob` is dead code — written but never read | Sonnet |
-| W11 | `src/store/store.ts:96` | Marker reads ignore `storedMarkerBlob`, synthesize fresh, drop persisted metadata | GPT-5.4 |
-| W12 | `src/sync/sync-engine.ts:55-60` | Queue deduplication ignores tenant context | Opus |
-| W13 | `src/sync/sync-engine.ts:58` | Deduped sync returns `EMPTY_RESULT` not real result | Sonnet, GPT-5.4, Codex |
-| W14 | `src/sync/sync-engine.ts:155-162` | `drain()` can busy-wait with `setTimeout(r, 0)` | Sonnet |
-| W15 | `src/sync/sync-engine.ts` | `processQueue` is fire-and-forget — errors not propagated | Sonnet |
-| W16 | `src/sync/sync-scheduler.ts:26-47` | `setInterval` without in-flight guard; operations pile up | Opus, Codex |
-| W17 | `src/sync/sync-scheduler.ts:38` | Cloud timer clears dirty before memory flush | GPT-5.4 |
-| W18 | `src/sync/sync-scheduler.ts:35-44` | Cloud sync scheduler errors only logged via debug, not propagated | Opus (sub-agent) |
-| W19 | `src/sync/unified.ts:~220` | `buildHlcMap` assumes `.hlc` exists — undefined if missing | Sonnet, GPT-5.4, Codex |
-| W20 | `src/sync/unified.ts:250-261` | Index updates not atomic with data writes — crash causes stale indexes | Opus |
-| W21 | `src/sync/unified.ts:146` | `isStale()` misses concurrent first-partition creation for new entities | GPT-5.4 |
-| W22 | `src/persistence/partition-index.ts:21-39` | `saveAllIndexes` read-modify-write race condition | Opus |
-| W23 | `src/persistence/partition-index.ts:13-15` | Multiple unchecked runtime casts to `Record<string, unknown>` | Sonnet (sub-agent) |
-| W24 | `src/persistence/serialize.ts:8` | `{ __t: 'D', v: string }` marker collides with user data shapes | Sonnet, GPT-5.4 |
-| W25 | `src/persistence/hash.ts:24` | 32-bit FNV-1a collisions can hide real divergence | GPT-5.4 |
-| W26 | `src/tenant/tenant-sync.ts:29-34` | `pushTenantList` overwrites cloud list without merging | Opus |
-| W27 | `src/tenant/tenant-sync.ts:21` | Date comparison in `mergeTenantLists` may fail after deserialization | Opus |
-| W28 | `src/tenant/tenant-manager.ts:63` | `create()` doesn't reject duplicate tenant IDs | GPT-5.4, Codex |
-| W29 | `src/tenant/tenant-manager.ts:100` | Persist path `[...tenants, tenant]` lacks duplicate-ID guard | Codex |
-| W30 | `src/tenant/tenant-manager.ts:170-182` | `delete()` non-atomic; data wiped but tenant stays listed on crash | Opus, Sonnet |
-| W31 | `src/tenant/marker-blob.ts:26` | `writeMarkerBlob` resets `createdAt` on every call | Opus, Sonnet |
-| W32 | `src/tenant/marker-blob.ts:19-36` | `writeMarkerBlob` creates fresh marker with `indexes: {}`, discarding existing index data | Opus |
-| W33 | `src/repo/repository.ts:74` | Caller-supplied IDs trusted without verifying they belong to current repository | GPT-5.4 |
-| W34 | `src/repo/query.ts:1-12` | `compareValues` returns 0 for unsupported types — silent no-op sorting | GPT-5.4, Codex |
-| W35 | `src/repo/query.ts:53` | `applyOrderBy` inherits `compareValues` silent no-op for unsupported types | Codex |
-| W36 | `src/reactive/event-bus.ts:17` | `emit()` no listener isolation; one throwing listener aborts all and bubbles into caller | GPT-5.4 |
-| W37 | `src/hlc/hlc.ts` | No drift detection or capping — rogue node can corrupt all timestamps | Sonnet |
-| W38 | `src/store/store.ts:130-135` | `write()` through BlobAdapter interface doesn't mark dirty — intentional but undocumented | Opus (sub-agent) |
+| W1 | `src/tenant/tenant-manager.ts` | Tenant manager cache race condition — `getList()` reads while `persistList()` writes without synchronization. Could return stale/partial tenant lists. | Opus, GPT-5.4, Sonnet |
+| W2 | `src/tenant/tenant-manager.ts` | Non-atomic tenant purge — tenant removed from list before data deletion. If purge fails, orphaned blobs remain forever. | Opus |
+| W3 | `src/sync/unified.ts` | Permanent divergence on stale sync — if `applyToA` is empty due to stale check but contained merged results, adapterA never receives the merge. | Opus |
+| W4 | `src/sync/sync-engine.ts` | SyncQueue deduplication ignores tenant context. Concurrent multi-tenant syncs with same (source, target) pair would be incorrectly deduplicated. | GPT-5.4 |
+| W5 | `src/sync/sync-engine.ts` | Silent sync failure in scheduler — cloud sync failures are only logged, no state correction occurs. Retry with stale/invalid encryption keys possible. | Opus |
+| W6 | `src/utils/serialize.ts` | JSON serialization field order not guaranteed for all object types. Nested/complex objects may not serialize deterministically, causing hash mismatches. | Opus |
+| W7 | `src/store/store.ts` | Index memory growth unbounded — marker blob indexes all entities+tombstones across all partitions with no size limit. Large tenants could OOM. | Codex |
+| W8 | `src/store/store.ts`, `src/tenant/marker-blob.ts` | Magic string `__system` not centralized — defined independently in multiple files. | Codex |
 
 ---
 
@@ -207,93 +177,35 @@ All four models independently converged on these findings (ordered by consensus 
 
 | # | File | Issue | Flagged by |
 |---|------|-------|-----------|
-| L1 | `src/persistence/types.ts:14-18` | `PartitionBlob` index signature creates type ambiguity with fixed fields | Opus, Sonnet (sub-agents) |
-| L2 | `src/persistence/serialize.ts:4-6` | Limited custom type serialization — only `Date` handled; `Map`, `Set`, `RegExp` silently lost | Opus (sub-agent) |
-| L3 | `src/persistence/partition-index.ts:29` | Marker defaults `createdAt: new Date()` on every save when existing is empty | Opus (sub-agent) |
-| L4 | `src/persistence/hash.ts` | `charCodeAt` hashes surrogate pairs (UCS-2), diverges from other FNV-1a implementations | Sonnet (sub-agent) |
-| L5 | `src/store/types.ts:4` | `EntityStore extends BlobAdapter` — tight coupling between store and sync abstractions | Opus (sub-agent) |
-| L6 | `src/store/store.ts:173-195` | `buildMarkerBlob` relies on entities having `.hlc` — unsafe type assertion | Opus (sub-agent) |
-| L7 | `src/store/store.ts:190` | `buildMarkerBlob` sets `updatedAt: Date.now()` on every read even when no data changed | Sonnet (sub-agent) |
-| L8 | `src/store/store.ts` | `count: hlcMap.size` includes tombstones — differs from expected "live entity count" semantics | Sonnet (sub-agent) |
-| L9 | `src/store/store.ts:179-181` | `buildMarkerBlob` skips entities without `hlc` — hash diverges from `unified.ts:buildHlcMap` | Sonnet (sub-agent) |
-| L10 | `src/store/store.ts:99-100` | `read()` returns null for regular keys when empty, but returns blob for marker key — asymmetry | Opus (sub-agent) |
-| L11 | `src/store/flush.ts:18,30` | `partitionBlobKey` called twice with identical arguments — redundant | Sonnet (sub-agent) |
-| L12 | `src/strata.ts:284` | Non-null assertion `marker.dek!` — if undefined, `importDek(undefined!)` throws opaque error | Sonnet (sub-agent) |
-| L13 | `src/strata.ts` | `StrataConfig.entities` typed as `EntityDefinition<any>[]` — pragmatic but weakens type safety | Sonnet (sub-agent) |
-| L14 | `src/adapter/local-storage.ts:52-60` | `list()` O(n) over all `localStorage` keys including unrelated libraries | Sonnet (sub-agent) |
-| L15 | `src/adapter/local-storage.ts` | No guard for environments without `localStorage` (SSR/worker contexts) | Sonnet (sub-agent) |
-| L16 | `src/hlc/hlc.ts` | Counter unbounded growth in rapid-event scenarios — can bloat HLC string representation | Sonnet (sub-agent) |
-| L17 | `src/sync/sync-engine.ts:82-87` | Sync result captured via closure mutation — fragile pattern | Opus (sub-agent) |
-| L18 | `src/sync/sync-engine.ts:178` | `emitEntityChanges` assumes key contains a dot — returns `""` if not | Sonnet (sub-agent) |
-| L19 | `src/sync/unified.ts:143-156` | Stale check re-reads all indexes from adapter A — expensive for large index sets | Sonnet (sub-agent) |
-| L20 | `src/tenant/marker-blob.ts:46` | `readMarkerBlob` performs unchecked cast — no schema validation on stored data | Sonnet (sub-agent) |
-| L21 | `src/tenant/tenant-list.ts:15` | `loadTenantList` unchecked cast `as Tenant[]` — no validation of stored fields | Opus, Sonnet (sub-agents) |
-| L22 | `src/tenant/tenant-manager.ts:52` | Cached tenant list can become stale across tabs/instances | Opus, Sonnet (sub-agents) |
-| L23 | `src/repo/repository.ts:14-17` | `parseEntityKey` silently returns `""` for malformed IDs (no dot) instead of throwing | Sonnet, Codex |
-| L24 | `src/repo/query.ts:17` | `applyWhere` uses strict `===` — breaks for `Date` and object field comparisons | Sonnet (sub-agent) |
-| L25 | `src/repo/repository.ts` | `observeQuery` re-executes full query on every entity change signal | Sonnet (sub-agent) |
-| L26 | `src/index.ts` | Barrel re-export exposes all internal types as public API surface | Sonnet (sub-agent) |
+| L1 | `src/sync/conflict.ts` | Conflict resolution tie-breaking is arbitrary when HLCs are equal (local wins for entities, tombstone wins for entity vs tombstone). Should not occur due to nodeId tie-breaking, but not documented. | GPT-5.4 |
+| L2 | `src/store/store.ts` | Tombstone retention uses HLC timestamp (logical time) rather than wall clock. Clock drift could cause incorrect retention. | GPT-5.4 |
+| L3 | `src/options.ts` | `tombstoneRetentionMs` accepts 0, negative, or `Infinity` without validation. Zero causes immediate tombstone expiry; Infinity causes memory leak. | Codex |
+| L4 | `src/sync/sync-engine.ts` | Error events may leak stack traces revealing internal code paths. | Codex |
+| L5 | `src/tenant/tenant-sync.ts` | Tenant list merge uses `updatedAt` timestamps without clock-skew tie-breaker. Wrong tenant could win, orphaning data. | Codex |
+| L6 | `src/strata.ts` | EventBus `dispose()` completes Subject but doesn't await pending subscriptions. Late emissions could still be buffered. | Opus |
+| L7 | `src/utils/composite-key.ts` | `parseCompositeKey()` returns null on malformed keys, but callers use `!` (non-null assertion) without guards. | Opus, Sonnet |
 
 ---
 
 ### Suggestions
 
-| # | File | Suggestion | Flagged by |
-|---|------|-----------|-----------|
-| S1 | `src/adapter/crypto.ts` | Use `crypto.getRandomValues()` for random salt, stored alongside encrypted DEK | Opus, Sonnet |
-| S2 | `src/adapter/crypto.ts:92` | Add minimum buffer length guard in `decrypt` | Sonnet |
-| S3 | `src/adapter/local-storage.ts:8` | Replace spread-based base64 with chunked conversion | All 4 |
-| S4 | `src/sync/unified.ts:76-98` | Parallelize blob reads in `planCopies`/`planMerges` for high-latency adapters | Opus, Sonnet |
-| S5 | `src/store/flush-scheduler.ts` | File is empty except for a comment — consider removing | Opus |
-| S6 | `src/store/store.ts:130-135` | Document that `write()` via BlobAdapter intentionally doesn't track dirty state | Opus |
-| S7 | `src/store/flush.ts:23` | Pass `entityName` to `migrateBlob` during partition load | GPT-5.4, Codex |
-| S8 | `src/persistence/hash.ts:5-20` | DRY: `fnv1a()` can delegate to `fnv1aAppend(FNV_OFFSET, input)` | Sonnet |
-| S9 | `src/repo/repository.ts:137-155` | `query()` collects all entities before applying `limit` — add early termination | Sonnet |
-| S10 | `src/repo/repository.ts:114` | Emit through `eventBus` in `saveMany`/`deleteMany` — batched event is sufficient | Codex |
-| S11 | `src/schema/define-entity.ts:31-35` | `deriveId` should also reject colons and null bytes (namespace collision risk) | Sonnet |
-| S12 | `src/index.ts` | Restrict barrel exports to consumer-facing types only | Sonnet |
-| S13 | `src/strata.ts:258` | Validate `oldPassword` explicitly before accepting password rotation | Codex |
-| S14 | `src/sync/sync-scheduler.ts:26` | Add in-flight guards or switch to self-scheduling await loops | Codex |
-| S15 | `src/tenant/tenant-manager.ts:63` | Add duplicate ID detection before create persists tenants | Codex |
-| S16 | `src/tenant/tenant-manager.ts:52` | Consider cache invalidation strategy for multi-tab scenarios | Opus |
+| # | File | Issue | Flagged by |
+|---|------|-------|-----------|
+| SG1 | `src/repo/repository.ts` | `query()` collects ALL entities from all partitions into memory before applying filters. For large datasets, this is O(n) memory. Pagination applied after full collection. | GPT-5.4, Sonnet |
+| SG2 | `src/reactive/event-bus.ts` | EventBus exposes raw Subject stream without `distinctUntilChanged`. While mitigated at the repository level, it's a footgun for direct subscribers. | Sonnet |
+| SG3 | `src/tenant/tenant-manager.ts` | During `create()`, if `deriveKeys()` throws, tenant is partially persisted. Persist tenant only after key derivation AND marker blob write succeed. | Sonnet |
 
 ---
 
 ## Positive Observations
 
-These patterns were called out across multiple models as **well-done**:
-
-- **Clean layered architecture**: Clear module boundaries with `types.ts` + implementation + `index.ts` barrel exports. Each layer has well-defined responsibility. *(All 4)*
-- **HLC implementation**: Correct hybrid logical clock with proper total ordering and nodeId tie-breaking. *(All 4)*
-- **Clean sync layering**: diff/merge/plan/apply separation is easier to reason about than monolithic sync. *(GPT-5.4, Codex)*
-- **Defensive cloning**: `MemoryBlobAdapter` uses `structuredClone`, `MemoryStorageAdapter` uses `.slice()` — prevents reference aliasing. *(Opus, Sonnet)*
-- **Snapshot iteration in EventBus**: `[...this.listeners]` spread before iteration prevents modification-during-iteration bugs. *(Opus, Sonnet)*
-- **Two-level encryption scheme**: Marker-key + DEK design allows password changes without re-encrypting all data. *(Opus)*
-- **AES-256-GCM with fresh IV per encryption call**: Correct and standard. *(Sonnet)*
-- **Two-phase sync with stale detection**: Writing to B before A and gating A-write on staleness check is correct optimistic concurrency. *(Sonnet)*
-- **Migration versioning**: `migrateBlob` correctly filters, sorts by version, applies in order, and stamps `__v`. *(Sonnet)*
-- **DirtyTracker with `distinctUntilChanged`**: Avoids redundant signals while preserving every real state transition. *(Sonnet)*
-- **Consistent `readonly` annotations**: Types use `readonly` and `ReadonlyArray` throughout. *(Opus)*
-- **TypeScript type discipline**: Avoids `any` except in well-documented pragmatic locations. Uses `Readonly<T>` and `as const` idioms. *(Sonnet)*
-- **Queue deduplication in SyncEngine**: The `existing.promise` await-and-return pattern efficiently prevents redundant in-flight sync operations. *(Opus, Sonnet)*
-- **Adapter bridge pattern**: Clean separation between storage adapters and blob adapters with composable transforms. *(Opus)*
-
----
-
-## Individual Model Reports
-
-### Claude Opus 4.6
-Full report: [reviewer-opus.md](reviewer-opus.md)  
-Sub-agent files: [opus/](opus/)
-
-### Claude Sonnet 4.6
-Full report: [reviewer-sonnet.md](reviewer-sonnet.md)  
-Sub-agent files: [sonnet/](sonnet/)
-
-### GPT-5.4
-Full report: [reviewer-gpt54.md](reviewer-gpt54.md)  
-Sub-agent files: [gpt54/](gpt54/)
-
-### GPT-5.3 Codex
-Full report: [reviewer-codex.md](reviewer-codex.md)  
-Sub-agent files: [codex/](codex/)
+- **Excellent HLC implementation** (`src/hlc/hlc.ts`) — Clean, immutable tick logic with proper timestamp/counter/nodeId tie-breaking. No mutation issues. Flagged by all 4 reviewers as exemplary.
+- **Strong cryptographic defaults** (`src/utils/crypto.ts`) — AES-256-GCM with 600,000 PBKDF2 iterations, proper 12-byte IV generation, encryption version byte for future-proofing.
+- **Principled KEK/DEK separation** (`src/adapter/encryption.ts`) — Clear lifecycle separation, tenant list kept unencrypted for enumeration before auth, informative error messages for key state issues.
+- **Well-designed RxJS patterns** (`src/repo/repository.ts`) — Proper `startWith()`, `map()`, `distinctUntilChanged()` with custom comparators. BehaviorSubject correctly used for stateful streams.
+- **Sound three-way merge strategy** (`src/sync/merge.ts`) — Entity vs entity, entity vs tombstone, tombstone vs tombstone resolution is exhaustive and logically sound.
+- **Clean adapter composition** (`src/adapter/transforms/`) — Functional wrapper pattern enables composable retry, compression, and encryption without mutation. Solid exponential backoff in retry.
+- **Deterministic partition hashing** (`src/persistence/hash.ts`) — Sorted keys before FNV-1a hashing for consistent change detection across platforms.
+- **Proper defensive copying** (`src/adapter/memory-storage.ts`) — Both `read()` and `write()` use `data.slice()` to prevent external mutation of stored data.
+- **Disposal guard pattern** (`src/utils/assert.ts`, `src/strata.ts`) — Centralized dispose with promise caching prevents double-disposal and use-after-free.
+- **Deterministic entity ID validation** (`src/schema/define-entity.ts`) — Validation prevents dots in custom IDs, preventing ambiguous composite key parsing.

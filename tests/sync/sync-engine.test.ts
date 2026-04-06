@@ -439,4 +439,40 @@ describe('SyncEngine.run()', () => {
     const results = await engine.run(undefined, []);
     expect(results).toEqual([]);
   });
+
+  it('stops processing queue when disposed mid-flight', async () => {
+    const { engine, local } = makeEngine();
+
+    // Make read very slow so dispose happens while first item is running
+    const origRead = local.read.bind(local);
+    local.read = async (...args) => {
+      await new Promise(r => setTimeout(r, 200));
+      return origRead(...args);
+    };
+
+    const p1 = engine.sync('memory', 'local', undefined).catch(() => {});
+    const p2 = engine.sync('local', 'memory', undefined).catch(() => {});
+
+    // Dispose while first sync is in progress — second will be skipped
+    await new Promise(r => setTimeout(r, 50));
+    engine.dispose();
+
+    // Wait for first sync to complete (delayed by 200ms read)
+    await Promise.race([p1, new Promise(r => setTimeout(r, 500))]);
+  });
+
+  it('wraps non-Error throws in sync-failed event', async () => {
+    const { engine, local, syncEventBus } = makeEngine();
+    const events: SyncEvent[] = [];
+    syncEventBus.all$.subscribe(e => events.push(e));
+
+    // Make adapter throw a string (non-Error)
+    local.read = async () => { throw 'string-failure'; };
+
+    await engine.sync('memory', 'local', undefined).catch(() => {});
+
+    const failed = events.find(e => e.type === 'sync-failed');
+    expect(failed).toBeDefined();
+    expect((failed as any).error).toBeInstanceOf(Error);
+  });
 });

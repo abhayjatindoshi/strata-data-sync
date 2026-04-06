@@ -10,6 +10,7 @@ import {
 import type { Tenant } from '@strata/adapter';
 import type { EntityDefinition } from '@strata/schema';
 import type { BlobMigration } from '@strata/schema/migration';
+import { validateMigrations } from '@strata/schema/migration';
 import { EventBus } from '@strata/reactive';
 import type { EntityEvent } from '@strata/reactive';
 import { EncryptedDataAdapter } from '@strata/persistence';
@@ -91,6 +92,7 @@ export class Strata {
 
   constructor(config: StrataConfig) {
     validateEntityDefinitions(config.entities);
+    if (config.migrations) validateMigrations(config.migrations);
     this.config = config;
     const resolvedOptions = resolveOptions(config.options);
     const encryptionService = config.encryptionService ?? noopEncryptionService;
@@ -124,6 +126,7 @@ export class Strata {
 
     this.tenants = new TenantManager({
       adapter: localAdapter,
+      rawAdapter: config.localAdapter,
       cloudAdapter,
       syncEngine: this.syncEngine,
       syncEventBus: this.syncEventBus,
@@ -184,7 +187,7 @@ export class Strata {
       this.dirtySubscription.unsubscribe();
       this.eventBus.dispose();
       this.syncEventBus.dispose();
-      this.syncEngine.dispose();
+      await this.syncEngine.dispose();
       log('strata disposed');
     })();
     return this.disposePromise;

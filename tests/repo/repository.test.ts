@@ -92,6 +92,13 @@ describe('Repository', () => {
       vi.restoreAllMocks();
     });
 
+    it('throws when saving entity with ID from different repository', () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      const repo = new Repository(ItemDef, store, makeHlcRef(), new EventBus<EntityEvent>());
+      expect(() => repo.save({ id: 'other._.abc12345', name: 'A', category: 'c', price: 1 } as any))
+        .toThrow('does not belong to repository "item"');
+    });
+
     it('uses partitioned key strategy for partition key', () => {
       vi.spyOn(Date, 'now').mockReturnValue(1000);
       const store = new Store(DEFAULT_OPTIONS);

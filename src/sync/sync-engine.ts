@@ -23,6 +23,7 @@ export class SyncEngine {
   private readonly queue: SyncQueueItem[] = [];
   private running = false;
   private disposed = false;
+  private inFlight: Promise<void> | null = null;
 
   constructor(
     private readonly store: EntityStore,
@@ -120,13 +121,15 @@ export class SyncEngine {
     this.running = true;
 
     while (this.queue.length > 0) {
+      if (this.disposed) break;
       const item = this.queue[0];
-      try {
-        await item.fn();
-        item.resolve();
-      } catch (err) {
-        item.reject(err instanceof Error ? err : new Error(String(err)));
-      }
+      const p = item.fn().then(
+        () => item.resolve(),
+        (err) => item.reject(err instanceof Error ? err : new Error(String(err))),
+      );
+      this.inFlight = p;
+      await p;
+      this.inFlight = null;
       this.queue.shift();
     }
 
@@ -205,13 +208,16 @@ export class SyncEngine {
     }
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     this.stopScheduler();
     this.disposed = true;
     for (const item of this.queue) {
       item.reject(new Error('SyncEngine disposed'));
     }
     this.queue.length = 0;
+    if (this.inFlight) {
+      await this.inFlight.catch(() => {});
+    }
   }
 
   private emitEntityChanges(changes: ReadonlyArray<SyncEntityChange>): void {

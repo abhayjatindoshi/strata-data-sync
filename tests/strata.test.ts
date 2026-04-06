@@ -83,6 +83,18 @@ describe('Strata', () => {
     expect(strata.observe).toBeTypeOf('function');
   });
 
+  it('accepts config with migrations', () => {
+    const taskDef = defineEntity<Task>('task');
+    strata = new Strata({
+      appId: 'test',
+      entities: [taskDef],
+      localAdapter: makeAdapter(),
+      deviceId: 'dev',
+      migrations: [{ version: 1, migrate: (blob: any) => blob }],
+    });
+    expect(strata).toBeDefined();
+  });
+
   describe('repo()', () => {
     it('returns repository for known entity definition', () => {
       const taskDef = defineEntity<Task>('task');
@@ -430,6 +442,50 @@ describe('Strata', () => {
       const values: boolean[] = [];
       strata.observe('dirty').subscribe(v => values.push(v));
       expect(values[0]).toBe(false);
+    });
+  });
+
+  describe('observe()', () => {
+    it('observe("entity") returns all entity events', () => {
+      const taskDef = defineEntity<Task>('task');
+      strata = new Strata({
+        appId: 'test',
+        entities: [taskDef],
+        localAdapter: makeAdapter(),
+        deviceId: 'dev',
+      });
+      const events: unknown[] = [];
+      strata.observe('entity').subscribe(e => events.push(e));
+      const repo = strata.repo(taskDef) as Repository<Task>;
+      repo.save({ title: 'X', done: false });
+      expect(events.length).toBeGreaterThan(0);
+    });
+
+    it('observe("entity", entityName) filters by entity name', () => {
+      const taskDef = defineEntity<Task>('task');
+      const settingsDef = defineEntity<Settings>('settings', { keyStrategy: 'singleton' });
+      strata = new Strata({
+        appId: 'test',
+        entities: [taskDef, settingsDef],
+        localAdapter: makeAdapter(),
+        deviceId: 'dev',
+      });
+      const taskEvents: unknown[] = [];
+      strata.observe('entity', 'task').subscribe(e => taskEvents.push(e));
+      const repo = strata.repo(settingsDef) as SingletonRepository<Settings>;
+      repo.save({ theme: 'dark' });
+      // No task events should fire for a settings save
+      const taskRepo = strata.repo(taskDef) as Repository<Task>;
+      taskRepo.save({ title: 'X', done: false });
+      // Only the task save should appear
+      expect(taskEvents.length).toBe(1);
+    });
+
+    it('observe("tenant") returns tenant observable', () => {
+      ({ strata } = makeStrata());
+      const values: unknown[] = [];
+      strata.observe('tenant').subscribe(v => values.push(v));
+      expect(values.length).toBeGreaterThan(0);
     });
   });
 

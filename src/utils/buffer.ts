@@ -14,28 +14,36 @@ export function toBase64(data: Uint8Array): string {
 }
 
 export function fromBase64(base64: string): Uint8Array {
-  return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  try {
+    return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  } catch {
+    throw new Error('Invalid base64 input');
+  }
 }
 
 export async function streamToUint8Array(
   readable: ReadableStream<Uint8Array>,
 ): Promise<Uint8Array> {
   const reader = readable.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalLength = 0;
+  try {
+    const chunks: Uint8Array[] = [];
+    let totalLength = 0;
 
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    totalLength += value.length;
-  }
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      totalLength += value.length;
+    }
 
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  } finally {
+    reader.releaseLock();
   }
-  return result;
 }

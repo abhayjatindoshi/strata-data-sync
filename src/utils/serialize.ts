@@ -29,6 +29,10 @@ export function serialize(data: unknown): Uint8Array {
   return encoder.encode(json);
 }
 
+// Note: The unchecked cast here is intentional. Blob structure is produced by
+// serialize() on both sides of the sync boundary, so the shape is framework-
+// controlled. Adapters that introduce untrusted data should validate at the
+// adapter boundary instead.
 export function deserialize<T>(bytes: Uint8Array): T {
   const json = decoder.decode(bytes);
   return JSON.parse(json, reviver) as T;

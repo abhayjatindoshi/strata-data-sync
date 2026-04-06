@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { noopEncryptionService } from '@strata/adapter';
+import { noopEncryptionService, InvalidEncryptionKeyError, MemoryStorageAdapter } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { SyncEvent } from '@strata/sync';
@@ -25,6 +25,7 @@ function stubSyncEngine(): SyncEngineType {
 function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>): TenantManagerDeps {
   return {
     adapter,
+    rawAdapter: new MemoryStorageAdapter(),
     syncEngine: stubSyncEngine(),
     syncEventBus: new EventBus<SyncEvent>(),
     store: { clear: () => {} } as unknown as EntityStore,
@@ -115,7 +116,7 @@ describe('TenantManager', () => {
         ...adapter,
         read: async (tenant: Tenant | undefined, key: string) => {
           if (key === DEFAULT_OPTIONS.markerKey && tenant?.id === 'fail-id') {
-            throw new Error('decrypt failed');
+            throw new InvalidEncryptionKeyError('decrypt failed');
           }
           return adapter.read(tenant, key);
         },
@@ -129,6 +130,26 @@ describe('TenantManager', () => {
       const result = await tm.probe({ meta: {} });
       expect(result.exists).toBe(true);
       expect(result.encrypted).toBe(true);
+    });
+
+    it('re-throws non-InvalidEncryptionKeyError from probe', async () => {
+      const adapter = createDataAdapter();
+      const failAdapter = {
+        ...adapter,
+        read: async (tenant: Tenant | undefined, key: string) => {
+          if (key === DEFAULT_OPTIONS.markerKey && tenant?.id === 'err-id') {
+            throw new Error('disk failure');
+          }
+          return adapter.read(tenant, key);
+        },
+        write: adapter.write.bind(adapter),
+        delete: adapter.delete.bind(adapter),
+      };
+      const tm = new TenantManager(makeDeps(adapter, {
+        adapter: failAdapter,
+        deriveTenantId: () => 'err-id',
+      }));
+      await expect(tm.probe({ meta: {} })).rejects.toThrow('disk failure');
     });
   });
 
@@ -272,7 +293,7 @@ describe('TenantManager', () => {
         ...adapter,
         read: async (tenant: Tenant | undefined, key: string) => {
           if (key === DEFAULT_OPTIONS.markerKey && tenant?.id === 'enc-join') {
-            throw new Error('decrypt failed');
+            throw new InvalidEncryptionKeyError('decrypt failed');
           }
           return adapter.read(tenant, key);
         },
@@ -343,6 +364,59 @@ describe('TenantManager', () => {
       const tm = new TenantManager(makeDeps(adapter));
       await expect(tm.remove('unknown', { purge: true })).resolves.toBeUndefined();
     });
+
+    it('deletes partition blobs when marker has indexes', async () => {
+      const adapter = createDataAdapter();
+      const tm = new TenantManager(makeDeps(adapter));
+      const tenant = await tm.create({ name: 'T', meta: {}, id: 'idx1' });
+      await tm.open('idx1');
+
+      // Write a marker that has indexes with partition keys
+      const markerBlob = {
+        __system: {
+          marker: {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            entityTypes: ['task'],
+            indexes: { task: { '_': { hash: 1, count: 1, deletedCount: 0, updatedAt: 1 } } },
+          },
+        },
+        deleted: {},
+      };
+      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, markerBlob);
+
+      // Write a partition blob that should be deleted
+      await adapter.write(tenant, 'task._', { task: { 'task._.a1': { id: 'a1' } }, deleted: {} });
+
+      await tm.remove('idx1', { purge: true });
+
+      // Partition blob should be deleted
+      const partitionData = await adapter.read(tenant, 'task._');
+      expect(partitionData).toBeNull();
+      // Marker should be deleted
+      const marker = await adapter.read(tenant, DEFAULT_OPTIONS.markerKey);
+      expect(marker).toBeNull();
+    });
+
+    it('purge deletes marker even when it has no indexes', async () => {
+      const adapter = createDataAdapter();
+      const tm = new TenantManager(makeDeps(adapter));
+      const tenant = await tm.create({ name: 'T', meta: {}, id: 'noidx' });
+      await tm.open('noidx');
+
+      // Write a marker without indexes field
+      const markerBlob = {
+        __system: {
+          marker: { version: 1, createdAt: new Date().toISOString(), entityTypes: [] },
+        },
+        deleted: {},
+      };
+      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, markerBlob);
+
+      await tm.remove('noidx', { purge: true });
+      const markerAfter = await adapter.read(tenant, DEFAULT_OPTIONS.markerKey);
+      expect(markerAfter).toBeNull();
+    });
   });
 
   describe('open - encrypted tenant edge cases', () => {
@@ -356,6 +430,34 @@ describe('TenantManager', () => {
 
       await expect(tm.open('enc2')).rejects.toThrow('Credential required');
       expect(tm.activeTenant).toBeUndefined();
+    });
+
+    it('opens encrypted tenant when marker has no keyData', async () => {
+      const adapter = createDataAdapter();
+      const rawAdapter = new MemoryStorageAdapter();
+      const mockEncService = {
+        ...noopEncryptionService,
+        targets: ['local'] as const,
+        deriveKeys: async () => ({ kek: 'mock-kek' }),
+      };
+      const tm = new TenantManager(makeDeps(adapter, {
+        rawAdapter,
+        encryptionService: mockEncService as any,
+      }));
+
+      const now = new Date();
+      const tenant: Tenant = { id: 'enc-nokd', name: 'Enc NoKeyData', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
+      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
+
+      // Write marker without keyData
+      const markerBlob = {
+        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [] } },
+        deleted: {},
+      };
+      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, markerBlob);
+
+      await tm.open('enc-nokd', { credential: 'pass' });
+      expect(tm.activeTenant?.id).toBe('enc-nokd');
     });
   });
 
@@ -424,28 +526,111 @@ describe('TenantManager', () => {
         deleted: {},
       });
 
-      let deriveCallCount = 0;
+      // Provide raw marker bytes via rawAdapter so changeCredential can read salt
+      const rawAdapter = new MemoryStorageAdapter();
+      await rawAdapter.write(tenant, DEFAULT_OPTIONS.markerKey, new Uint8Array(32));
+
+      const verifiedKeys = { kek: 'old-kek', dek: 'old-dek' };
+      const rekeyedKeys = { kek: 'new-kek', dek: 'old-dek' };
       const mockService = {
         targets: ['local'] as const,
-        deriveKeys: async () => { deriveCallCount++; return null; },
+        deriveKeys: async () => verifiedKeys,
         generateKeyData: async (keys: unknown) => ({ keys }),
-        loadKeyData: async () => { throw new Error('invalid key data'); },
-        rekey: async (keys: unknown) => ({ keys }),
+        loadKeyData: async () => verifiedKeys,
+        rekey: async () => ({ keys: rekeyedKeys, keyData: { dek: 'fakeDek' } }),
+        encrypt: async (_blobKey: string, data: Uint8Array) => data,
+        decrypt: async (_blobKey: string, data: Uint8Array) => data,
+      };
+
+      // Wrap adapter to fail on marker write during changeCredential
+      let allowNextMarkerWrite = false;
+      const failingAdapter: DataAdapter = {
+        read: adapter.read.bind(adapter),
+        write: async (t, key, blob) => {
+          if (key === DEFAULT_OPTIONS.markerKey && allowNextMarkerWrite) {
+            throw new Error('write failed');
+          }
+          return adapter.write(t, key, blob);
+        },
+        delete: adapter.delete.bind(adapter),
+      };
+
+      const ctx = new TenantContext();
+      const tm = new TenantManager(makeDeps(failingAdapter, { rawAdapter, encryptionService: mockService as any, tenantContext: ctx }));
+
+      // Set active tenant via context (bypass open which needs real crypto)
+      ctx.set(tenant, verifiedKeys as any);
+
+      // Enable the write trap so the next marker write fails
+      allowNextMarkerWrite = true;
+
+      // Marker write will throw → enters catch block → restores old keys
+      await expect(tm.changeCredential('old', 'new')).rejects.toThrow('write failed');
+
+      // Verify infallible rollback restored old keys (no re-derivation needed)
+      expect(ctx.getKeys()).toBe(verifiedKeys);
+    });
+
+    it('throws when marker cannot be read during changeCredential', async () => {
+      const adapter = createDataAdapter();
+      const now = new Date();
+      const tenant: Tenant = { id: 'enc-nm', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
+      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
+
+      // No marker blob written — readMarkerBlob returns undefined
+      const rawAdapter = new MemoryStorageAdapter();
+      await rawAdapter.write(tenant, DEFAULT_OPTIONS.markerKey, new Uint8Array(32));
+
+      const mockService = {
+        targets: ['local'] as const,
+        deriveKeys: async () => ({ kek: 'kek' }),
+        generateKeyData: async (keys: unknown) => ({ keys }),
+        loadKeyData: async (keys: unknown) => keys,
+        rekey: async (keys: unknown) => ({ keys, keyData: {} }),
         encrypt: async (_blobKey: string, data: Uint8Array) => data,
         decrypt: async (_blobKey: string, data: Uint8Array) => data,
       };
 
       const ctx = new TenantContext();
-      const tm = new TenantManager(makeDeps(adapter, { encryptionService: mockService as any, tenantContext: ctx }));
+      const tm = new TenantManager(makeDeps(adapter, { rawAdapter, encryptionService: mockService as any, tenantContext: ctx }));
+      ctx.set(tenant, { kek: 'kek' } as any);
 
-      // Set active tenant via context (bypass open which needs real crypto)
-      ctx.set(tenant, null);
+      await expect(tm.changeCredential('old', 'new')).rejects.toThrow('Failed to read marker blob');
+    });
 
-      // loadKeyData will throw → enters catch block
-      await expect(tm.changeCredential('old', 'new')).rejects.toThrow();
+    it('changeCredential works when marker has no keyData', async () => {
+      const adapter = createDataAdapter();
+      const now = new Date();
+      const tenant: Tenant = { id: 'enc-nkd', name: 'Encrypted', encrypted: true, meta: {}, createdAt: now, updatedAt: now };
+      await saveTenantList(adapter, [tenant], DEFAULT_OPTIONS);
 
-      // Verify error recovery called deriveKeys again (restore with old credential)
-      expect(deriveCallCount).toBeGreaterThanOrEqual(2); // deriveKeys(old), deriveKeys(old) recovery
+      // Marker WITHOUT keyData
+      await adapter.write(tenant, DEFAULT_OPTIONS.markerKey, {
+        __system: { marker: { version: 1, createdAt: now.toISOString(), entityTypes: [] } },
+        deleted: {},
+      });
+
+      const rawAdapter = new MemoryStorageAdapter();
+      await rawAdapter.write(tenant, DEFAULT_OPTIONS.markerKey, new Uint8Array(32));
+
+      const derivedKeys = { kek: 'kek', dek: 'dek' };
+      const mockService = {
+        targets: ['local'] as const,
+        deriveKeys: async () => derivedKeys,
+        generateKeyData: async (keys: unknown) => ({ keys }),
+        loadKeyData: async (keys: unknown) => keys,
+        rekey: async () => ({ keys: { kek: 'new', dek: 'dek' }, keyData: { dek: 'wrapped' } }),
+        encrypt: async (_blobKey: string, data: Uint8Array) => data,
+        decrypt: async (_blobKey: string, data: Uint8Array) => data,
+      };
+
+      const ctx = new TenantContext();
+      const tm = new TenantManager(makeDeps(adapter, { rawAdapter, encryptionService: mockService as any, tenantContext: ctx }));
+      ctx.set(tenant, derivedKeys as any);
+
+      await tm.changeCredential('old', 'new');
+      // Credential changed successfully — keys updated
+      expect(ctx.getKeys()).toEqual({ kek: 'new', dek: 'dek' });
     });
   });
 });

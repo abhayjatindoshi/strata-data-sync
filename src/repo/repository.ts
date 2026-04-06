@@ -71,7 +71,7 @@ export class Repository<T> {
 
     const existing = this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;
 
-    this.hlc.current = tick(this.hlc.current);
+    const nextHlc = tick(this.hlc.current);
     const now = new Date();
 
     const entity = {
@@ -80,11 +80,12 @@ export class Repository<T> {
       createdAt: existing?.createdAt ?? partial.createdAt ?? now,
       updatedAt: now,
       version: (existing?.version ?? 0) + 1,
-      device: this.hlc.current.nodeId,
-      hlc: this.hlc.current,
+      device: nextHlc.nodeId,
+      hlc: nextHlc,
     };
 
     this.store.setEntity(entityKey, id, entity);
+    this.hlc.current = nextHlc;
     log('saved %s', id);
 
     return id;

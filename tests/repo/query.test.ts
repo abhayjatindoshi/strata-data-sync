@@ -94,4 +94,24 @@ describe('applyRange — Date range', () => {
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('B');
   });
+
+  it('filters by gte only', () => {
+    const entities = [
+      { name: 'A', value: 1 },
+      { name: 'B', value: 5 },
+      { name: 'C', value: 10 },
+    ];
+    const result = applyRange(entities, { field: 'value', gte: 5 });
+    expect(result.map(e => e.name)).toEqual(['B', 'C']);
+  });
+
+  it('filters by lte only', () => {
+    const entities = [
+      { name: 'A', value: 1 },
+      { name: 'B', value: 5 },
+      { name: 'C', value: 10 },
+    ];
+    const result = applyRange(entities, { field: 'value', lte: 5 });
+    expect(result.map(e => e.name)).toEqual(['A', 'B']);
+  });
 });

@@ -1,4 +1,4 @@
-import { toArrayBuffer, toBase64 } from './buffer';
+import { toArrayBuffer, toBase64, fromBase64 } from './buffer';
 
 // ─── Constants ───────────────────────────────────────────
 
@@ -14,6 +14,14 @@ export async function pbkdf2DeriveKey(
   password: string,
   salt: string,
 ): Promise<CryptoKey> {
+  const saltBytes = textEncoder.encode(salt);
+  return pbkdf2DeriveKeyWithSalt(password, saltBytes);
+}
+
+export async function pbkdf2DeriveKeyWithSalt(
+  password: string,
+  salt: Uint8Array,
+): Promise<CryptoKey> {
   const keyMaterial = await globalThis.crypto.subtle.importKey(
     'raw',
     toArrayBuffer(textEncoder.encode(password)),
@@ -21,10 +29,9 @@ export async function pbkdf2DeriveKey(
     false,
     ['deriveKey'],
   );
-  const saltBytes = textEncoder.encode(salt);
 
   return globalThis.crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: toArrayBuffer(saltBytes), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: toArrayBuffer(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -48,7 +55,7 @@ export async function exportCryptoKey(key: CryptoKey): Promise<string> {
 }
 
 export async function importAesGcmKey(base64: string): Promise<CryptoKey> {
-  const raw = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  const raw = fromBase64(base64);
   return globalThis.crypto.subtle.importKey(
     'raw',
     toArrayBuffer(raw),

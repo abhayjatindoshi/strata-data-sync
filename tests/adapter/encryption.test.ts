@@ -46,7 +46,9 @@ describe('Pbkdf2EncryptionService', () => {
     const data = new TextEncoder().encode('marker data');
     const encrypted = await svc.encrypt('__strata', data, keys);
     expect(encrypted).not.toEqual(data);
-    expect(encrypted[0]).toBe(1); // version byte
+    // First 16 bytes are the salt prefix, then version byte at offset 16
+    expect(encrypted.length).toBeGreaterThan(16);
+    expect(encrypted[16]).toBe(1); // version byte after salt
     const decrypted = await svc.decrypt('__strata', encrypted, keys);
     expect(decrypted).toEqual(data);
   });
@@ -112,6 +114,13 @@ describe('Pbkdf2EncryptionService', () => {
     // Data still decryptable (same DEK)
     const decrypted = await svc.decrypt('task.global', encrypted, rekeyedKeys);
     expect(decrypted).toEqual(data);
+  });
+
+  it('rekey throws if DEK is not loaded', async () => {
+    const svc = createService();
+    const keys = await svc.deriveKeys('password', appId);
+    // Keys without DEK (no generateKeyData/loadKeyData)
+    await expect(svc.rekey(keys, 'new-password', appId)).rejects.toThrow('No DEK loaded');
   });
 });
 

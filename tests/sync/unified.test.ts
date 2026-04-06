@@ -4,6 +4,7 @@ import type { PartitionBlob } from '@strata/persistence';
 import type { Hlc } from '@strata/hlc';
 import { Store } from '@strata/store';
 import { syncBetween } from '@strata/sync';
+import { defineEntity } from '@strata/schema';
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 
 function makePartitionBlob(
@@ -255,5 +256,171 @@ describe('syncBetween', () => {
     );
 
     expect(result.changesForA.length + result.changesForB.length).toBeGreaterThan(0);
+  });
+
+  it('one-directional copy (A→B) with no applyToA changes', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+
+    // A→B only: changesForB has data, changesForA empty, not stale
+    expect(result.changesForB.length).toBe(1);
+    expect(result.changesForA).toHaveLength(0);
+    expect(result.stale).toBe(false);
+  });
+
+  it('includes tombstone HLC in maxHlc calculation', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    const tombstoneHlc = { timestamp: 9000, counter: 5, nodeId: 'n1' };
+    const blob = {
+      task: {},
+      deleted: { task: { 'task._.x1': tombstoneHlc } },
+    };
+    await adapterA.write(undefined, 'task._', blob);
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 333, count: 0, deletedCount: 1, updatedAt: 9000 } },
+    }, DEFAULT_OPTIONS);
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+
+    expect(result.maxHlc).toBeDefined();
+    expect(result.maxHlc!.timestamp).toBe(9000);
+  });
+
+  it('handles merge with migrations applied', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    const entityA = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    const entityB = { id: 'task._.b1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
+
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entityA }));
+    await adapterB.write(undefined, 'task._', makePartitionBlob('task', { 'task._.b1': entityB }));
+
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+    await saveAllIndexes(adapterB, undefined, {
+      task: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
+    }, DEFAULT_OPTIONS);
+
+    const migrations = [{
+      version: 1,
+      migrate: (blob: PartitionBlob) => blob,
+    }];
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, migrations as any, DEFAULT_OPTIONS);
+    expect(result.changesForA.length).toBe(1);
+    expect(result.changesForB.length).toBe(1);
+  });
+
+  it('copy with no migrations (null migration path)', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+
+    // Pass undefined migrations explicitly
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+    expect(result.changesForB.length).toBe(1);
+  });
+
+  it('copies with migrations applied (planCopies migration branch)', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    await adapterA.write(undefined, 'task._', makePartitionBlob('task', { 'task._.a1': entity }));
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+
+    const entityB = { id: 'note._.b1', hlc: { timestamp: 2000, counter: 0, nodeId: 'n2' } };
+    await adapterB.write(undefined, 'note._', makePartitionBlob('note', { 'note._.b1': entityB }));
+    await saveAllIndexes(adapterB, undefined, {
+      note: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
+    }, DEFAULT_OPTIONS);
+
+    const migrations = [{
+      version: 1,
+      migrate: (blob: PartitionBlob) => blob, // identity migration
+    }];
+
+    const result = await syncBetween(adapterA, adapterB, ['task', 'note'], undefined, migrations as any, DEFAULT_OPTIONS);
+    expect(result.changesForB.length).toBeGreaterThan(0);
+    expect(result.changesForA.length).toBeGreaterThan(0);
+  });
+
+  it('skips copy when blob is null for indexed partition (race condition)', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    // Index says partition exists, but blob is missing (deleted between index read and blob read)
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 111, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+    // No actual blob written to adapterA for task._
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+    // No data to copy since blob was null
+    expect(result.changesForB).toHaveLength(0);
+  });
+
+  it('skips copy from B when blob is null for B-only partition', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    // Index says partition exists on B, but blob is missing
+    await saveAllIndexes(adapterB, undefined, {
+      task: { '_': { hash: 222, count: 1, deletedCount: 0, updatedAt: 2000 } },
+    }, DEFAULT_OPTIONS);
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+    expect(result.changesForA).toHaveLength(0);
+  });
+
+  it('handles blobs where entity section is missing (undefined fallback paths)', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    // Write a blob without the entity key — only has 'deleted'
+    const minimalBlob: PartitionBlob = { deleted: { task: {} } };
+    await adapterA.write(undefined, 'task._', minimalBlob);
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 555, count: 0, deletedCount: 0, updatedAt: 100 } },
+    }, DEFAULT_OPTIONS);
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+    expect(result.changesForB.length).toBe(1);
+  });
+
+  it('handles blobs where deleted section is missing entity key', async () => {
+    const adapterA = createDataAdapter();
+    const adapterB = createDataAdapter();
+
+    const entity = { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n1' } };
+    // Write a blob with entities but no deleted.task section
+    const blob: PartitionBlob = { task: { 'task._.a1': entity }, deleted: {} };
+    await adapterA.write(undefined, 'task._', blob);
+    await saveAllIndexes(adapterA, undefined, {
+      task: { '_': { hash: 666, count: 1, deletedCount: 0, updatedAt: 1000 } },
+    }, DEFAULT_OPTIONS);
+
+    const result = await syncBetween(adapterA, adapterB, ['task'], undefined, undefined, DEFAULT_OPTIONS);
+    expect(result.changesForB.length).toBe(1);
+    expect(result.maxHlc).toBeDefined();
   });
 });

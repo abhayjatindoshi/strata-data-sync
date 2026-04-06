@@ -7,6 +7,7 @@ import { Store } from '@strata/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 import { SyncEngine } from '@strata/sync';
 import type { SyncEvent } from '@strata/sync';
+import { ReactiveFlag } from '@strata/utils';
 
 function makeEngine(opts?: { cloud?: boolean }) {
   const store = new Store(DEFAULT_OPTIONS);
@@ -114,6 +115,68 @@ describe('SyncEngine scheduler', () => {
     engine.startScheduler(undefined, true);
     await new Promise(r => setTimeout(r, 3000));
     await engine.drain().catch(() => {});
+    engine.stopScheduler();
+  });
+
+  it('cloud scheduler clears dirtyTracker on success', async () => {
+    // Create engine with very short cloud interval
+    const store = new Store(DEFAULT_OPTIONS);
+    const local = createDataAdapter();
+    const cloud = createDataAdapter();
+    const hlcRef = { current: createHlc('test') };
+    const eventBus = new EventBus<EntityEvent>();
+    const syncEventBus = new EventBus<SyncEvent>();
+    const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, syncEventBus, undefined, {
+      ...DEFAULT_OPTIONS,
+      cloudSyncIntervalMs: 100,
+      localFlushIntervalMs: 50,
+    });
+
+    const tracker = new ReactiveFlag();
+    tracker.set();
+    expect(tracker.value).toBe(true);
+
+    engine.startScheduler(undefined, true, tracker);
+    await new Promise(r => setTimeout(r, 500));
+    await engine.drain().catch(() => {});
+    engine.stopScheduler();
+
+    expect(tracker.value).toBe(false);
+  });
+
+  it('cloud scheduler catches errors with short interval', async () => {
+    const store = new Store(DEFAULT_OPTIONS);
+    const local = createDataAdapter();
+    const cloud = createDataAdapter();
+    const hlcRef = { current: createHlc('test') };
+    const eventBus = new EventBus<EntityEvent>();
+    const syncEventBus = new EventBus<SyncEvent>();
+    const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, syncEventBus, undefined, {
+      ...DEFAULT_OPTIONS,
+      cloudSyncIntervalMs: 100,
+      localFlushIntervalMs: 50,
+    });
+
+    cloud.read = async () => { throw new Error('cloud failure'); };
+
+    engine.startScheduler(undefined, true);
+    await new Promise(r => setTimeout(r, 500));
+    await engine.drain().catch(() => {});
+    engine.stopScheduler();
+  });
+
+  it('uses default intervals when options are undefined', () => {
+    vi.useFakeTimers();
+    const store = new Store(DEFAULT_OPTIONS);
+    const local = createDataAdapter();
+    const cloud = createDataAdapter();
+    const hlcRef = { current: createHlc('test') };
+    const eventBus = new EventBus<EntityEvent>();
+    const syncEventBus = new EventBus<SyncEvent>();
+    // Create engine without options — triggers ?? fallbacks
+    const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, syncEventBus);
+
+    engine.startScheduler(undefined, true);
     engine.stopScheduler();
   });
 });

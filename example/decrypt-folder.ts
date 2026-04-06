@@ -11,7 +11,7 @@
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  pbkdf2DeriveKey,
+  pbkdf2DeriveKeyWithSalt,
   importAesGcmKey,
   aesGcmDecrypt,
 } from 'strata-data-sync';
@@ -57,9 +57,8 @@ async function main() {
   console.log(`Decrypting: ${rootDir}`);
   console.log(`App ID: ${appId}\n`);
 
-  // 1. Derive KEK from credential
-  const kek = await pbkdf2DeriveKey(credential, appId);
-  console.log('KEK derived from credential');
+  const textEncoder = new TextEncoder();
+  const SALT_LENGTH = 16;
 
   // 2. Find all subdirectories containing a __strata marker
   const rootEntries = await readdir(rootDir, { withFileTypes: true });
@@ -96,12 +95,23 @@ async function main() {
       const markerBytes = new Uint8Array(await readFile(markerPath));
 
       // Skip if marker is not encrypted (starts with '{' = plain JSON)
-      if (markerBytes[0] !== 1) {
+      // Encrypted markers: [16-byte salt][version=1][IV][ciphertext]
+      if (markerBytes.length < SALT_LENGTH + 14 || markerBytes[SALT_LENGTH] !== 1) {
         console.log('  · not encrypted, skipping');
         continue;
       }
 
-      const decryptedMarker = await aesGcmDecrypt(markerBytes, kek);
+      // Extract salt prefix and derive KEK for this tenant
+      const salt = markerBytes.slice(0, SALT_LENGTH);
+      const appIdBytes = textEncoder.encode(appId);
+      const fullSalt = new Uint8Array(SALT_LENGTH + appIdBytes.length);
+      fullSalt.set(salt, 0);
+      fullSalt.set(appIdBytes, SALT_LENGTH);
+      const kek = await pbkdf2DeriveKeyWithSalt(credential, fullSalt);
+      console.log('  KEK derived from salt + credential');
+
+      const ciphertext = markerBytes.slice(SALT_LENGTH);
+      const decryptedMarker = await aesGcmDecrypt(ciphertext, kek);
       await writeFile(markerPath, decryptedMarker);
       console.log('  ✓ __strata decrypted');
 

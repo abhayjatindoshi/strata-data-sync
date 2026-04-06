@@ -113,3 +113,7 @@ password + appId → PBKDF2 (100k iterations) → markerKey (AES-256-GCM)
 
 - `localAdapter` must be a `StorageAdapter` (not a `BlobAdapter`) for encryption to work. The `StorageAdapter` operates on raw bytes, which is where the encrypt/decrypt transform is applied.
 - Encryption is handled by the `AdapterBridge` transform pipeline — transparent to the rest of the framework.
+
+### Security Considerations
+
+**Credential lifetime in memory**: JavaScript strings are immutable and garbage-collected — they cannot be zeroed after use. Credentials passed to `open()`, `join()`, and `changeCredential()` remain in process memory until the GC reclaims them. This is a fundamental language limitation, not a framework bug. Credentials are kept in function-parameter scope to minimize lifetime, but they may still be observable via heap snapshots or debugger inspection. If your threat model includes memory-dump attacks, consider accepting credentials as close to the call site as possible and avoiding storing them in long-lived variables.

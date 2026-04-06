@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { EncryptionService, EncryptionKeys } from '@strata/adapter';
+import type { EncryptionService, EncryptionKeys, StorageAdapter } from '@strata/adapter';
 import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
@@ -7,7 +7,7 @@ import type { SyncEngineType, SyncResult, SyncLocation, SyncEvent } from '@strat
 import type { ReactiveFlag } from '@strata/utils';
 import type { EventBus } from '@strata/reactive';
 import { generateId } from '@strata/utils';
-import { partitionBlobKey } from '@strata/adapter';
+import { partitionBlobKey, InvalidEncryptionKeyError } from '@strata/adapter';
 import type {
   Tenant,
   ProbeResult,
@@ -24,6 +24,7 @@ const log = debug('strata:tenant');
 
 export type TenantManagerDeps = {
   readonly adapter: DataAdapter;
+  readonly rawAdapter: StorageAdapter;
   readonly cloudAdapter?: DataAdapter;
   readonly syncEngine: SyncEngineType;
   readonly syncEventBus: EventBus<SyncEvent>;
@@ -92,9 +93,11 @@ export class TenantManager implements TenantManagerType {
       const marker = await readMarkerBlob(this.deps.adapter, tempTenant, this.deps.options);
       if (!marker) return { exists: false };
       return { exists: true, encrypted: !!marker.keyData, tenantId: id };
-    } catch {
-      // Parse failure means encrypted data
-      return { exists: true, encrypted: true, tenantId: id };
+    } catch (err) {
+      if (err instanceof InvalidEncryptionKeyError) {
+        return { exists: true, encrypted: true, tenantId: id };
+      }
+      throw err;
     }
   }
 
@@ -131,7 +134,6 @@ export class TenantManager implements TenantManagerType {
       const result = await this.deps.encryptionService.generateKeyData(keys);
       keys = result.keys;
       keyData = result.keyData;
-      // Temporarily set context so writeMarkerBlob can encrypt
       this.deps.tenantContext.set(tenant, keys);
     }
 
@@ -177,14 +179,11 @@ export class TenantManager implements TenantManagerType {
       }
       encrypted = !!marker.keyData;
     } catch (err) {
-      if (err instanceof Error && (
-        err.message.includes('No strata workspace') ||
-        err.message.includes('Incompatible strata')
-      )) {
+      if (err instanceof InvalidEncryptionKeyError) {
+        encrypted = true;
+      } else {
         throw err;
       }
-      // Parse failure means encrypted
-      encrypted = true;
     }
 
     const prefs = encrypted ? undefined : await loadTenantPrefs(this.deps.adapter, tempTenant);
@@ -233,6 +232,9 @@ export class TenantManager implements TenantManagerType {
 
   // ─── Hot ops ─────────────────────────────────────────────
 
+  // Security note: `credential` is a JS string and cannot be zeroed after use.
+  // It remains in memory until GC reclaims it. This is a fundamental language
+  // limitation. Keeping it as a function parameter minimizes its lifetime.
   async open(tenantId: string, opts?: { credential?: string }): Promise<void> {
     await this.close();
 
@@ -250,19 +252,21 @@ export class TenantManager implements TenantManagerType {
         throw new Error('Credential required for encrypted tenant');
       }
       try {
-        keys = await this.deps.encryptionService.deriveKeys(opts.credential, this.deps.appId);
+        const rawBytes = await this.deps.rawAdapter.read(tenant, this.deps.options.markerKey);
+        keys = await this.deps.encryptionService.deriveKeys(opts.credential, this.deps.appId, rawBytes);
         this.deps.tenantContext.set(tenant, keys);
         const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
         if (marker?.keyData) {
           keys = await this.deps.encryptionService.loadKeyData(keys, marker.keyData);
         }
+        this.deps.tenantContext.set(tenant, keys);
       } catch (err) {
         this.deps.tenantContext.clear();
         throw err;
       }
+    } else {
+      this.deps.tenantContext.set(tenant, keys);
     }
-
-    this.deps.tenantContext.set(tenant, keys);
 
     // Hydrate: cloud → local → memory
     const hasCloud = !!this.deps.cloudAdapter;
@@ -316,45 +320,42 @@ export class TenantManager implements TenantManagerType {
     };
   }
 
+  // Security note: credential strings cannot be zeroed in JS — see open() comment.
   async changeCredential(oldCredential: string, newCredential: string): Promise<void> {
     const tenant = this.deps.tenantContext.activeTenant;
     if (!tenant) throw new Error('No tenant loaded');
     if (!tenant.encrypted) throw new Error('Current tenant is not encrypted');
 
-    try {
-      // Verify old credential by deriving keys and reading marker
-      let keys = await this.deps.encryptionService.deriveKeys(oldCredential, this.deps.appId);
+    // Verify old credential by deriving keys and reading marker
+    const rawBytes = await this.deps.rawAdapter.read(tenant, this.deps.options.markerKey);
+    let keys = await this.deps.encryptionService.deriveKeys(oldCredential, this.deps.appId, rawBytes);
+    this.deps.tenantContext.set(tenant, keys);
+    const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
+    if (!marker) throw new Error('Failed to read marker blob');
+    if (marker.keyData) {
+      keys = await this.deps.encryptionService.loadKeyData(keys, marker.keyData);
       this.deps.tenantContext.set(tenant, keys);
-      const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
-      if (!marker) throw new Error('Failed to read marker blob');
-      if (marker.keyData) {
-        keys = await this.deps.encryptionService.loadKeyData(keys, marker.keyData);
-        this.deps.tenantContext.set(tenant, keys);
-      }
+    }
 
-      // Old credential verified — rekey with new credential
-      const result = await this.deps.encryptionService.rekey(
-        keys, newCredential, this.deps.appId,
-      );
-      this.deps.tenantContext.set(tenant, result.keys);
+    // Snapshot verified old keys so restore is infallible
+    const verifiedOldKeys = keys;
 
+    // Rekey with new credential
+    const result = await this.deps.encryptionService.rekey(
+      keys, newCredential, this.deps.appId,
+    );
+    this.deps.tenantContext.set(tenant, result.keys);
+
+    try {
       await writeMarkerBlob(
         this.deps.adapter, tenant, marker.entityTypes, this.deps.options, result.keyData,
       );
-
-      log('encryption credential changed');
     } catch (err) {
-      // Restore to old credential state
-      const oldKeys = await this.deps.encryptionService.deriveKeys(oldCredential, this.deps.appId).catch(() => null);
-      if (oldKeys) {
-        this.deps.tenantContext.set(tenant, oldKeys);
-        const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options).catch(() => null);
-        if (marker?.keyData) {
-          const fullKeys = await this.deps.encryptionService.loadKeyData(oldKeys, marker.keyData).catch(() => oldKeys);
-          this.deps.tenantContext.set(tenant, fullKeys);
-        }
-      }
+      // Marker write failed — restore old keys (infallible, no I/O)
+      this.deps.tenantContext.set(tenant, verifiedOldKeys);
       throw err;
     }
+
+    log('encryption credential changed');
   }
 }

@@ -61,5 +61,72 @@ describe('loadPartitionFromAdapter', () => {
     expect(result.size).toBe(1);
     expect(store.getTombstones('task._').size).toBe(0);
   });
+
+  it('returns empty map and skips loading when blob is malformed', async () => {
+    const adapter = createDataAdapter();
+    const store = new Store(DEFAULT_OPTIONS);
+
+    // deleted is not a plain object — validation fails
+    const malformed = { task: { 'task._.a1': { id: 'task._.a1' } }, deleted: 'not-an-object' };
+    await adapter.write(undefined, 'task._', malformed as any);
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+
+    expect(result.size).toBe(0);
+  });
+
+  it('returns empty map when entity data is not a plain object', async () => {
+    const adapter = createDataAdapter();
+    const store = new Store(DEFAULT_OPTIONS);
+
+    const malformed = { task: 'not-an-object', deleted: {} };
+    await adapter.write(undefined, 'task._', malformed as any);
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+
+    expect(result.size).toBe(0);
+  });
+
+  it('returns empty map when tombstone HLC is invalid', async () => {
+    const adapter = createDataAdapter();
+    const store = new Store(DEFAULT_OPTIONS);
+
+    const malformed = { task: {}, deleted: { task: { 'task._.d1': 'not-hlc' } } };
+    await adapter.write(undefined, 'task._', malformed as any);
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+
+    expect(result.size).toBe(0);
+  });
+
+  it('applies migrations before loading', async () => {
+    const adapter = createDataAdapter();
+    const store = new Store(DEFAULT_OPTIONS);
+
+    const blob = { task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } }, deleted: {} };
+    await adapter.write(undefined, 'task._', blob);
+
+    const migrations = [{
+      version: 1,
+      migrate: (b: any) => ({ ...b, task: { 'task._.a1': { ...b.task['task._.a1'], migrated: true } } }),
+    }];
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_', migrations);
+
+    expect(result.size).toBe(1);
+    expect((result.get('task._.a1') as any).migrated).toBe(true);
+  });
+
+  it('loads entities when deleted section has no entry for entity', async () => {
+    const adapter = createDataAdapter();
+    const store = new Store(DEFAULT_OPTIONS);
+
+    // deleted section exists but has no 'task' key — triggers ?? {} and undefined tombstoneData branches
+    const blob = { task: { 'task._.a1': { id: 'task._.a1', name: 'Test' } }, deleted: { other: {} } };
+    await adapter.write(undefined, 'task._', blob);
+
+    const result = await loadPartitionFromAdapter(adapter, undefined, store, 'task', '_');
+    expect(result.size).toBe(1);
+    expect(store.getTombstones('task._').size).toBe(0);
+  });
 });
 

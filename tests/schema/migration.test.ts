@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { migrateBlob } from '@strata/schema/migration';
+import { migrateBlob, validateMigrations } from '@strata/schema/migration';
 import type { BlobMigration } from '@strata/schema/migration';
 import type { PartitionBlob } from '@strata/persistence';
 
@@ -171,6 +171,53 @@ describe('Schema migration', () => {
       ];
       const result = migrateBlob(blob, migrations, 'task');
       expect((result as Record<string, unknown>).applied).toBe(true);
+    });
+  });
+
+  describe('validateMigrations', () => {
+    it('accepts empty migrations array', () => {
+      expect(() => validateMigrations([])).not.toThrow();
+    });
+
+    it('accepts contiguous versions starting at 1', () => {
+      const m: BlobMigration[] = [
+        { version: 1, migrate: (b) => b },
+        { version: 2, migrate: (b) => b },
+        { version: 3, migrate: (b) => b },
+      ];
+      expect(() => validateMigrations(m)).not.toThrow();
+    });
+
+    it('accepts unsorted but contiguous versions', () => {
+      const m: BlobMigration[] = [
+        { version: 3, migrate: (b) => b },
+        { version: 1, migrate: (b) => b },
+        { version: 2, migrate: (b) => b },
+      ];
+      expect(() => validateMigrations(m)).not.toThrow();
+    });
+
+    it('throws on version gap', () => {
+      const m: BlobMigration[] = [
+        { version: 1, migrate: (b) => b },
+        { version: 3, migrate: (b) => b },
+      ];
+      expect(() => validateMigrations(m)).toThrow('contiguous');
+    });
+
+    it('throws on duplicate version', () => {
+      const m: BlobMigration[] = [
+        { version: 1, migrate: (b) => b },
+        { version: 1, migrate: (b) => b },
+      ];
+      expect(() => validateMigrations(m)).toThrow('Duplicate');
+    });
+
+    it('throws when starting at version 0', () => {
+      const m: BlobMigration[] = [
+        { version: 0, migrate: (b) => b },
+      ];
+      expect(() => validateMigrations(m)).toThrow('contiguous');
     });
   });
 });

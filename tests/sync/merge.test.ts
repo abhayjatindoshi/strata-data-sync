@@ -224,4 +224,47 @@ describe('mergePartition', () => {
     expect(result.tombstones['task._.a']).toBeDefined();
     expect(result.tombstones['task._.a'].timestamp).toBe(5000);
   });
+
+  it('includes cloud-only tombstones in merged result', () => {
+    const local = makeBlob(entityName, {});
+    const cloud = makeBlob(entityName, {}, {
+      'task._.d1': { timestamp: 4000, counter: 0, nodeId: 'n2' },
+    });
+
+    const result = mergePartition(local, cloud, entityName);
+    expect(result.tombstones['task._.d1']).toBeDefined();
+    expect(result.tombstones['task._.d1'].timestamp).toBe(4000);
+  });
+
+  it('includes local-only tombstones in merged result', () => {
+    const local = makeBlob(entityName, {}, {
+      'task._.d2': { timestamp: 3000, counter: 0, nodeId: 'n1' },
+    });
+    const cloud = makeBlob(entityName, {});
+
+    const result = mergePartition(local, cloud, entityName);
+    expect(result.tombstones['task._.d2']).toBeDefined();
+  });
+
+  it('handles blobs where entity key is missing (undefined fallback)', () => {
+    // Local blob has no 'task' key at all — triggers ?? {} fallback
+    const local: PartitionBlob = { deleted: { [entityName]: {} } };
+    const cloud = makeBlob(entityName, {
+      'task._.c1': { id: 'task._.c1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n' } },
+    });
+
+    const result = mergePartition(local, cloud, entityName);
+    expect(result.entities['task._.c1']).toBeDefined();
+  });
+
+  it('handles blobs where deleted section has no entity key', () => {
+    const local = makeBlob(entityName, {
+      'task._.a1': { id: 'task._.a1', hlc: { timestamp: 1000, counter: 0, nodeId: 'n' } },
+    });
+    // Cloud blob's deleted section has no 'task' key
+    const cloud: PartitionBlob = { [entityName]: {}, deleted: {} };
+
+    const result = mergePartition(local, cloud, entityName);
+    expect(result.entities['task._.a1']).toBeDefined();
+  });
 });

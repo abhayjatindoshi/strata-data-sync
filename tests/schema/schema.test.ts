@@ -8,8 +8,8 @@ describe('Schema', () => {
       expect(generateId()).toHaveLength(8);
     });
 
-    it('returns alphanumeric characters only', () => {
-      expect(generateId()).toMatch(/^[A-Za-z0-9]{8}$/);
+    it('returns URL-safe characters only', () => {
+      expect(generateId()).toMatch(/^[A-Za-z0-9_-]{8}$/);
     });
 
     it('returns unique IDs', () => {

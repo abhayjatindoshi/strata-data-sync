@@ -78,6 +78,10 @@ describe('Encryption primitives', () => {
       expect(typeof b64).toBe('string');
       expect(b64.length).toBeGreaterThan(0);
     });
+
+    it('importDek throws on invalid base64', async () => {
+      await expect(importDek('!!!not-base64!!!')).rejects.toThrow('Invalid base64');
+    });
   });
 
   describe('encrypt / decrypt', () => {
@@ -117,6 +121,12 @@ describe('Encryption primitives', () => {
       const data = new Uint8Array(14); // minimum length, version 0 → unsupported
       data[0] = 99;
       await expect(decrypt(data, dek)).rejects.toThrow('Unsupported encryption version');
+    });
+
+    it('data too short throws', async () => {
+      const dek = await generateDek();
+      const short = new Uint8Array([1, 2, 3]); // way below minimum
+      await expect(decrypt(short, dek)).rejects.toThrow('too short');
     });
 
     it('empty data round-trip', async () => {

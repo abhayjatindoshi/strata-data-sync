@@ -99,4 +99,30 @@ describe('LocalStorageAdapter', () => {
       expect(result).toBeNull();
     });
   });
+
+  it('throws when localStorage is unavailable', () => {
+    const saved = globalThis.localStorage;
+    delete (globalThis as any).localStorage;
+    try {
+      expect(() => new LocalStorageAdapter()).toThrow('localStorage');
+    } finally {
+      (globalThis as any).localStorage = saved;
+    }
+  });
+
+  it('wraps localStorage.setItem quota errors', async () => {
+    const errorStorage = createLocalStoragePolyfill();
+    errorStorage.setItem = () => { throw new DOMException('QuotaExceededError'); };
+    (globalThis as any).localStorage = errorStorage;
+    const errAdapter = new LocalStorageAdapter('test');
+    await expect(errAdapter.write(tenant, 'big', new Uint8Array([1]))).rejects.toThrow('localStorage write failed');
+  });
+
+  it('wraps non-Error throws from localStorage.setItem', async () => {
+    const errorStorage = createLocalStoragePolyfill();
+    errorStorage.setItem = () => { throw 'string-error'; };
+    (globalThis as any).localStorage = errorStorage;
+    const errAdapter = new LocalStorageAdapter('test');
+    await expect(errAdapter.write(tenant, 'key', new Uint8Array([1]))).rejects.toThrow('string-error');
+  });
 });

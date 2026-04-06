@@ -48,7 +48,7 @@ type BlobMigration = {
 };
 ```
 
-- **`version`** — sequential version number. Migrations with `version > blob.__v` are applied.
+- **`version`** — contiguous integer starting at 1 (i.e. 1, 2, 3, …). Gaps and duplicates are rejected at startup. Migrations with `version > blob.__v` are applied.
 - **`entities`** — optional. If provided, only blobs matching these entity types are migrated. If omitted, the migration applies to all blobs.
 - **`migrate`** — receives the raw `PartitionBlob`, returns the transformed blob.
 
@@ -100,13 +100,21 @@ Without `entities`, the migration applies to every blob regardless of type.
 
 ## Sequential Migrations
 
-Migrations stack. A blob at version 0 with migrations 1, 2, 3 defined will have all three applied in order:
+Migration versions **must** be contiguous integers starting at 1 — no gaps, no duplicates. Strata validates this at startup and throws if the sequence is broken:
 
 ```typescript
+// ✅ valid
 const migrations: BlobMigration[] = [
   { version: 1, migrate: (b) => { /* v0→v1 */ return b; } },
   { version: 2, migrate: (b) => { /* v1→v2 */ return b; } },
   { version: 3, migrate: (b) => { /* v2→v3 */ return b; } },
+];
+
+// ❌ throws — gap between 2 and 5
+const bad: BlobMigration[] = [
+  { version: 1, migrate: (b) => b },
+  { version: 2, migrate: (b) => b },
+  { version: 5, migrate: (b) => b },
 ];
 ```
 

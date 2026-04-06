@@ -66,6 +66,16 @@ describe('withGzip', () => {
     const result = await adapter.read(undefined, 'missing');
     expect(result).toBeNull();
   });
+
+  it('delete delegates to inner adapter', async () => {
+    const inner = new MemoryStorageAdapter();
+    const adapter = withGzip(inner);
+    await adapter.write(undefined, 'test', new TextEncoder().encode('data'));
+    const deleted = await adapter.delete(undefined, 'test');
+    expect(deleted).toBe(true);
+    const result = await adapter.read(undefined, 'test');
+    expect(result).toBeNull();
+  });
 });
 
 

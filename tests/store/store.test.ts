@@ -32,6 +32,12 @@ describe('EntityStore', () => {
       const store = new Store(DEFAULT_OPTIONS);
       expect(store.deleteEntity('transaction._', 'id1')).toBe(false);
     });
+
+    it('delete returns false for missing entity ID in existing partition', () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      store.setEntity('transaction._', 'id1', { id: 'id1' });
+      expect(store.deleteEntity('transaction._', 'id-nonexistent')).toBe(false);
+    });
   });
 
   describe('partition access', () => {
@@ -162,6 +168,30 @@ describe('EntityStore', () => {
       };
       await store.write(undefined, 'task._', blob);
       expect(store.getEntity('task._', 'id1')).toEqual({ id: 'id1', title: 'Written' });
+    });
+
+    it('write skips marker key silently', async () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      // Writing to marker key should be a no-op (marker is computed from live state)
+      await store.write(undefined, DEFAULT_OPTIONS.markerKey, { __system: { dummy: true }, deleted: {} });
+      // The dummy data should not appear; read returns computed marker instead
+      const blob = await store.read(undefined, DEFAULT_OPTIONS.markerKey) as Record<string, unknown> | null;
+      expect(blob === null || !(blob as any).__system?.dummy).toBe(true);
+    });
+
+    it('write handles blob without deleted section', async () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      await store.write(undefined, 'task._', { task: { id1: { id: 'id1' } } } as any);
+      expect(store.getEntity('task._', 'id1')).toEqual({ id: 'id1' });
+      expect(store.getTombstones('task._').size).toBe(0);
+    });
+
+    it('write handles blob with deleted section lacking entity key', async () => {
+      const store = new Store(DEFAULT_OPTIONS);
+      // deleted exists but has no 'task' key — triggers ?? {} fallback
+      await store.write(undefined, 'task._', { task: { id1: { id: 'id1' } }, deleted: {} } as any);
+      expect(store.getEntity('task._', 'id1')).toEqual({ id: 'id1' });
+      expect(store.getTombstones('task._').size).toBe(0);
     });
 
     it('write ignores key without dot separator', async () => {

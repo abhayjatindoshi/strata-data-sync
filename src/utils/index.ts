@@ -5,7 +5,7 @@ export { assertNotDisposed } from './assert';
 export { serialize, deserialize } from './serialize';
 export { ReactiveFlag } from './reactive-flag';
 export {
-  pbkdf2DeriveKey, aesGcmGenerateKey, exportCryptoKey, importAesGcmKey,
+  pbkdf2DeriveKey, pbkdf2DeriveKeyWithSalt, aesGcmGenerateKey, exportCryptoKey, importAesGcmKey,
   aesGcmEncrypt, aesGcmDecrypt,
 } from './crypto';
 export { FNV_OFFSET, FNV_PRIME, fnv1a, fnv1aAppend } from './fnv';
