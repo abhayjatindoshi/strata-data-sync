@@ -54,10 +54,6 @@ jobs:
             echo "Version ${PACKAGE_VERSION} not yet published."
           fi
 
-      - name: Publish to npm (dry-run)
-        if: steps.version-check.outputs.skip != 'true' && github.ref != 'refs/heads/main'
-        run: npm publish --provenance --access public --dry-run
-
       - name: Publish to npm
-        if: steps.version-check.outputs.skip != 'true' && github.ref == 'refs/heads/main'
+        if: steps.version-check.outputs.skip != 'true'
         run: npm publish --provenance --access public
