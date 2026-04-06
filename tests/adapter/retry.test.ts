@@ -90,4 +90,25 @@ describe('withRetry', () => {
     const result = await adapter.read(undefined, 'k');
     expect(result).toBeNull();
   });
+
+  it('uses exponential backoff between retries', async () => {
+    const timestamps: number[] = [];
+    const inner: any = {
+      read: async () => {
+        timestamps.push(Date.now());
+        if (timestamps.length <= 3) throw new Error('fail');
+        return new Uint8Array([1]);
+      },
+    };
+    const adapter = withRetry(inner, { maxRetries: 3, delayMs: 50 });
+    await adapter.read(undefined, 'k');
+    // Delays should be ~50ms (50*2^0), ~100ms (50*2^1), ~200ms (50*2^2)
+    const gaps = timestamps.slice(1).map((t, i) => t - timestamps[i]);
+    expect(gaps[0]).toBeGreaterThanOrEqual(30);   // ~50ms
+    expect(gaps[1]).toBeGreaterThanOrEqual(70);   // ~100ms
+    expect(gaps[2]).toBeGreaterThanOrEqual(150);  // ~200ms
+    // Each gap should be roughly double the previous
+    expect(gaps[1]).toBeGreaterThan(gaps[0] * 1.3);
+    expect(gaps[2]).toBeGreaterThan(gaps[1] * 1.3);
+  });
 });

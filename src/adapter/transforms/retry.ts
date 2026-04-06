@@ -21,7 +21,7 @@ async function withRetries<T>(
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < maxRetries) {
         options.onRetry?.(attempt + 1, lastError);
-        await new Promise(r => setTimeout(r, delayMs));
+        await new Promise(r => setTimeout(r, delayMs * Math.pow(2, attempt)));
       }
     }
   }

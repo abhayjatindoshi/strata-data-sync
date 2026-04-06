@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyOrderBy, applyRange } from '@strata/repo';
+import { applyOrderBy, applyRange, applyPagination } from '@strata/repo';
 
 describe('applyOrderBy — Date, string, and equal values', () => {
   it('sorts by Date fields ascending', () => {
@@ -113,5 +113,19 @@ describe('applyRange — Date range', () => {
     ];
     const result = applyRange(entities, { field: 'value', lte: 5 });
     expect(result.map(e => e.name)).toEqual(['A', 'B']);
+  });
+});
+
+describe('applyPagination', () => {
+  it('clamps negative offset to zero', () => {
+    const entities = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const result = applyPagination(entities, -5);
+    expect(result).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+  });
+
+  it('clamps negative limit to zero', () => {
+    const entities = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const result = applyPagination(entities, undefined, -1);
+    expect(result).toEqual([]);
   });
 });

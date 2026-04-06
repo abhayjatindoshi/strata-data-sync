@@ -50,10 +50,10 @@ export function applyPagination<T>(
 ): ReadonlyArray<T> {
   let result: ReadonlyArray<T> = entities;
   if (offset !== undefined) {
-    result = result.slice(offset);
+    result = result.slice(Math.max(0, offset));
   }
   if (limit !== undefined) {
-    result = result.slice(0, limit);
+    result = result.slice(0, Math.max(0, limit));
   }
   return result;
 }

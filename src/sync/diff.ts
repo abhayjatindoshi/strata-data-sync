@@ -44,7 +44,7 @@ export function diffPartitions(
     } else if (!local && cloud) {
       cloudOnly.push(key);
     } else if (local && cloud) {
-      if (local.hash === cloud.hash) {
+      if (local.hash === cloud.hash && local.count === cloud.count && local.deletedCount === cloud.deletedCount) {
         unchanged.push(key);
       } else {
         diverged.push(key);

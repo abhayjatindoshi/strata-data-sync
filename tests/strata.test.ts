@@ -789,6 +789,21 @@ describe('Strata', () => {
       const opts = resolveOptions({ tombstoneRetentionMs: 0 });
       expect(opts.tombstoneRetentionMs).toBe(0);
     });
+
+    it('rejects zero cloudSyncIntervalMs', () => {
+      expect(() => resolveOptions({ cloudSyncIntervalMs: 0 }))
+        .toThrow('Invalid cloudSyncIntervalMs');
+    });
+
+    it('rejects negative localFlushIntervalMs', () => {
+      expect(() => resolveOptions({ localFlushIntervalMs: -100 }))
+        .toThrow('Invalid localFlushIntervalMs');
+    });
+
+    it('rejects Infinity cloudSyncIntervalMs', () => {
+      expect(() => resolveOptions({ cloudSyncIntervalMs: Infinity }))
+        .toThrow('Invalid cloudSyncIntervalMs');
+    });
   });
 });
 

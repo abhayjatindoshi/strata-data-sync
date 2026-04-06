@@ -61,7 +61,11 @@ export class Pbkdf2EncryptionService implements EncryptionService {
   }
 
   private castKeys(keys: EncryptionKeys | null): Pbkdf2Keys | null {
-    return keys as Pbkdf2Keys | null;
+    if (keys === null) return null;
+    if (typeof keys !== 'object' || !('kek' in (keys as Record<string, unknown>))) {
+      throw new Error('Invalid encryption keys: expected Pbkdf2Keys with kek property');
+    }
+    return keys as Pbkdf2Keys;
   }
 
   // ── Encrypt / Decrypt (stateless — keys passed in) ─────

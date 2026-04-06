@@ -122,5 +122,13 @@ describe('Pbkdf2EncryptionService', () => {
     // Keys without DEK (no generateKeyData/loadKeyData)
     await expect(svc.rekey(keys, 'new-password', appId)).rejects.toThrow('No DEK loaded');
   });
+
+  it('throws on invalid encryption keys object', async () => {
+    const svc = createService();
+    const badKeys = { notKek: 'wrong' } as any;
+    const data = new Uint8Array([1, 2, 3]);
+    await expect(svc.encrypt('task.global', data, badKeys)).rejects.toThrow('Invalid encryption keys');
+    await expect(svc.decrypt('task.global', data, badKeys)).rejects.toThrow('Invalid encryption keys');
+  });
 });
 

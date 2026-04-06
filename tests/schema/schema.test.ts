@@ -65,5 +65,10 @@ describe('Schema', () => {
       });
       expect(def.deriveId!({ provider: 'google', userId: '123' })).toBe('google-123');
     });
+
+    it('rejects entity names containing dots', () => {
+      expect(() => defineEntity<{ x: string }>('auth.users'))
+        .toThrow('must not contain dots');
+    });
   });
 });

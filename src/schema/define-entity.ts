@@ -13,6 +13,9 @@ export function defineEntity<T>(
   name: string,
   options?: EntityDefinitionOptions<T>,
 ): EntityDefinition<T> {
+  if (name.includes('.')) {
+    throw new Error(`Entity name "${name}" must not contain dots`);
+  }
   const keyStrategyOption = options?.keyStrategy ?? 'global';
   let keyStrategy: KeyStrategy<T>;
 

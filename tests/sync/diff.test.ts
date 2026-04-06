@@ -100,6 +100,32 @@ describe('diffPartitions', () => {
     expect(result.cloudOnly).toHaveLength(0);
     expect(result.unchanged).toHaveLength(0);
   });
+
+  it('marks diverged when hash matches but count differs', () => {
+    const local: PartitionIndex = {
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
+    };
+    const cloud: PartitionIndex = {
+      '2026-01': { hash: 111, count: 15, deletedCount: 0, updatedAt: 2000 },
+    };
+
+    const result = diffPartitions(local, cloud);
+    expect(result.diverged).toEqual(['2026-01']);
+    expect(result.unchanged).toHaveLength(0);
+  });
+
+  it('marks diverged when hash matches but deletedCount differs', () => {
+    const local: PartitionIndex = {
+      '2026-01': { hash: 111, count: 10, deletedCount: 0, updatedAt: 1000 },
+    };
+    const cloud: PartitionIndex = {
+      '2026-01': { hash: 111, count: 10, deletedCount: 3, updatedAt: 2000 },
+    };
+
+    const result = diffPartitions(local, cloud);
+    expect(result.diverged).toEqual(['2026-01']);
+    expect(result.unchanged).toHaveLength(0);
+  });
 });
 
 describe('loadAllIndexPairs', () => {
