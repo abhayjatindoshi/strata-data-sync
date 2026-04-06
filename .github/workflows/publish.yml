@@ -2,7 +2,7 @@ name: Publish to npm
 
 on:
   push:
-    branches: [main]
+    branches: [main, test/publish-pipeline]
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -45,8 +45,8 @@ jobs:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          PUBLISHED=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>&1 || true)
-          if [ -n "$PUBLISHED" ] && echo "$PUBLISHED" | grep -qv "E404"; then
+          PUBLISHED=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$PACKAGE_VERSION" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Version ${PACKAGE_VERSION} already published, skipping."
           else
@@ -54,6 +54,10 @@ jobs:
             echo "Version ${PACKAGE_VERSION} not yet published."
           fi
 
+      - name: Publish to npm (dry-run)
+        if: steps.version-check.outputs.skip != 'true' && github.ref != 'refs/heads/main'
+        run: npm publish --provenance --access public --dry-run
+
       - name: Publish to npm
-        if: steps.version-check.outputs.skip != 'true'
+        if: steps.version-check.outputs.skip != 'true' && github.ref == 'refs/heads/main'
         run: npm publish --provenance --access public
