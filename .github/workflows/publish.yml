@@ -56,7 +56,10 @@ jobs:
 
       - name: Publish to npm
         if: steps.version-check.outputs.skip != 'true'
+        env:
+          NODE_AUTH_TOKEN: ''
         run: |
-          # Strip token-based auth so npm uses native OIDC exchange for trusted publishers
-          sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
+          # Overwrite .npmrc with just registry URL — no auth token line
+          # This forces npm to use native OIDC token exchange for trusted publishers
+          echo "registry=https://registry.npmjs.org/" > "$NPM_CONFIG_USERCONFIG"
           npm publish --provenance --access public
