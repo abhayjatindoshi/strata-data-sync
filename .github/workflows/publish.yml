@@ -35,6 +35,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          registry-url: https://registry.npmjs.org
 
       - run: npm ci
       - run: npm run build
@@ -55,4 +56,7 @@ jobs:
 
       - name: Publish to npm
         if: steps.version-check.outputs.skip != 'true'
-        run: npm publish --provenance --access public
+        run: |
+          # Strip token-based auth so npm uses native OIDC exchange for trusted publishers
+          sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
+          npm publish --provenance --access public
