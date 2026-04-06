@@ -1,25 +1,37 @@
 {
   "name": "strata-data-sync",
-  "version": "1.0.0",
+  "version": "0.1.1",
   "description": "`strata-data-sync`",
-  "license": "ISC",
-  "author": "",
+  "homepage": "https://github.com/abhayjatindoshi/strata-data-sync#readme",
+  "bugs": {
+    "url": "https://github.com/abhayjatindoshi/strata-data-sync/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhayjatindoshi/strata-data-sync.git"
+  },
+  "license": "MIT",
+  "author": "Abhay Jatin Doshi <ajd1996@hotmail.com>",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc",
-    "lint": "eslint .",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "rxjs": "^7.8.2"
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "eslint": "^10.1.0",
+    "@types/debug": "^4.1.13",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.1",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "debug": "^4.4.3",
+    "rxjs": "^7.8.2"
   }
 }

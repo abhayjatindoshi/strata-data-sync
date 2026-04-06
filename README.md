@@ -1,71 +1,116 @@
 # Strata
-`strata-data-sync`
 
-An offline-first, reactive data framework for TypeScript applications that need to store data locally and optionally synchronize it to the cloud. It handles the full lifecycle: entity definition, identity generation, partitioned storage, multi-tier persistence, automatic synchronization, conflict resolution, and reactive UI bindings.
+[![CI](https://github.com/abhayjatindoshi/strata-data-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/abhayjatindoshi/strata-data-sync/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/abhayjatindoshi/strata-data-sync/branch/main/graph/badge.svg)](https://codecov.io/gh/abhayjatindoshi/strata-data-sync)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
----
+An offline-first, reactive data framework for TypeScript/JavaScript. Strata handles entity storage, multi-device sync via cloud blob storage, HLC-based conflict resolution, multi-tenancy, encryption, and reactive UI bindings.
 
-## What It Does
+## Install
 
-The framework lets an application define domain entities as lightweight TypeScript type tokens, persist them across three storage tiers (in-memory, local, cloud), and keep all tiers in sync automatically. The application interacts with a single repository API for reads and writes. Everything else — lazy loading from lower tiers, dirty tracking, sync scheduling, conflict resolution, and reactive change propagation — happens behind the scenes.
+```bash
+npm install strata-data-sync
+```
 
 ## Quick Start
 
 ```typescript
-import { defineEntity, createStrata } from "strata-data-sync";
+import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
 
-// 1. Define entities — lightweight type tokens, no schema library needed
-const Transaction = defineEntity<{
-  amount: number;
-  date: Date;
-  accountId: string;
-}>("Transaction");
+// 1. Define your entities
+type Task = { title: string; done: boolean };
+const taskDef = defineEntity<Task>('task');
 
-const Account = defineEntity<{
-  name: string;
-  balance: number;
-}>("Account");
-
-// 2. Create the framework instance
-const strata = createStrata({
-  entities: [Transaction, Account],
-  localAdapter: myLocalAdapter,        // app-implemented blob storage
-  keyStrategy: dateKeyStrategy({ period: "year" }),
-  deviceId: "phone_1",
+// 2. Create a Strata instance
+const strata = new Strata({
+  appId: 'my-app',
+  entities: [taskDef],
+  localAdapter: new MemoryBlobAdapter(),
+  deviceId: 'device-1',
 });
 
-// 3. Load a tenant and start working
-await strata.load("default");
+// 3. Create and load a tenant
+const tenant = await strata.tenants.create({ name: 'My Workspace', meta: {} });
+await strata.loadTenant(tenant.id);
 
-// 4. Use type-safe repositories — zero casts
-const txnRepo = strata.repo(Transaction);
+// 4. Use the repository
+const tasks = strata.repo(taskDef);
+const id = tasks.save({ title: 'Hello Strata', done: false });
+console.log(tasks.get(id));        // { title: 'Hello Strata', done: false, id: '...', ... }
+console.log(tasks.query().length); // 1
 
-const id = await txnRepo.save({ amount: 50, date: new Date(), accountId: "acct_1" });
-const txn = await txnRepo.get(id);    // fully typed: { id, createdAt, ..., amount, date, accountId }
+// 5. Clean up
+await strata.dispose();
+```
 
-txnRepo.observe(id).subscribe(t => {
-  console.log(t?.amount);             // ✅ number, no cast
+## Features
+
+| Feature | Description |
+|---|---|
+| **Offline-first** | In-memory Map is the source of truth. All reads are synchronous. |
+| **Multi-device sync** | Three-phase sync: hydrate on load, periodic persist, manual full sync via any blob storage. |
+| **Conflict resolution** | HLC-based (Hybrid Logical Clock) last-writer-wins with tombstone support. |
+| **Reactive** | RxJS Observables for entity changes, queries, and dirty state. |
+| **Multi-tenancy** | Isolated workspaces with metadata-based storage routing and tenant sharing. |
+| **Encryption** | Per-tenant password-protected encryption with automatic detection. |
+| **Migrations** | Lazy blob migrations that transform stored data to new formats on read. |
+| **Pluggable storage** | One `StorageAdapter` interface — implement for IndexedDB, filesystem, S3, or any backend. |
+
+## Configuration
+
+```typescript
+const strata = new Strata({
+  appId: 'my-app',                    // unique app identifier
+  entities: [taskDef, noteDef],       // entity definitions
+  localAdapter: myStorageAdapter,     // BlobAdapter or StorageAdapter
+  cloudAdapter: myCloudAdapter,       // optional — enables sync
+  deviceId: 'device-1',              // unique per device
+  migrations: [...],                  // optional — blob migrations
+  options: {
+    localFlushIntervalMs: 2000,       // memory → local flush interval (default: 2s)
+    cloudSyncIntervalMs: 300000,      // local → cloud sync interval (default: 5m)
+  },
 });
 ```
 
-## Documentation
+## Lifecycle
+
+```
+new Strata(config) → loadTenant(id) → use repos → dispose()
+```
+
+1. **`new Strata(config)`** — creates instance, validates entity definitions
+2. **`strata.loadTenant(tenantId)`** — loads tenant, hydrates data from local/cloud adapters
+3. **Use repos** — `strata.repo(entityDef)` for CRUD, queries, and reactive observations
+4. **`strata.dispose()`** — flushes pending data to storage, stops sync, cleans up
+
+## Guides
+
+| Guide | Description |
+|---|---|
+| [Getting Started](docs/guides/getting-started.md) | Installation, first entity, and basic usage |
+| [Entities & Repositories](docs/guides/entities-repositories.md) | Key strategies, queries, CRUD operations |
+| [Reactive Observations](docs/guides/reactive.md) | Observe entity changes with RxJS |
+| [Storage Adapters](docs/guides/storage-adapters.md) | Implement custom persistence backends |
+| [Sync & Offline](docs/guides/sync.md) | Cloud sync and conflict resolution |
+| [Encryption](docs/guides/encryption.md) | Per-tenant encryption setup |
+| [Multi-Tenancy](docs/guides/multi-tenancy.md) | Tenant management and sharing |
+| [Migrations](docs/guides/migrations.md) | Data schema evolution |
+
+## Design Documents
 
 | Document | Description |
-|----------|-------------|
-| [Architecture](docs/architecture.md) | Three-tier storage (in-memory → local → cloud), lazy loading |
-| [Entities & Type System](docs/entities.md) | `defineEntity`, base fields, framework entities, type inference deep dive |
-| [Partitioning](docs/partitioning.md) | Entity keys, partition strategies, identity format, blob persistence format |
-| [Sync & Conflict Resolution](docs/sync.md) | Dirty tracking, metadata-first sync, HLC clocks, resolution rules |
-| [Multi-Tenancy](docs/tenancy.md) | Tenant isolation, lifecycle, extending tenant shape |
-| [API Reference](docs/api.md) | Initialization, repository API, tenant manager, query options, adapters, React integration |
+|---|---|
+| [Architecture Overview](docs/design/architecture.md) | High-level component diagram, design principles, data flow summary |
+| [Schema & Repository](docs/design/schema-repository.md) | Entity definitions, ID generation, key strategies, repository API surface |
+| [Adapter Contract](docs/design/adapter.md) | `BlobAdapter` interface, `meta` per-call, transform pipeline |
+| [Tenant System](docs/design/tenant.md) | Multi-tenancy, `meta`, tenant lifecycle, sharing, tenant list storage |
+| [Persistence & Sync](docs/design/persistence-sync.md) | Serialization, hashing, flush timing, sync phases, conflict resolution, tombstones |
+| [Reactive Layer](docs/design/reactive.md) | Event bus, shared subjects, observables, change detection, batch writes |
+| [App Lifecycle](docs/design/lifecycle.md) | Full lifecycle sequence diagram (init → tenant → query → save → sync → dispose) |
+| [Decisions Tracker](docs/design/decisions.md) | All accepted, rejected, and future decisions with rationale |
 
-## Design Principles
+## License
 
-- **Offline-first** — the app works fully without a network. Cloud sync is opportunistic.
-- **Zero-cast type safety** — entity types flow from definition tokens through repositories, queries, and observables without any manual casting.
-- **Deterministic serialization** — all blobs serialize with sorted keys so identical data always produces the same hash.
-- **Metadata-driven sync** — never load entity data unless metadata proves something has changed.
-- **Event-driven reactivity** — every mutation emits an event. Observers are always consistent with the latest state.
-- **Partition isolation** — operations on one partition never affect another. Sync, loading, and hashing are all per-partition.
-- **Delete tracking** — deletions are recorded, not erased, allowing sync to propagate deletes correctly.
-- **Global adapters** — storage adapters are stateless singletons, key-based, with no awareness of tenants or entity types.
+MIT

@@ -1,0 +1,59 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx vitest run
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Check if version already published
+        id: version-check
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>&1 || true)
+          if [ -n "$PUBLISHED" ] && echo "$PUBLISHED" | grep -qv "E404"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${PACKAGE_VERSION} already published, skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${PACKAGE_VERSION} not yet published."
+          fi
+
+      - name: Publish to npm
+        if: steps.version-check.outputs.skip != 'true'
+        run: npm publish --provenance --access public
