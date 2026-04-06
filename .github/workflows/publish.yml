@@ -54,6 +54,17 @@ jobs:
             echo "Version ${PACKAGE_VERSION} not yet published."
           fi
 
+      - name: Debug OIDC token claims
+        if: steps.version-check.outputs.skip != 'true'
+        run: |
+          echo "Ref: $GITHUB_REF"
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Workflow: $GITHUB_WORKFLOW"
+          echo "Actor: $GITHUB_ACTOR"
+          echo "Registry URL from npmrc:"
+          cat ~/.npmrc || true
+          npm whoami 2>&1 || echo "npm whoami failed (expected without token)"
+
       - name: Publish to npm
         if: steps.version-check.outputs.skip != 'true'
         run: npm publish --provenance --access public
