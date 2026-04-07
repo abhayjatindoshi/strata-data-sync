@@ -47,6 +47,32 @@ try {
 
 Import `InvalidEncryptionKeyError` from `strata-data-sync` if you need to catch it specifically.
 
+## Encryption Service Setup
+
+Strata defines the `EncryptionService` interface but does not ship concrete implementations. Install `strata-adapters` for the built-in PBKDF2 + AES-GCM implementation:
+
+```bash
+npm install strata-adapters
+```
+
+```typescript
+import { Strata, defineEntity } from 'strata-data-sync';
+import { Pbkdf2EncryptionService, AesGcmEncryptionStrategy } from 'strata-adapters/encryption';
+
+const encryptionService = new Pbkdf2EncryptionService({
+  targets: ['local'],
+  strategy: new AesGcmEncryptionStrategy(),
+});
+
+const strata = new Strata({
+  appId: 'my-app',
+  entities: [taskDef],
+  localAdapter: storage,
+  encryptionService,
+  deviceId: 'device-1',
+});
+```
+
 ## Changing Passwords
 
 ```typescript

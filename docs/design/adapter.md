@@ -174,7 +174,7 @@ All encrypted files (including `__strata`) use this format. The `__tenants` file
 | `encrypt(data, key)` | Encrypts a `Uint8Array` with AES-256-GCM (prepends version + IV) |
 | `decrypt(data, key)` | Decrypts a `Uint8Array` (reads version + IV from prefix) |
 
-`InvalidEncryptionKeyError` is thrown when decryption fails due to a wrong password.
+`InvalidEncryptionKeyError` is thrown when decryption fails due to a wrong password. This error class is defined in `strata-data-sync`. Concrete encryption implementations (e.g., `Pbkdf2EncryptionService`, `AesGcmEncryptionStrategy`) are provided by the `strata-adapters` package.
 
 ### `EncryptionTransformService`
 

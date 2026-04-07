@@ -7,7 +7,9 @@
     "start": "tsx"
   },
   "dependencies": {
-    "strata-data-sync": "file:.."
+    "strata-data-sync": "^0.1.0",
+    "strata-adapters": "^0.1.0",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

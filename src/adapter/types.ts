@@ -36,3 +36,10 @@ export const noopEncryptionService: EncryptionService = {
   rekey: async (keys) => ({ keys }),
 };
 
+export class InvalidEncryptionKeyError extends Error {
+  constructor(message = 'Invalid encryption key') {
+    super(message);
+    this.name = 'InvalidEncryptionKeyError';
+  }
+}
+

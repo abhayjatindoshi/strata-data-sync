@@ -1,4 +1,5 @@
-import { Strata, LocalStorageAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, defineEntity } from 'strata-data-sync';
+import { LocalStorageAdapter } from 'strata-adapters';
 
 // ─── Entity Definitions ──────────────────────────────────
 

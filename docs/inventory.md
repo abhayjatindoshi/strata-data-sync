@@ -22,21 +22,14 @@ Auto-generated inventory of all symbols.
 
 | File | Name | Kind | Exported | Description |
 |------|------|------|----------|-------------|
-| encryption.ts | `Pbkdf2Keys` | type | no | Internal KEK/DEK pair type for PBKDF2 encryption service |
-| encryption.ts | `InvalidEncryptionKeyError` | class | yes | Error thrown when decryption fails with invalid key |
-| encryption.ts | `AesGcmEncryptionStrategy` | class | yes | Stateless AES-GCM encryption strategy implementing EncryptionStrategy\<CryptoKey\> |
-| encryption.ts | `Pbkdf2EncryptionService` | class | yes | Encryption service using PBKDF2 key derivation with KEK/DEK separation |
 | keys.ts | `partitionBlobKey` | function | yes | Generates composite blob key from entity name and partition |
-| local-storage.ts | `LocalStorageAdapter` | class | yes | Browser localStorage adapter implementing StorageAdapter |
 | memory-storage.ts | `MemoryStorageAdapter` | class | yes | In-memory adapter implementing StorageAdapter for testing |
-| transforms/gzip.ts | `withGzip` | function | yes | Wraps adapter with gzip compression/decompression |
-| transforms/retry.ts | `RetryOptions` | type | yes | Configuration for retry logic (maxRetries, delayMs, onRetry) |
-| transforms/retry.ts | `withRetries` | function | no | Internal async helper with exponential retry logic |
-| transforms/retry.ts | `withRetry` | function | yes | Wraps adapter with configurable retry behavior |
-| types.ts | `StorageAdapter` | type | yes | Adapter interface for read/write/delete/list blob storage operations |
+| types.ts | `StorageAdapter` | type | yes | Adapter interface for read/write/delete blob storage operations |
 | types.ts | `EncryptionStrategy` | type | yes | Generic encryption/decryption interface for cipher implementations |
 | types.ts | `EncryptionKeys` | type | yes | Opaque type representing encryption keys |
 | types.ts | `EncryptionService` | type | yes | Service interface for encryption lifecycle, key derivation, and rekeying |
+| types.ts | `noopEncryptionService` | const | yes | No-op encryption service passthrough |
+| types.ts | `InvalidEncryptionKeyError` | class | yes | Error thrown when decryption fails with invalid key |
 | types.ts | `Tenant` | type | yes | Re-export of Tenant type from @strata/tenant |
 | types.ts | `noopEncryptionService` | constant | yes | No-op encryption service that passes data through unchanged |
 

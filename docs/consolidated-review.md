@@ -92,14 +92,14 @@
 > **Rationale**: Salt is always exactly 16 bytes (fixed length from crypto.getRandomValues). With a fixed-length prefix, there is no ambiguity — the salt boundary is always at byte 16. The example given (variable-length salt) cannot occur.
 
 #### S3. All decrypt errors masked as `InvalidEncryptionKeyError`
-**File**: `src/adapter/encryption.ts` (lines ~49–51)
+**File**: `strata-adapters: src/encryption/encryption.ts`
 **Flagged by**: Opus, GPT-5.4
 **Resolution**: By Design
 **Impact**: In `AesGcmEncryptionStrategy.decrypt()`, any error during decryption is caught and rethrown as `InvalidEncryptionKeyError`. Network errors, memory errors, auth tag mismatches, and malformed ciphertext are all misreported as authentication failures. Client code cannot distinguish actual key errors from system errors, hiding real problems and making debugging impossible.
 > **Rationale**: This is intentional crypto best practice — leaking specific decryption error types creates an error oracle that aids chosen-ciphertext attacks. All failures should appear identical to the caller. The strategy layer operates only on in-memory byte arrays, so network errors cannot reach this code path.
 
 #### S4. Unsafe type cast of keys to `Pbkdf2Keys` without validation
-**File**: `src/adapter/encryption.ts` (lines ~54, 73, 85, 118, 130)
+**File**: `strata-adapters: src/encryption/encryption.ts`
 **Flagged by**: Sonnet, GPT-5.4, Codex
 **Resolution**: **Fixed** — Added runtime guard in `castKeys()` checking for `kek` property before cast
 **Impact**: Multiple methods (`castKeys`, `encrypt`, `decrypt`, `generateKeyData`, `loadKeyData`, `rekey`) use unchecked `as Pbkdf2Keys` casts. If a wrong key structure is passed, accessing `kek`/`dek` properties returns `undefined`, potentially causing silent encryption bypass (data stored unencrypted) or cryptic runtime errors.

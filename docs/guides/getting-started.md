@@ -9,7 +9,7 @@ npm install strata-data-sync
 ## Quick Start
 
 ```typescript
-import { Strata, MemoryBlobAdapter, defineEntity } from 'strata-data-sync';
+import { Strata, MemoryStorageAdapter, defineEntity } from 'strata-data-sync';
 
 // 1. Define your entities
 type Task = { title: string; done: boolean };
@@ -19,7 +19,7 @@ const taskDef = defineEntity<Task>('task');
 const strata = new Strata({
   appId: 'my-app',
   entities: [taskDef],
-  localAdapter: new MemoryBlobAdapter(),
+  localAdapter: new MemoryStorageAdapter(),
   deviceId: 'device-1',
 });
 

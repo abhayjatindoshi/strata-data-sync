@@ -1,10 +1,8 @@
 import {
   Strata,
-  Pbkdf2EncryptionService,
-  AesGcmEncryptionStrategy,
   defineEntity,
-  InvalidEncryptionKeyError,
 } from 'strata-data-sync';
+import { Pbkdf2EncryptionService, AesGcmEncryptionStrategy, InvalidEncryptionKeyError } from 'strata-adapters';
 import { FsStorageAdapter, tmpDirFor, cleanTmpDir, printTree } from './common';
 
 type Note = { title: string; body: string };
