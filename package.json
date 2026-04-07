@@ -1,6 +1,6 @@
 {
   "name": "strata-data-sync",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "`strata-data-sync`",
   "homepage": "https://github.com/abhayjatindoshi/strata-data-sync#readme",
   "bugs": {
@@ -19,7 +19,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
     "dev": "tsc -p tsconfig.build.json --watch",
     "test": "vitest run"
   },
