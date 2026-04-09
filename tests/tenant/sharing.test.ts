@@ -1,7 +1,7 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
 import { noopEncryptionService } from '@strata/adapter';
-import type { Tenant } from '@strata/adapter';
+import type { Tenant, StorageAdapter } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
 import type { EntityStore } from '@strata/store';
@@ -47,13 +47,22 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
   };
 }
 
+function cloudWithDerive(fn: (meta: Record<string, unknown>) => string): StorageAdapter {
+  return {
+    read: async () => null,
+    write: async () => {},
+    delete: async () => false,
+    deriveTenantId: fn,
+  };
+}
+
 describe('Sharing flow', () => {
   it('join reads marker blob and detects existing workspace', async () => {
     const adapter = createDataAdapter();
     const tempTenant = makeTenant('shared-id', { folder: 'shared' });
     await writeMarkerBlob(adapter, tempTenant, ['transaction'], DEFAULT_OPTIONS);
 
-    const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'shared-id' }));
+    const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'shared-id') }));
     const tenant = await tm.join({ meta: { folder: 'shared' }, name: 'Project X' });
     expect(tenant).toBeDefined();
     expect(tenant.name).toBe('Project X');
@@ -65,14 +74,14 @@ describe('Sharing flow', () => {
 
     // User A creates
     const adapterA = createDataAdapter();
-    const tmA = new TenantManager(makeDeps(adapterA, { deriveTenantId: deriveFn }));
+    const tmA = new TenantManager(makeDeps(adapterA, { rawCloudAdapter: cloudWithDerive(deriveFn) }));
     const tenantA = await tmA.create({ name: 'Project X', meta: { folderId: 'abc12345' } });
 
     // User B sets up (separate adapter simulating separate device, marker blob must exist)
     const adapterB = createDataAdapter();
     const tenantRefB = makeTenant('abc1', { folderId: 'abc12345' });
     await writeMarkerBlob(adapterB, tenantRefB, [], DEFAULT_OPTIONS);
-    const tmB = new TenantManager(makeDeps(adapterB, { deriveTenantId: deriveFn }));
+    const tmB = new TenantManager(makeDeps(adapterB, { rawCloudAdapter: cloudWithDerive(deriveFn) }));
     const tenantB = await tmB.join({ meta: { folderId: 'abc12345' } });
 
     expect(tenantA.id).toBe('abc1');
@@ -87,7 +96,7 @@ describe('Sharing flow', () => {
     await writeMarkerBlob(adapter, tempTenant, [], DEFAULT_OPTIONS);
     await saveTenantPrefs(adapter, tempTenant, { name: 'Team Project' });
 
-    const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'prefs-id' }));
+    const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'prefs-id') }));
     const tenant = await tm.join({ meta: { folder: 'shared' } });
 
     expect(tenant.name).toBe('Team Project');
@@ -100,7 +109,7 @@ describe('Sharing flow', () => {
     await writeMarkerBlob(adapter, tempTenant, [], DEFAULT_OPTIONS);
     await saveTenantPrefs(adapter, tempTenant, { name: 'From Prefs' });
 
-    const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'prefs-id2' }));
+    const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'prefs-id2') }));
     const tenant = await tm.join({ meta: { folder: 'shared' }, name: 'From Opts' });
 
     expect(tenant.name).toBe('From Prefs');
@@ -108,7 +117,7 @@ describe('Sharing flow', () => {
 
   it('rejects location without valid marker blob', async () => {
     const adapter = createDataAdapter();
-    const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'no-data' }));
+    const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'no-data') }));
 
     await expect(tm.join({ meta: { folder: 'empty' } })).rejects.toThrow(
       'No strata workspace found',
@@ -121,7 +130,7 @@ describe('Sharing flow', () => {
     const marker = { version: 99, createdAt: new Date(), entityTypes: [] };
     await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
 
-    const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'bad-ver' }));
+    const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'bad-ver') }));
     await expect(tm.join({ meta: {} })).rejects.toThrow(
       'Incompatible strata workspace version',
     );

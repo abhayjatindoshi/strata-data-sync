@@ -44,7 +44,6 @@ export type StrataConfig = {
   readonly localAdapter: StorageAdapter;
   readonly cloudAdapter?: StorageAdapter;
   readonly deviceId: string;
-  readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
   readonly migrations?: ReadonlyArray<BlobMigration>;
   readonly encryptionService?: EncryptionService;
   readonly options?: StrataOptions;
@@ -137,7 +136,7 @@ export class Strata {
       options: resolvedOptions,
       appId: config.appId,
       entityTypes: config.entities.map(d => d.name),
-      deriveTenantId: config.deriveTenantId,
+      rawCloudAdapter: config.cloudAdapter,
     });
 
     this.dirtySubscription = this.eventBus.all$.pipe(

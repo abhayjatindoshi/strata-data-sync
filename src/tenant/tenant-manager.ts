@@ -35,7 +35,7 @@ export type TenantManagerDeps = {
   readonly options: ResolvedStrataOptions;
   readonly appId: string;
   readonly entityTypes: readonly string[];
-  readonly deriveTenantId?: (meta: Record<string, unknown>) => string;
+  readonly rawCloudAdapter?: StorageAdapter;
 };
 
 export class TenantManager implements TenantManagerType {
@@ -66,8 +66,8 @@ export class TenantManager implements TenantManagerType {
   }
 
   private deriveId(meta: Record<string, unknown>): string {
-    if (this.deps.deriveTenantId) {
-      return this.deps.deriveTenantId(meta);
+    if (this.deps.rawCloudAdapter?.deriveTenantId) {
+      return this.deps.rawCloudAdapter.deriveTenantId(meta);
     }
     return generateId();
   }

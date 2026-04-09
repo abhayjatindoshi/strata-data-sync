@@ -16,12 +16,12 @@ const TaskDef = defineEntity<Task>('task');
 
 // ── Shared cloud adapter (simulates a remote backend) ───
 
-const sharedCloud = new MemoryStorageAdapter();
+const sharedCloud = Object.assign(new MemoryStorageAdapter(), {
+  // Cloud adapter owns tenant ID derivation — same folder = same tenant ID
+  deriveTenantId: (meta: Record<string, unknown>) =>
+    `shared-${(meta.folderId as string).substring(0, 4)}`,
+});
 const sharedCloudDa: DataAdapter = new EncryptedDataAdapter(sharedCloud, noopEncryptionService, new TenantContext());
-
-// Both users derive the same tenant ID from the folder metadata
-const deriveTenantId = (meta: Record<string, unknown>) =>
-  `shared-${(meta.folderId as string).substring(0, 4)}`;
 
 // ── Main ─────────────────────────────────────────────────
 
@@ -42,7 +42,6 @@ async function main() {
     localAdapter: storageA,
     cloudAdapter: sharedCloud,
     deviceId: 'device-A',
-    deriveTenantId,
   });
 
   const tenantA = await strataA.tenants.create({
@@ -81,8 +80,8 @@ async function main() {
     appId: 'sharing-demo',
     entities: [TaskDef],
     localAdapter: sharedCloud,  // User B reads directly from cloud for setup
+    cloudAdapter: sharedCloud,  // Cloud adapter provides deriveTenantId
     deviceId: 'device-B',
-    deriveTenantId,
   });
 
   // join() detects the existing workspace via the marker blob

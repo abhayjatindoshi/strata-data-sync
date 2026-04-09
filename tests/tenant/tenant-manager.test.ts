@@ -1,7 +1,7 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
 import { noopEncryptionService, InvalidEncryptionKeyError, MemoryStorageAdapter } from '@strata/adapter';
-import type { Tenant } from '@strata/adapter';
+import type { Tenant, StorageAdapter } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { SyncEvent } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
@@ -36,6 +36,15 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
     appId: 'test-app',
     entityTypes: [],
     ...overrides,
+  };
+}
+
+function cloudWithDerive(fn: (meta: Record<string, unknown>) => string): StorageAdapter {
+  return {
+    read: async () => null,
+    write: async () => {},
+    delete: async () => false,
+    deriveTenantId: fn,
   };
 }
 
@@ -97,7 +106,7 @@ describe('TenantManager', () => {
 
     it('returns exists: true with unencrypted marker', async () => {
       const adapter = createDataAdapter();
-      const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'probe-id' }));
+      const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'probe-id') }));
       const tempTenant = { id: 'probe-id', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, {
         __system: { marker: { version: 1, createdAt: new Date().toISOString(), entityTypes: [] } },
@@ -125,7 +134,7 @@ describe('TenantManager', () => {
       };
       const tm = new TenantManager(makeDeps(adapter, {
         adapter: failAdapter,
-        deriveTenantId: () => 'fail-id',
+        rawCloudAdapter: cloudWithDerive(() => 'fail-id'),
       }));
       const result = await tm.probe({ meta: {} });
       expect(result.exists).toBe(true);
@@ -147,7 +156,7 @@ describe('TenantManager', () => {
       };
       const tm = new TenantManager(makeDeps(adapter, {
         adapter: failAdapter,
-        deriveTenantId: () => 'err-id',
+        rawCloudAdapter: cloudWithDerive(() => 'err-id'),
       }));
       await expect(tm.probe({ meta: {} })).rejects.toThrow('disk failure');
     });
@@ -170,10 +179,10 @@ describe('TenantManager', () => {
       expect(tenant.id).toHaveLength(8);
     });
 
-    it('derives ID from meta when deriveTenantId is configured', async () => {
+    it('derives ID from meta when cloud adapter has deriveTenantId', async () => {
       const adapter = createDataAdapter();
       const tm = new TenantManager(makeDeps(adapter, {
-        deriveTenantId: (meta) => (meta as { folderId: string }).folderId.substring(0, 4),
+        rawCloudAdapter: cloudWithDerive((meta) => (meta as { folderId: string }).folderId.substring(0, 4)),
       }));
       const tenant = await tm.create({ name: 'Shared', meta: { folderId: 'abcdefgh' } });
       expect(tenant.id).toBe('abcd');
@@ -235,7 +244,7 @@ describe('TenantManager', () => {
       const tempTenant: Tenant = { id: 'shared-id', name: 'Shared', encrypted: false, meta: { folder: 'shared' }, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
 
-      const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'shared-id' }));
+      const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'shared-id') }));
       const tenant = await tm.join({ meta: { folder: 'shared' }, name: 'Shared' });
       expect(tenant.name).toBe('Shared');
       const list = await tm.list();
@@ -257,7 +266,7 @@ describe('TenantManager', () => {
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
 
       const tm = new TenantManager(makeDeps(adapter, {
-        deriveTenantId: () => 'derived-id',
+        rawCloudAdapter: cloudWithDerive(() => 'derived-id'),
       }));
       const t1 = await tm.join({ meta: { folder: 'f1' } });
       const t2 = await tm.join({ meta: { folder: 'f1' } });
@@ -272,7 +281,7 @@ describe('TenantManager', () => {
       const tempTenant: Tenant = { id: 'default-id', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
 
-      const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'default-id' }));
+      const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'default-id') }));
       const tenant = await tm.join({ meta: {} });
       expect(tenant.name).toBe('Shared Workspace');
     });
@@ -283,7 +292,7 @@ describe('TenantManager', () => {
       const tempTenant: Tenant = { id: 'bad-ver', name: '', encrypted: false, meta: {}, createdAt: new Date(), updatedAt: new Date() };
       await adapter.write(tempTenant, DEFAULT_OPTIONS.markerKey, { __system: { marker }, deleted: {} });
 
-      const tm = new TenantManager(makeDeps(adapter, { deriveTenantId: () => 'bad-ver' }));
+      const tm = new TenantManager(makeDeps(adapter, { rawCloudAdapter: cloudWithDerive(() => 'bad-ver') }));
       await expect(tm.join({ meta: {} })).rejects.toThrow('Incompatible strata workspace version');
     });
 
@@ -302,7 +311,7 @@ describe('TenantManager', () => {
       };
       const tm = new TenantManager(makeDeps(adapter, {
         adapter: failAdapter,
-        deriveTenantId: () => 'enc-join',
+        rawCloudAdapter: cloudWithDerive(() => 'enc-join'),
       }));
       const tenant = await tm.join({ meta: {} });
       expect(tenant.encrypted).toBe(true);

@@ -144,12 +144,15 @@ describe('Tenant integration', () => {
 
     await writeMarkerBlob(wrapAdapter(localAdapter), tempTenant, ['task'], resolveOptions());
 
+    const cloudAdapter = Object.assign(new MemoryStorageAdapter(), {
+      deriveTenantId: deriveFn,
+    });
     const strata = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
       localAdapter,
+      cloudAdapter,
       deviceId: 'dev-1',
-      deriveTenantId: deriveFn,
     }));
     const tenant = await strata.tenants.join({ meta, name: 'Shared Project' });
     expect(tenant).toBeDefined();
@@ -169,7 +172,7 @@ describe('Tenant integration', () => {
     ).rejects.toThrow('No strata workspace found');
   });
 
-  it('two devices share tenant via deriveTenantId', async () => {
+  it('two devices share tenant via cloud adapter deriveTenantId', async () => {
     const deriveFn = (meta: Record<string, unknown>) =>
       (meta as { folderId: string }).folderId.substring(0, 6);
 
@@ -177,12 +180,15 @@ describe('Tenant integration', () => {
 
     // Device A creates
     const localA = new MemoryStorageAdapter();
+    const cloudA = Object.assign(new MemoryStorageAdapter(), {
+      deriveTenantId: deriveFn,
+    });
     const strataA2 = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
       localAdapter: localA,
+      cloudAdapter: cloudA,
       deviceId: 'dev-A',
-      deriveTenantId: deriveFn,
     }));
     const tenantA = await strataA2.tenants.create({ name: 'Shared', meta });
 
@@ -190,12 +196,15 @@ describe('Tenant integration', () => {
     const localB = new MemoryStorageAdapter();
     const tenantRefB: Tenant = { id: deriveFn(meta), name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };
     await writeMarkerBlob(wrapAdapter(localB), tenantRefB, ['task'], resolveOptions());
+    const cloudB = Object.assign(new MemoryStorageAdapter(), {
+      deriveTenantId: deriveFn,
+    });
     const strataB2 = track(new Strata({
       appId: 'test',
       entities: [TaskDef],
       localAdapter: localB,
+      cloudAdapter: cloudB,
       deviceId: 'dev-B',
-      deriveTenantId: deriveFn,
     }));
     const tenantB = await strataB2.tenants.join({ meta });
 
