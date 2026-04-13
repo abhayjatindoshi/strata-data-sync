@@ -5,7 +5,7 @@ import { createHlc } from '@strata/hlc';
 import type { Hlc } from '@strata/hlc';
 import type { StorageAdapter, EncryptionService } from '@strata/adapter';
 import {
-  noopEncryptionService,
+  NOOP_ENCRYPTION_SERVICE,
 } from '@strata/adapter';
 import type { Tenant } from '@strata/adapter';
 import type { EntityDefinition } from '@strata/schema';
@@ -94,7 +94,7 @@ export class Strata {
     if (config.migrations) validateMigrations(config.migrations);
     this.config = config;
     const resolvedOptions = resolveOptions(config.options);
-    const encryptionService = config.encryptionService ?? noopEncryptionService;
+    const encryptionService = config.encryptionService ?? NOOP_ENCRYPTION_SERVICE;
 
     const store = new Store(resolvedOptions);
     this.tenantContext = new TenantContext();

@@ -3,7 +3,7 @@ import {
   MemoryStorageAdapter,
   defineEntity,
   saveTenantPrefs,
-  noopEncryptionService,
+  NOOP_ENCRYPTION_SERVICE,
 } from 'strata-data-sync';
 import { EncryptedDataAdapter, type DataAdapter } from 'strata-data-sync';
 import { TenantContext } from 'strata-data-sync';
@@ -21,7 +21,7 @@ const sharedCloud = Object.assign(new MemoryStorageAdapter(), {
   deriveTenantId: (meta: Record<string, unknown>) =>
     `shared-${(meta.folderId as string).substring(0, 4)}`,
 });
-const sharedCloudDa: DataAdapter = new EncryptedDataAdapter(sharedCloud, noopEncryptionService, new TenantContext());
+const sharedCloudDa: DataAdapter = new EncryptedDataAdapter(sharedCloud, NOOP_ENCRYPTION_SERVICE, new TenantContext());
 
 // ── Main ─────────────────────────────────────────────────
 

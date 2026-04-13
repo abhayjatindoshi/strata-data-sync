@@ -27,7 +27,7 @@ export type EncryptionService = {
   rekey(keys: EncryptionKeys, credential: string, appId: string): Promise<{ keys: EncryptionKeys; keyData?: Record<string, unknown> }>;
 };
 
-export const noopEncryptionService: EncryptionService = {
+export const NOOP_ENCRYPTION_SERVICE: EncryptionService = {
   targets: [],
   encrypt: async (_blobKey, data) => data,
   decrypt: async (_blobKey, data) => data,

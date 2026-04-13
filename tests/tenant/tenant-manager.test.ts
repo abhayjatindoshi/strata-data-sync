@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { noopEncryptionService, InvalidEncryptionKeyError, MemoryStorageAdapter } from '@strata/adapter';
+import { NOOP_ENCRYPTION_SERVICE, InvalidEncryptionKeyError, MemoryStorageAdapter } from '@strata/adapter';
 import type { Tenant, StorageAdapter } from '@strata/adapter';
 import type { SyncEngineType } from '@strata/sync';
 import type { SyncEvent } from '@strata/sync';
@@ -30,7 +30,7 @@ function makeDeps(adapter: DataAdapter, overrides?: Partial<TenantManagerDeps>):
     syncEventBus: new EventBus<SyncEvent>(),
     store: { clear: () => {} } as unknown as EntityStore,
     dirtyTracker: { value: false, value$: { pipe: () => ({}) }, set: () => {}, clear: () => {} } as unknown as ReactiveFlag,
-    encryptionService: noopEncryptionService,
+    encryptionService: NOOP_ENCRYPTION_SERVICE,
     tenantContext: new TenantContext(),
     options: DEFAULT_OPTIONS,
     appId: 'test-app',
@@ -445,7 +445,7 @@ describe('TenantManager', () => {
       const adapter = createDataAdapter();
       const rawAdapter = new MemoryStorageAdapter();
       const mockEncService = {
-        ...noopEncryptionService,
+        ...NOOP_ENCRYPTION_SERVICE,
         targets: ['local'] as const,
         deriveKeys: async () => ({ kek: 'mock-kek' }),
       };

@@ -1,6 +1,6 @@
 import { resolveOptions } from '@strata/options';
 import type { ResolvedStrataOptions } from '@strata/options';
-import { MemoryStorageAdapter, noopEncryptionService, InvalidEncryptionKeyError } from '@strata/adapter';
+import { MemoryStorageAdapter, NOOP_ENCRYPTION_SERVICE, InvalidEncryptionKeyError } from '@strata/adapter';
 import type { StorageAdapter, EncryptionService, EncryptionStrategy, EncryptionKeys } from '@strata/adapter';
 import { EncryptedDataAdapter } from '@strata/persistence';
 import type { DataAdapter } from '@strata/persistence';
@@ -15,11 +15,11 @@ export const DEFAULT_OPTIONS: ResolvedStrataOptions = resolveOptions();
 const sharedContext = new TenantContext();
 
 export function createDataAdapter(): DataAdapter {
-  return new EncryptedDataAdapter(new MemoryStorageAdapter(), noopEncryptionService, sharedContext);
+  return new EncryptedDataAdapter(new MemoryStorageAdapter(), NOOP_ENCRYPTION_SERVICE, sharedContext);
 }
 
 export function wrapAdapter(adapter: StorageAdapter): DataAdapter {
-  return new EncryptedDataAdapter(adapter, noopEncryptionService, sharedContext);
+  return new EncryptedDataAdapter(adapter, NOOP_ENCRYPTION_SERVICE, sharedContext);
 }
 
 // ── Test encryption helpers (mirrors Pbkdf2EncryptionService + AesGcmEncryptionStrategy) ──
