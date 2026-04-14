@@ -1,0 +1,148 @@
+# Encryption
+
+## Overview
+
+Strata supports per-tenant encryption. Each tenant can independently opt in to encryption at creation time. When enabled, all entity data is encrypted at rest using AES-256-GCM with keys derived from a user-provided credential.
+
+## Setup
+
+Strata defines the `EncryptionService` interface but does not ship concrete implementations. Install `strata-adapters` for the built-in PBKDF2 + AES-GCM implementation:
+
+```bash
+npm install strata-adapters
+```
+
+```typescript
+import { Strata, defineEntity } from 'strata-data-sync';
+import { Pbkdf2EncryptionService, AesGcmEncryptionStrategy } from 'strata-adapters';
+
+const encryptionService = new Pbkdf2EncryptionService({
+  targets: ['cloud'],  // encrypt cloud storage only (or ['local', 'cloud'] for both)
+  strategy: new AesGcmEncryptionStrategy(),
+});
+
+const strata = new Strata({
+  appId: 'my-app',
+  entities: [taskDef],
+  localAdapter: storage,
+  deviceId: 'device-1',
+  encryptionService,
+});
+```
+
+## Creating an Encrypted Tenant
+
+```typescript
+const tenant = await strata.tenants.create({
+  name: 'Secure Workspace',
+  meta: { folderId: 'secure-folder', space: 'drive' },
+  encryption: { credential: 'user-secret' },
+});
+```
+
+This generates a random Data Encryption Key (DEK) and stores it encrypted inside the `__strata` marker blob. All data blobs for this tenant are encrypted with the DEK.
+
+## Opening an Encrypted Tenant
+
+```typescript
+await strata.tenants.open(tenant.id, { credential: 'user-secret' });
+```
+
+The credential is required every time an encrypted tenant is opened. The framework:
+1. Reads the raw marker blob bytes
+2. Derives the KEK from the credential via PBKDF2
+3. Decrypts the marker blob to extract the DEK
+4. Sets both keys in the tenant context for subsequent I/O
+
+## Error Handling
+
+```typescript
+try {
+  await strata.tenants.open(tenantId, { credential: 'wrong-password' });
+} catch (err) {
+  if (err instanceof InvalidEncryptionKeyError) {
+    // Wrong credential — prompt user to retry
+  }
+}
+```
+
+| Scenario | Behavior |
+|---|---|
+| Encrypted tenant, no credential | Throws `Error('Credential required for encrypted tenant')` |
+| Encrypted tenant, wrong credential | Throws `InvalidEncryptionKeyError` |
+| Unencrypted tenant, no credential | Loads normally |
+
+Import `InvalidEncryptionKeyError` from `strata-data-sync`.
+
+## Changing Credentials
+
+```typescript
+await strata.tenants.changeCredential('old-password', 'new-password');
+```
+
+This re-derives the KEK with the new credential and re-encrypts the marker blob. The DEK (which encrypts all data blobs) is unchanged — no data re-encryption needed.
+
+Requires an active encrypted tenant. The old credential is verified before the change is applied.
+
+## Mixed Tenants
+
+Encrypted and unencrypted tenants coexist on the same Strata instance:
+
+```typescript
+const secureTenant = await strata.tenants.create({
+  name: 'Secure',
+  meta: {},
+  encryption: { credential: 'secret' },
+});
+
+const plainTenant = await strata.tenants.create({
+  name: 'Public',
+  meta: {},
+});
+
+await strata.tenants.open(secureTenant.id, { credential: 'secret' });
+// ... encrypted data operations ...
+
+await strata.tenants.open(plainTenant.id);
+// ... unencrypted data operations ...
+```
+
+## How It Works
+
+### Key Hierarchy
+
+```
+credential + appId → PBKDF2 (600K iterations, SHA-256) → KEK (AES-256-GCM)
+                                                              │
+                                              Encrypts/decrypts __strata marker blob
+                                              Marker blob contains DEK (base64)
+                                                              │
+                                              DEK encrypts all entity partition blobs
+```
+
+### What's Encrypted
+
+| Blob | Encrypted? | Key used |
+|---|---|---|
+| `__tenants` (tenant list) | Never — always plaintext | — |
+| `__strata` (marker blob) | Yes (encrypted tenants) | KEK |
+| Entity blobs (`task._`, etc.) | Yes (encrypted tenants) | DEK |
+
+### Encrypted Data Format
+
+```
+[version: 1 byte] [IV: 12 bytes] [AES-GCM ciphertext + auth tag]
+```
+
+The marker blob additionally prefixes the salt:
+
+```
+[salt: 16 bytes] [version: 1 byte] [IV: 12 bytes] [AES-GCM ciphertext + auth tag]
+```
+
+### Security Notes
+
+- **Credential lifetime:** JavaScript strings are immutable and cannot be zeroed. Credentials persist in memory until garbage collected. This is a fundamental JS limitation. Keep credential references short-lived.
+- **PBKDF2 iterations:** 600,000 (meets 2023 OWASP recommendations).
+- **Salt:** 16 random bytes, generated at tenant creation, stored as the first bytes of the encrypted marker blob.
+- **Error masking:** All decryption errors are reported as `InvalidEncryptionKeyError` to prevent error oracle attacks.
