@@ -13,6 +13,7 @@ import type { BlobMigration } from '@strata/schema/migration';
 import { validateMigrations } from '@strata/schema/migration';
 import { EventBus } from '@strata/reactive';
 import type { EntityEvent } from '@strata/reactive';
+import { StrataError } from '@strata/errors';
 import { EncryptedDataAdapter } from '@strata/persistence';
 import { Store } from '@strata/store';
 import { Repository, SingletonRepository } from '@strata/repo';
@@ -78,6 +79,7 @@ export class Strata {
   private readonly hlcRef: { current: Hlc };
   private readonly eventBus: EventBus<EntityEvent>;
   private readonly syncEventBus: EventBus<SyncEvent>;
+  private readonly errorBus: EventBus<StrataError>;
   private readonly syncEngine: SyncEngineType;
   private readonly dirtyTracker: ReactiveFlag;
   private readonly tenantContext: TenantContext;
@@ -85,6 +87,7 @@ export class Strata {
   private readonly repoMap = new Map<string, RepositoryType<unknown> | SingletonRepositoryType<unknown>>();
   private readonly config: StrataConfig;
   private readonly dirtySubscription: Subscription;
+  private readonly errorSubscription: Subscription;
 
   private disposed = false;
   private disposePromise: Promise<void> | null = null;
@@ -108,6 +111,7 @@ export class Strata {
     this.hlcRef = { current: createHlc(config.deviceId) };
     this.eventBus = new EventBus<EntityEvent>();
     this.syncEventBus = new EventBus<SyncEvent>();
+    this.errorBus = new EventBus<StrataError>();
     this.syncEngine = new SyncEngine(
       store, localAdapter, cloudAdapter,
       config.entities.map(d => d.name), this.hlcRef, this.eventBus, this.syncEventBus,
@@ -142,6 +146,14 @@ export class Strata {
     this.dirtySubscription = this.eventBus.all$.pipe(
       filter(e => e.source !== 'sync'),
     ).subscribe(() => this.dirtyTracker.set());
+
+    // Re-emit sync errors that are StrataErrors onto the errorBus so consumers
+    // get a single channel for all data-op errors regardless of source.
+    this.errorSubscription = this.syncEventBus.all$.subscribe((evt: SyncEvent) => {
+      if (evt.type === 'sync-failed' && evt.error instanceof StrataError) {
+        this.errorBus.emit(evt.error);
+      }
+    });
   }
 
   repo<T>(def: EntityDefinition<T, 'singleton'>): SingletonRepositoryType<T>;
@@ -161,7 +173,8 @@ export class Strata {
   observe(channel: 'sync'): Observable<SyncEvent>;
   observe(channel: 'dirty'): Observable<boolean>;
   observe(channel: 'tenant'): Observable<Tenant | undefined>;
-  observe(channel: 'entity' | 'sync' | 'dirty' | 'tenant', entityName?: string): Observable<unknown> {
+  observe(channel: 'error'): Observable<StrataError>;
+  observe(channel: 'entity' | 'sync' | 'dirty' | 'tenant' | 'error', entityName?: string): Observable<unknown> {
     assertNotDisposed(this.disposed, 'Strata instance');
     switch (channel) {
       case 'entity':
@@ -174,6 +187,8 @@ export class Strata {
         return this.dirtyTracker.value$;
       case 'tenant':
         return this.tenantContext.activeTenant$;
+      case 'error':
+        return this.errorBus.all$;
     }
   }
 
@@ -184,8 +199,10 @@ export class Strata {
       await this.tenants.close();
       for (const r of this.repoMap.values()) r.dispose();
       this.dirtySubscription.unsubscribe();
+      this.errorSubscription.unsubscribe();
       this.eventBus.dispose();
       this.syncEventBus.dispose();
+      this.errorBus.dispose();
       await this.syncEngine.dispose();
       log('strata disposed');
     })();

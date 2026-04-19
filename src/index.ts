@@ -12,3 +12,4 @@ export * from '@strata/repo';
 export * from '@strata/tenant';
 export * from '@strata/sync';
 export * from '@strata/utils';
+export * from '@strata/errors';
