@@ -29,6 +29,7 @@ function validateBlob(blob: PartitionBlob, entityName: string): boolean {
   if (entityData !== undefined && !isPlainObject(entityData)) return false;
 
   const tombstoneData = blob.deleted[entityName];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (tombstoneData !== undefined) {
     if (!isPlainObject(tombstoneData)) return false;
     for (const hlc of Object.values(tombstoneData)) {
@@ -65,7 +66,7 @@ export async function loadPartitionFromAdapter(
   const tombstoneData = blob.deleted[entityName] ?? {};
 
   for (const [id, hlc] of Object.entries(tombstoneData)) {
-    store.setTombstone(key, id, hlc as Hlc);
+    store.setTombstone(key, id, hlc);
   }
 
   return new Map(Object.entries(entities));

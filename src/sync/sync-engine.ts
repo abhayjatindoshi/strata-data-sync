@@ -12,7 +12,7 @@ import type { ReactiveFlag } from '@strata/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type {
   SyncLocation, SyncQueueItem, SyncEvent,
-  SyncEnqueueResult, SyncEngine as SyncEngineType, SyncBetweenResult,
+  SyncEnqueueResult, SyncBetweenResult,
   SyncEntityChange,
 } from './types';
 import { syncBetween } from './unified';
@@ -33,8 +33,8 @@ export class SyncEngine {
     private readonly hlcRef: { current: Hlc },
     private readonly entityEventBus: EventBus<EntityEvent>,
     private readonly syncEventBus: EventBus<SyncEvent>,
+    private readonly options: ResolvedStrataOptions,
     private readonly migrations?: ReadonlyArray<BlobMigration>,
-    private readonly options?: ResolvedStrataOptions,
   ) {}
 
   private resolveAdapter(loc: SyncLocation): DataAdapter {
@@ -80,8 +80,8 @@ export class SyncEngine {
       this.syncEventBus.emit({ type: 'sync-started', source, target });
       try {
         syncResult = await syncBetween(
-          sourceAdapter, targetAdapter, this.entityNames, tenant, this.migrations,
-          this.options,
+          sourceAdapter, targetAdapter, this.entityNames, tenant,
+          this.options, this.migrations,
         );
 
         if (syncResult.maxHlc) {
@@ -110,7 +110,7 @@ export class SyncEngine {
     };
 
     this.queue.push({ source, target, fn, promise, resolve, reject });
-    this.processQueue();
+    void this.processQueue();
 
     await promise;
     return { result: syncResult, deduplicated: false };
@@ -124,8 +124,8 @@ export class SyncEngine {
       if (this.disposed) break;
       const item = this.queue[0];
       const p = item.fn().then(
-        () => item.resolve(),
-        (err) => item.reject(err instanceof Error ? err : new Error(String(err))),
+        () => { item.resolve(); },
+        (err: unknown) => { item.reject(err instanceof Error ? err : new Error(String(err))); },
       );
       this.inFlight = p;
       await p;
@@ -175,11 +175,11 @@ export class SyncEngine {
       this.sync('memory', 'local', tenant).catch((err: unknown) => {
         log.extend('error')('local flush failed: %O', err);
       });
-    }, this.options?.localFlushIntervalMs ?? 2_000);
+    }, this.options.localFlushIntervalMs);
 
     if (hasCloud) {
       this.cloudTimer = setInterval(() => {
-        (async () => {
+        void (async () => {
           try {
             await this.sync('local', 'cloud', tenant);
             await this.sync('local', 'memory', tenant);
@@ -188,12 +188,12 @@ export class SyncEngine {
             log.extend('error')('cloud sync failed: %O', err);
           }
         })();
-      }, this.options?.cloudSyncIntervalMs ?? 300_000);
+      }, this.options.cloudSyncIntervalMs);
     }
 
     log('scheduler started (local=%dms, cloud=%dms)',
-      this.options?.localFlushIntervalMs ?? 2_000,
-      this.options?.cloudSyncIntervalMs ?? 300_000,
+      this.options.localFlushIntervalMs,
+      this.options.cloudSyncIntervalMs,
     );
   }
 

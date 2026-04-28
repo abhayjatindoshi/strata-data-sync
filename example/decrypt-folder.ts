@@ -125,7 +125,7 @@ async function main() {
         continue;
       }
 
-      dek = await importAesGcmKey(keyData.dek as string);
+      dek = await importAesGcmKey(keyData.dek);
     } catch (err) {
       console.error(`  ✗ Failed to aesGcmDecrypt marker: ${(err as Error).message}`);
       console.error('    Check your credential and app ID');

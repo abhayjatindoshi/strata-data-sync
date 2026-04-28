@@ -9,7 +9,7 @@ import type { EventBus } from '@strata/reactive';
 import type { EntityEvent } from '@strata/reactive';
 import { filter } from 'rxjs/operators';
 import type { EntityStore } from '@strata/store';
-import type { Repository as RepositoryType, QueryOptions } from './types';
+import type { QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
 import { assertNotDisposed } from '@strata/utils';
 
@@ -189,7 +189,7 @@ export class Repository<T> {
     assertNotDisposed(this.disposed, 'Repository');
     return this.eventBus.all$.pipe(
       filter((e: EntityEvent) => e.entityName === this.definition.name),
-      startWith(undefined as void),
+      startWith(undefined),
       map(() => this.get(id)),
       distinctUntilChanged(entityComparator),
     );
@@ -199,7 +199,7 @@ export class Repository<T> {
     assertNotDisposed(this.disposed, 'Repository');
     return this.eventBus.all$.pipe(
       filter((e: EntityEvent) => e.entityName === this.definition.name),
-      startWith(undefined as void),
+      startWith(undefined),
       map(() => this.query(opts)),
       distinctUntilChanged((prev, next) => !resultsChanged(prev, next)),
     );

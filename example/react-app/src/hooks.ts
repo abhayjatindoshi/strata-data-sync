@@ -12,7 +12,7 @@ export function useObservable<T>(observable: Observable<T>, initialValue?: T): T
 
   useEffect(() => {
     const sub = observable.subscribe(setValue);
-    return () => sub.unsubscribe();
+    return () => { sub.unsubscribe(); };
   }, [observable]);
 
   return value;

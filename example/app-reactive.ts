@@ -44,9 +44,9 @@ async function main() {
   );
 
   await delay(50);
-  repo.save({ title: 'Write docs (updated)', done: false, id } as Task & { id: string });
+  repo.save({ title: 'Write docs (updated)', done: false, id });
   await delay(50);
-  repo.save({ title: 'Write docs (updated)', done: true, id } as Task & { id: string });
+  repo.save({ title: 'Write docs (updated)', done: true, id });
   await delay(50);
   repo.delete(id);
   await delay(50);
@@ -72,7 +72,7 @@ async function main() {
   await delay(50);
 
   // Mark Task A as done — open count drops from 2 → 1
-  repo.save({ title: 'Task A', done: true, id: a } as Task & { id: string });
+  repo.save({ title: 'Task A', done: true, id: a });
   await delay(50);
 
   repo.delete(b);

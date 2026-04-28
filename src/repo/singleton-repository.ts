@@ -1,14 +1,10 @@
-import debug from 'debug';
 import type { Hlc } from '@strata/hlc';
 import type { EntityDefinition, BaseEntity } from '@strata/schema';
 import { formatEntityId } from '@strata/schema';
 import type { EventBus } from '@strata/reactive';
 import type { EntityEvent } from '@strata/reactive';
 import type { EntityStore } from '@strata/store';
-import type { SingletonRepository as SingletonRepositoryType } from './types';
 import { Repository } from './repository';
-
-const log = debug('strata:repo');
 
 export class SingletonRepository<T> {
   private readonly repo: Repository<T>;
@@ -29,7 +25,7 @@ export class SingletonRepository<T> {
   }
 
   save(entity: T & Partial<BaseEntity>): void {
-    this.repo.save({ ...entity, id: this.deterministicId } as T & Partial<BaseEntity>);
+    this.repo.save({ ...entity, id: this.deterministicId });
   }
 
   delete(): boolean {

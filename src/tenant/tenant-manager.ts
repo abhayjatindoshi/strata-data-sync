@@ -3,7 +3,7 @@ import type { EncryptionService, EncryptionKeys, StorageAdapter } from '@strata/
 import type { EntityStore } from '@strata/store';
 import type { DataAdapter } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
-import type { SyncEngineType, SyncResult, SyncLocation, SyncEvent } from '@strata/sync';
+import type { SyncEngineType, SyncResult, SyncEvent } from '@strata/sync';
 import type { ReactiveFlag } from '@strata/utils';
 import type { EventBus } from '@strata/reactive';
 import { generateId } from '@strata/utils';
@@ -111,9 +111,8 @@ export class TenantManager implements TenantManagerType {
       id = this.deriveId(opts.meta);
     }
 
-    if (tenants.some(t => t.id === id)) {
-      return tenants.find(t => t.id === id)!;
-    }
+    const existing = tenants.find(t => t.id === id);
+    if (existing) return existing;
 
     const now = new Date();
     const encrypted = !!opts.encryption;
@@ -171,7 +170,7 @@ export class TenantManager implements TenantManagerType {
     };
 
     // Probe to detect if workspace exists and whether it's encrypted
-    let encrypted = false;
+    let encrypted: boolean;
     try {
       const marker = await readMarkerBlob(this.deps.adapter, tempTenant, this.deps.options);
       if (!marker) {
@@ -247,7 +246,7 @@ export class TenantManager implements TenantManagerType {
       throw new Error(`Tenant not found: ${tenantId}`);
     }
 
-    let keys: EncryptionKeys | null = null;
+    let keys: EncryptionKeys = null;
 
     // Encryption setup
     if (tenant.encrypted) {

@@ -52,7 +52,7 @@ async function main() {
       const entries = (blob.task ?? {}) as Record<string, Record<string, unknown>>;
       const migrated: Record<string, unknown> = {};
       for (const [id, entity] of Object.entries(entries)) {
-        migrated[id] = { ...entity, priority: (entity as Record<string, unknown>).priority ?? 'medium' };
+        migrated[id] = { ...entity, priority: (entity).priority ?? 'medium' };
       }
       return { ...blob, task: migrated };
     },

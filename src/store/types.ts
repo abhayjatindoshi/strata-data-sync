@@ -2,7 +2,7 @@ import type { Hlc } from '@strata/hlc';
 import type { DataAdapter } from '@strata/persistence';
 
 export type EntityStore = DataAdapter & {
-  getEntity(entityKey: string, id: string): unknown | undefined;
+  getEntity(entityKey: string, id: string): unknown;
   setEntity(entityKey: string, id: string, entity: unknown): void;
   deleteEntity(entityKey: string, id: string): boolean;
   getPartition(entityKey: string): ReadonlyMap<string, unknown>;

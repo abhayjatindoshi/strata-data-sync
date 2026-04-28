@@ -100,8 +100,8 @@ export function mergePartition(
     const result = resolveBothEntry(
       localEntities[id] as SyncEntity | undefined,
       cloudEntities[id] as SyncEntity | undefined,
-      localTombstones[id] as Hlc | undefined,
-      cloudTombstones[id] as Hlc | undefined,
+      localTombstones[id],
+      cloudTombstones[id],
     );
     if (result.entity) mergedEntities[id] = result.entity;
     if (result.tombstone) mergedTombstones[id] = result.tombstone;

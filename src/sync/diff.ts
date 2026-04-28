@@ -1,6 +1,6 @@
 import debug from 'debug';
 import type { Tenant } from '@strata/adapter';
-import type { AllIndexes, PartitionIndex, DataAdapter } from '@strata/persistence';
+import type { AllIndexes, PartitionIndex, PartitionIndexEntry, DataAdapter } from '@strata/persistence';
 import { loadAllIndexes } from '@strata/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { PartitionDiffResult } from './types';
@@ -36,8 +36,8 @@ export function diffPartitions(
   ]);
 
   for (const key of allKeys) {
-    const local = localIndex[key];
-    const cloud = cloudIndex[key];
+    const local = localIndex[key] as PartitionIndexEntry | undefined;
+    const cloud = cloudIndex[key] as PartitionIndexEntry | undefined;
 
     if (local && !cloud) {
       localOnly.push(key);

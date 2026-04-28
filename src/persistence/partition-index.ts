@@ -26,6 +26,7 @@ export async function saveAllIndexes(
   let markerData: Record<string, unknown>;
   if (existing) {
     const systemEntities = existing[options.systemEntityKey] as Record<string, unknown> | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     markerData = systemEntities?.['marker'] as Record<string, unknown> ?? { version: 1, createdAt: new Date(), entityTypes: [] };
   } else {
     markerData = { version: 1, createdAt: new Date(), entityTypes: [] };

@@ -6,7 +6,7 @@ import type { EncryptionKeys } from '@strata/adapter';
 
 export type TenantSession = {
   readonly tenant: Tenant;
-  readonly keys: EncryptionKeys | null;
+  readonly keys: EncryptionKeys;
 };
 
 export class TenantContext {
@@ -21,11 +21,11 @@ export class TenantContext {
     return this.session$.getValue()?.tenant;
   }
 
-  getKeys(): EncryptionKeys | null {
+  getKeys(): EncryptionKeys {
     return this.session$.getValue()?.keys ?? null;
   }
 
-  set(tenant: Tenant, keys: EncryptionKeys | null): void {
+  set(tenant: Tenant, keys: EncryptionKeys): void {
     this.session$.next({ tenant, keys });
   }
 

@@ -36,7 +36,7 @@ const log = debug('strata:core');
 export type { StrataOptions, ResolvedStrataOptions } from './options';
 export { resolveOptions } from './options';
 import { resolveOptions } from './options';
-import type { StrataOptions, ResolvedStrataOptions } from './options';
+import type { StrataOptions } from './options';
 
 export type StrataConfig = {
   readonly appId: string;
@@ -83,9 +83,8 @@ export class Strata {
   private readonly syncEngine: SyncEngineType;
   private readonly dirtyTracker: ReactiveFlag;
   private readonly tenantContext: TenantContext;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   private readonly repoMap = new Map<string, RepositoryType<unknown> | SingletonRepositoryType<unknown>>();
-  private readonly config: StrataConfig;
   private readonly dirtySubscription: Subscription;
   private readonly errorSubscription: Subscription;
 
@@ -95,7 +94,6 @@ export class Strata {
   constructor(config: StrataConfig) {
     validateEntityDefinitions(config.entities);
     if (config.migrations) validateMigrations(config.migrations);
-    this.config = config;
     const resolvedOptions = resolveOptions(config.options);
     const encryptionService = config.encryptionService ?? NOOP_ENCRYPTION_SERVICE;
 
@@ -115,7 +113,7 @@ export class Strata {
     this.syncEngine = new SyncEngine(
       store, localAdapter, cloudAdapter,
       config.entities.map(d => d.name), this.hlcRef, this.eventBus, this.syncEventBus,
-      config.migrations, resolvedOptions,
+      resolvedOptions, config.migrations,
     );
     this.dirtyTracker = new ReactiveFlag();
 
@@ -145,7 +143,7 @@ export class Strata {
 
     this.dirtySubscription = this.eventBus.all$.pipe(
       filter(e => e.source !== 'sync'),
-    ).subscribe(() => this.dirtyTracker.set());
+    ).subscribe(() => { this.dirtyTracker.set(); });
 
     // Re-emit sync errors that are StrataErrors onto the errorBus so consumers
     // get a single channel for all data-op errors regardless of source.
@@ -168,8 +166,7 @@ export class Strata {
 
   get isDirty(): boolean { return this.dirtyTracker.value; }
 
-  observe(channel: 'entity'): Observable<EntityEvent>;
-  observe(channel: 'entity', entityName: string): Observable<EntityEvent>;
+  observe(channel: 'entity', entityName?: string): Observable<EntityEvent>;
   observe(channel: 'sync'): Observable<SyncEvent>;
   observe(channel: 'dirty'): Observable<boolean>;
   observe(channel: 'tenant'): Observable<Tenant | undefined>;

@@ -5,8 +5,6 @@ import type { ResolvedStrataOptions } from '../options';
 
 const log = debug('strata:tenant');
 
-const MARKER_ENTITY_KEY = '__system';
-
 export type MarkerData = {
   readonly version: number;
   readonly createdAt: Date;

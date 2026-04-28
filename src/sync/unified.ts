@@ -3,7 +3,7 @@ import type { Tenant } from '@strata/adapter';
 import { partitionBlobKey } from '@strata/adapter';
 import type { Hlc } from '@strata/hlc';
 import { compareHlc } from '@strata/hlc';
-import type { AllIndexes, PartitionBlob, DataAdapter } from '@strata/persistence';
+import type { AllIndexes, PartitionBlob, PartitionIndexEntry, DataAdapter } from '@strata/persistence';
 import { loadAllIndexes, saveAllIndexes } from '@strata/persistence';
 import { partitionHash, updatePartitionIndexEntry } from '@strata/persistence';
 import type { BlobMigration } from '@strata/schema/migration';
@@ -35,12 +35,12 @@ async function buildPlan(
   adapterB: DataAdapter,
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
+  options: ResolvedStrataOptions,
   migrations?: ReadonlyArray<BlobMigration>,
-  options?: ResolvedStrataOptions,
 ): Promise<SyncPlan> {
   const [indexesA, indexesB] = await Promise.all([
-    loadAllIndexes(adapterA, tenant, options!),
-    loadAllIndexes(adapterB, tenant, options!),
+    loadAllIndexes(adapterA, tenant, options),
+    loadAllIndexes(adapterB, tenant, options),
   ]);
 
   const applyToA: SyncChange[] = [];
@@ -146,9 +146,9 @@ async function checkStale(
   adapter: DataAdapter,
   tenant: Tenant | undefined,
   snapshot: AllIndexes,
-  options?: ResolvedStrataOptions,
+  options: ResolvedStrataOptions,
 ): Promise<{ stale: boolean; currentIndexes: AllIndexes }> {
-  const current = await loadAllIndexes(adapter, tenant, options!);
+  const current = await loadAllIndexes(adapter, tenant, options);
   for (const entityName of Object.keys(snapshot)) {
     const snapIndex = snapshot[entityName] ?? {};
     const curIndex = current[entityName] ?? {};
@@ -156,7 +156,9 @@ async function checkStale(
       ...Object.keys(snapIndex), ...Object.keys(curIndex),
     ]);
     for (const key of allKeys) {
-      if (snapIndex[key]?.hash !== curIndex[key]?.hash) {
+      const snapEntry = snapIndex[key] as PartitionIndexEntry | undefined;
+      const curEntry = curIndex[key] as PartitionIndexEntry | undefined;
+      if (snapEntry?.hash !== curEntry?.hash) {
         return { stale: true, currentIndexes: current };
       }
     }
@@ -263,10 +265,10 @@ export async function syncBetween(
   adapterB: DataAdapter,
   entityNames: ReadonlyArray<string>,
   tenant: Tenant | undefined,
+  options: ResolvedStrataOptions,
   migrations?: ReadonlyArray<BlobMigration>,
-  options?: ResolvedStrataOptions,
 ): Promise<SyncBetweenResult> {
-  const plan = await buildPlan(adapterA, adapterB, entityNames, tenant, migrations, options);
+  const plan = await buildPlan(adapterA, adapterB, entityNames, tenant, options, migrations);
 
   if (plan.applyToB.length === 0 && plan.applyToA.length === 0) {
     return { changesForA: [], changesForB: [], stale: false, maxHlc: undefined };
@@ -284,14 +286,14 @@ export async function syncBetween(
   // Update indexes — each adapter only gets updates for changes actually written to it
   // Skip A index save when stale — another process may have updated A's indexes
   const indexUpdatesB = computeIndexUpdates(deduplicateChanges(plan.applyToB));
-  const existingIdxB = await loadAllIndexes(adapterB, tenant, options!);
+  const existingIdxB = await loadAllIndexes(adapterB, tenant, options);
   if (stale) {
-    await saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options!);
+    await saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options);
   } else {
     const indexUpdatesA = computeIndexUpdates(deduplicateChanges(plan.applyToA));
     await Promise.all([
-      saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdatesA), options!),
-      saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options!),
+      saveAllIndexes(adapterA, tenant, mergeIndexes(existingIdxA, indexUpdatesA), options),
+      saveAllIndexes(adapterB, tenant, mergeIndexes(existingIdxB, indexUpdatesB), options),
     ]);
   }
 
