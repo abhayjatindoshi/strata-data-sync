@@ -1,6 +1,6 @@
-import type { Hlc } from '@strata/hlc';
-import type { Tenant } from '@strata/adapter';
-import type { ReactiveFlag } from '@strata/utils';
+import type { Hlc } from '@/hlc';
+import type { Tenant } from '@/adapter';
+import type { ReactiveFlag } from '@/utils';
 
 export type PartitionDiffResult = {
   readonly localOnly: ReadonlyArray<string>;

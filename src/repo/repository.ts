@@ -1,17 +1,17 @@
 import debug from 'debug';
 import { startWith, map, distinctUntilChanged } from 'rxjs/operators';
-import type { Hlc } from '@strata/hlc';
-import { tick } from '@strata/hlc';
-import type { EntityDefinition, BaseEntity } from '@strata/schema';
-import { formatEntityId } from '@strata/schema';
-import { generateId, parseEntityKey } from '@strata/utils';
-import type { EventBus } from '@strata/reactive';
-import type { EntityEvent } from '@strata/reactive';
+import type { Hlc } from '@/hlc';
+import { tick } from '@/hlc';
+import type { EntityDefinition, BaseEntity } from '@/schema';
+import { formatEntityId } from '@/schema';
+import { generateId, parseEntityKey } from '@/utils';
+import type { EventBus } from '@/reactive';
+import type { EntityEvent } from '@/reactive';
 import { filter } from 'rxjs/operators';
-import type { EntityStore } from '@strata/store';
+import type { EntityStore } from '@/store';
 import type { QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
-import { assertNotDisposed } from '@strata/utils';
+import { assertNotDisposed } from '@/utils';
 
 const log = debug('strata:repo');
 

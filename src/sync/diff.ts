@@ -1,7 +1,7 @@
 import debug from 'debug';
-import type { Tenant } from '@strata/adapter';
-import type { AllIndexes, PartitionIndex, PartitionIndexEntry, DataAdapter } from '@strata/persistence';
-import { loadAllIndexes } from '@strata/persistence';
+import type { Tenant } from '@/adapter';
+import type { AllIndexes, PartitionIndex, PartitionIndexEntry, DataAdapter } from '@/persistence';
+import { loadAllIndexes } from '@/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { PartitionDiffResult } from './types';
 

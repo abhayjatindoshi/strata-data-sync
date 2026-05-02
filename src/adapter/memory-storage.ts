@@ -1,5 +1,5 @@
 import type { StorageAdapter, Tenant } from './types';
-import { compositeKey } from '@strata/utils';
+import { compositeKey } from '@/utils';
 
 export class MemoryStorageAdapter implements StorageAdapter {
   private readonly store = new Map<string, Uint8Array>();

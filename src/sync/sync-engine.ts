@@ -1,14 +1,14 @@
 import debug from 'debug';
-import type { Tenant } from '@strata/adapter';
-import type { Hlc } from '@strata/hlc';
-import { tick } from '@strata/hlc';
-import type { EventBus } from '@strata/reactive';
-import type { EntityEvent } from '@strata/reactive';
-import type { EntityStore } from '@strata/store';
-import type { BlobMigration } from '@strata/schema/migration';
-import type { DataAdapter } from '@strata/persistence';
-import { parseCompositeKey } from '@strata/utils';
-import type { ReactiveFlag } from '@strata/utils';
+import type { Tenant } from '@/adapter';
+import type { Hlc } from '@/hlc';
+import { tick } from '@/hlc';
+import type { EventBus } from '@/reactive';
+import type { EntityEvent } from '@/reactive';
+import type { EntityStore } from '@/store';
+import type { BlobMigration } from '@/schema/migration';
+import type { DataAdapter } from '@/persistence';
+import { parseCompositeKey } from '@/utils';
+import type { ReactiveFlag } from '@/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type {
   SyncLocation, SyncQueueItem, SyncEvent,

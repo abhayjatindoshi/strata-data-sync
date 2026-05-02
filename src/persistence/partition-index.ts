@@ -1,4 +1,4 @@
-import type { Tenant } from '@strata/adapter';
+import type { Tenant } from '@/adapter';
 import type { AllIndexes, PartitionIndex, PartitionBlob } from './types';
 import type { DataAdapter } from './blob-io';
 import type { ResolvedStrataOptions } from '../options';

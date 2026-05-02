@@ -1,10 +1,10 @@
 import debug from 'debug';
-import type { Tenant } from '@strata/adapter';
-import { partitionBlobKey } from '@strata/adapter';
-import type { DataAdapter, PartitionBlob } from '@strata/persistence';
-import type { BlobMigration } from '@strata/schema/migration';
-import { migrateBlob } from '@strata/schema/migration';
-import type { Hlc } from '@strata/hlc';
+import type { Tenant } from '@/adapter';
+import { partitionBlobKey } from '@/adapter';
+import type { DataAdapter, PartitionBlob } from '@/persistence';
+import type { BlobMigration } from '@/schema/migration';
+import { migrateBlob } from '@/schema/migration';
+import type { Hlc } from '@/hlc';
 import type { EntityStore } from './types';
 
 const log = debug('strata:store');

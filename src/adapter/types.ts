@@ -1,6 +1,6 @@
-import type { Tenant } from '@strata/tenant';
+import type { Tenant } from '@/tenant';
 
-export type { Tenant } from '@strata/tenant';
+export type { Tenant } from '@/tenant';
 
 export type StorageAdapter = {
   read(tenant: Tenant | undefined, key: string): Promise<Uint8Array | null>;

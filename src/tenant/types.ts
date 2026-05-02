@@ -1,5 +1,5 @@
 import type { Observable } from 'rxjs';
-import type { SyncResult } from '@strata/sync';
+import type { SyncResult } from '@/sync';
 
 export type Tenant = {
   readonly id: string;

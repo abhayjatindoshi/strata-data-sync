@@ -1,4 +1,4 @@
-import type { PartitionBlob } from '@strata/persistence';
+import type { PartitionBlob } from '@/persistence';
 import type { EntityDefinition } from './types';
 
 export type BlobMigration = {

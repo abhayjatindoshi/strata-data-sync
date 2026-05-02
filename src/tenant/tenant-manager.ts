@@ -1,13 +1,13 @@
 import debug from 'debug';
-import type { EncryptionService, EncryptionKeys, StorageAdapter } from '@strata/adapter';
-import type { EntityStore } from '@strata/store';
-import type { DataAdapter } from '@strata/persistence';
+import type { EncryptionService, EncryptionKeys, StorageAdapter } from '@/adapter';
+import type { EntityStore } from '@/store';
+import type { DataAdapter } from '@/persistence';
 import type { ResolvedStrataOptions } from '../options';
-import type { SyncEngineType, SyncResult, SyncEvent } from '@strata/sync';
-import type { ReactiveFlag } from '@strata/utils';
-import type { EventBus } from '@strata/reactive';
-import { generateId } from '@strata/utils';
-import { partitionBlobKey, InvalidEncryptionKeyError } from '@strata/adapter';
+import type { SyncEngineType, SyncResult, SyncEvent } from '@/sync';
+import type { ReactiveFlag } from '@/utils';
+import type { EventBus } from '@/reactive';
+import { generateId } from '@/utils';
+import { partitionBlobKey, InvalidEncryptionKeyError } from '@/adapter';
 import type {
   Tenant,
   ProbeResult,
@@ -17,6 +17,7 @@ import type {
 } from './types';
 import type { TenantContext } from './tenant-context';
 import { loadTenantList, saveTenantList } from './tenant-list';
+import { pullTenantList, pushTenantList } from './tenant-sync';
 import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-blob';
 import { loadTenantPrefs } from './tenant-prefs';
 
@@ -55,6 +56,13 @@ export class TenantManager implements TenantManagerType {
 
   private async getList(): Promise<Tenant[]> {
     if (!this.cachedList) {
+      if (this.deps.cloudAdapter) {
+        try {
+          await pullTenantList(this.deps.adapter, this.deps.cloudAdapter, this.deps.options);
+        } catch {
+          log('cloud unreachable — using local tenant list');
+        }
+      }
       this.cachedList = await loadTenantList(this.deps.adapter, this.deps.options);
     }
     return this.cachedList;
@@ -63,6 +71,13 @@ export class TenantManager implements TenantManagerType {
   private async persistList(tenants: Tenant[]): Promise<void> {
     this.cachedList = tenants;
     await saveTenantList(this.deps.adapter, tenants, this.deps.options);
+    if (this.deps.cloudAdapter) {
+      try {
+        await pushTenantList(this.deps.adapter, this.deps.cloudAdapter, this.deps.options);
+      } catch {
+        log('cloud unreachable — tenant list saved locally only');
+      }
+    }
   }
 
   private deriveId(meta: Record<string, unknown>): string {

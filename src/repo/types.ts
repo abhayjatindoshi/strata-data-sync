@@ -1,5 +1,5 @@
 import type { Observable } from 'rxjs';
-import type { BaseEntity } from '@strata/schema';
+import type { BaseEntity } from '@/schema';
 
 export type QueryOptions<T> = {
   readonly where?: Partial<T>;

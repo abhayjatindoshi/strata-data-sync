@@ -1,5 +1,5 @@
-import type { Hlc } from '@strata/hlc';
-import type { DataAdapter } from '@strata/persistence';
+import type { Hlc } from '@/hlc';
+import type { DataAdapter } from '@/persistence';
 
 export type EntityStore = DataAdapter & {
   getEntity(entityKey: string, id: string): unknown;

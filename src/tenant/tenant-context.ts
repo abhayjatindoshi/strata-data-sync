@@ -2,7 +2,7 @@ import { BehaviorSubject } from 'rxjs';
 import { map, distinctUntilChanged } from 'rxjs/operators';
 import type { Observable } from 'rxjs';
 import type { Tenant } from './types';
-import type { EncryptionKeys } from '@strata/adapter';
+import type { EncryptionKeys } from '@/adapter';
 
 export type TenantSession = {
   readonly tenant: Tenant;

@@ -1,5 +1,5 @@
-import type { DataAdapter } from '@strata/persistence';
-import type { PartitionBlob } from '@strata/persistence';
+import type { DataAdapter } from '@/persistence';
+import type { PartitionBlob } from '@/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { Tenant } from './types';
 

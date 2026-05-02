@@ -1,6 +1,6 @@
 import debug from 'debug';
-import type { Tenant } from '@strata/adapter';
-import type { PartitionBlob, DataAdapter } from '@strata/persistence';
+import type { Tenant } from '@/adapter';
+import type { PartitionBlob, DataAdapter } from '@/persistence';
 
 const log = debug('strata:tenant');
 

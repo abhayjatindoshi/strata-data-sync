@@ -1,5 +1,5 @@
 import debug from 'debug';
-import type { DataAdapter } from '@strata/persistence';
+import type { DataAdapter } from '@/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { Tenant } from './types';
 import { loadTenantList, saveTenantList } from './tenant-list';

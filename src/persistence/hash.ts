@@ -1,5 +1,5 @@
-import type { Hlc } from '@strata/hlc';
-import { FNV_OFFSET, fnv1aAppend } from '@strata/utils';
+import type { Hlc } from '@/hlc';
+import { FNV_OFFSET, fnv1aAppend } from '@/utils';
 
 export function partitionHash(entityMap: ReadonlyMap<string, Hlc>): number {
   const entries = [...entityMap.entries()].sort(([a], [b]) => a.localeCompare(b));

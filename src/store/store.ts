@@ -1,8 +1,8 @@
-import type { Hlc } from '@strata/hlc';
-import type { Tenant } from '@strata/adapter';
-import type { PartitionBlob } from '@strata/persistence';
-import { partitionHash } from '@strata/persistence';
-import { parseCompositeKey } from '@strata/utils';
+import type { Hlc } from '@/hlc';
+import type { Tenant } from '@/adapter';
+import type { PartitionBlob } from '@/persistence';
+import { partitionHash } from '@/persistence';
+import { parseCompositeKey } from '@/utils';
 import type { ResolvedStrataOptions } from '../options';
 import type { EntityStore } from './types';
 

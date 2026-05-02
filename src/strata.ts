@@ -1,33 +1,33 @@
 import debug from 'debug';
 import type { Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
-import { createHlc } from '@strata/hlc';
-import type { Hlc } from '@strata/hlc';
-import type { StorageAdapter, EncryptionService } from '@strata/adapter';
+import { createHlc } from '@/hlc';
+import type { Hlc } from '@/hlc';
+import type { StorageAdapter, EncryptionService } from '@/adapter';
 import {
   NOOP_ENCRYPTION_SERVICE,
-} from '@strata/adapter';
-import type { Tenant } from '@strata/adapter';
-import type { EntityDefinition } from '@strata/schema';
-import type { BlobMigration } from '@strata/schema/migration';
-import { validateMigrations } from '@strata/schema/migration';
-import { EventBus } from '@strata/reactive';
-import type { EntityEvent } from '@strata/reactive';
-import { StrataError } from '@strata/errors';
-import { EncryptedDataAdapter } from '@strata/persistence';
-import { Store } from '@strata/store';
-import { Repository, SingletonRepository } from '@strata/repo';
-import type { RepositoryType, SingletonRepositoryType } from '@strata/repo';
-import { TenantManager, TenantContext } from '@strata/tenant';
-import type { TenantManagerType } from '@strata/tenant';
+} from '@/adapter';
+import type { Tenant } from '@/adapter';
+import type { EntityDefinition } from '@/schema';
+import type { BlobMigration } from '@/schema/migration';
+import { validateMigrations } from '@/schema/migration';
+import { EventBus } from '@/reactive';
+import type { EntityEvent } from '@/reactive';
+import { StrataError } from '@/errors';
+import { EncryptedDataAdapter } from '@/persistence';
+import { Store } from '@/store';
+import { Repository, SingletonRepository } from '@/repo';
+import type { RepositoryType, SingletonRepositoryType } from '@/repo';
+import { TenantManager, TenantContext } from '@/tenant';
+import type { TenantManagerType } from '@/tenant';
 import {
   SyncEngine,
-} from '@strata/sync';
+} from '@/sync';
 import type {
   SyncEvent,
   SyncEngineType,
-} from '@strata/sync';
-import { assertNotDisposed, ReactiveFlag } from '@strata/utils';
+} from '@/sync';
+import { assertNotDisposed, ReactiveFlag } from '@/utils';
 
 const log = debug('strata:core');
 

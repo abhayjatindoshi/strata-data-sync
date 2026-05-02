@@ -1,9 +1,9 @@
-import type { Hlc } from '@strata/hlc';
-import type { EntityDefinition, BaseEntity } from '@strata/schema';
-import { formatEntityId } from '@strata/schema';
-import type { EventBus } from '@strata/reactive';
-import type { EntityEvent } from '@strata/reactive';
-import type { EntityStore } from '@strata/store';
+import type { Hlc } from '@/hlc';
+import type { EntityDefinition, BaseEntity } from '@/schema';
+import { formatEntityId } from '@/schema';
+import type { EventBus } from '@/reactive';
+import type { EntityEvent } from '@/reactive';
+import type { EntityStore } from '@/store';
 import { Repository } from './repository';
 
 export class SingletonRepository<T> {

@@ -1,6 +1,6 @@
-import type { Hlc } from '@strata/hlc';
-import { compareHlc } from '@strata/hlc';
-import type { PartitionBlob } from '@strata/persistence';
+import type { Hlc } from '@/hlc';
+import { compareHlc } from '@/hlc';
+import type { PartitionBlob } from '@/persistence';
 import type { EntityDiffResult, MergeResult, SyncEntity } from './types';
 import { resolveConflict, resolveEntityTombstone } from './conflict';
 
