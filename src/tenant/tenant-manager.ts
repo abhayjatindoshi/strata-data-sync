@@ -159,6 +159,12 @@ export class TenantManager implements TenantManagerType {
       this.deps.adapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
     );
 
+    if (this.deps.cloudAdapter) {
+      await writeMarkerBlob(
+        this.deps.cloudAdapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
+      );
+    }
+
     if (opts.encryption) {
       this.deps.tenantContext.clear();
     }
@@ -367,6 +373,11 @@ export class TenantManager implements TenantManagerType {
       await writeMarkerBlob(
         this.deps.adapter, tenant, marker.entityTypes, this.deps.options, result.keyData,
       );
+      if (this.deps.cloudAdapter) {
+        await writeMarkerBlob(
+          this.deps.cloudAdapter, tenant, marker.entityTypes, this.deps.options, result.keyData,
+        );
+      }
     } catch (err) {
       // Marker write failed — restore old keys (infallible, no I/O)
       this.deps.tenantContext.set(tenant, verifiedOldKeys);
