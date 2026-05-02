@@ -1,18 +1,18 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { NOOP_ENCRYPTION_SERVICE } from '@strata/adapter';
-import type { Tenant, StorageAdapter } from '@strata/adapter';
-import type { SyncEngineType } from '@strata/sync';
-import type { ReactiveFlag } from '@strata/utils';
-import type { EntityStore } from '@strata/store';
-import type { DataAdapter } from '@strata/persistence';
+import { NOOP_ENCRYPTION_SERVICE } from '@/adapter';
+import type { Tenant, StorageAdapter } from '@/adapter';
+import type { SyncEngineType } from '@/sync';
+import type { ReactiveFlag } from '@/utils';
+import type { EntityStore } from '@/store';
+import type { DataAdapter } from '@/persistence';
 import {
   TenantManager,
   TenantContext,
   writeMarkerBlob,
   saveTenantPrefs,
-} from '@strata/tenant';
-import type { TenantManagerDeps } from '@strata/tenant';
+} from '@/tenant';
+import type { TenantManagerDeps } from '@/tenant';
 
 function makeTenant(id: string, meta: Record<string, unknown>): Tenant {
   return { id, name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };
@@ -142,7 +142,7 @@ describe('Sharing flow', () => {
 
     const created = await tm.create({ name: 'My App', meta: { bucket: 'x' } });
 
-    const { readMarkerBlob } = await import('@strata/tenant');
+    const { readMarkerBlob } = await import('@/tenant');
     const marker = await readMarkerBlob(adapter, created, DEFAULT_OPTIONS);
     expect(marker).toBeDefined();
     expect(marker!.entityTypes).toEqual(['transaction', 'account']);

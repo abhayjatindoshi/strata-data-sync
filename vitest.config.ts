@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      '@strata': path.resolve(__dirname, 'src'),
+      '@/': path.resolve(__dirname, 'src') + '/',
     },
   },
   test: {

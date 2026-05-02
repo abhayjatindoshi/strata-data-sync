@@ -8,10 +8,10 @@ import {
   serialize,
   deserialize,
   partitionHash,
-} from '@strata/index';
-import type { Repository } from '@strata/repo';
-import type { Hlc } from '@strata/hlc';
-import type { BaseEntity } from '@strata/schema';
+} from '@/index';
+import type { Repository } from '@/repo';
+import type { Hlc } from '@/hlc';
+import type { BaseEntity } from '@/schema';
 
 type Transaction = { amount: number; date: Date; accountId: string };
 type Item = { name: string; category: string };

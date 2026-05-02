@@ -1,8 +1,8 @@
 import { DEFAULT_OPTIONS } from '../helpers';
 import { describe, it, expect } from 'vitest';
 import { createDataAdapter } from '../helpers';
-import type { Tenant } from '@strata/adapter';
-import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@strata/tenant';
+import type { Tenant } from '@/adapter';
+import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from '@/tenant';
 
 function makeTenant(id: string, meta: Record<string, unknown>): Tenant {
   return { id, name: '', encrypted: false, meta, createdAt: new Date(), updatedAt: new Date() };

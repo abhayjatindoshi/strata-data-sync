@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { Store } from '@strata/store';
+import { Store } from '@/store';
 import { DEFAULT_OPTIONS } from '../helpers';
-import { createHlc } from '@strata/hlc';
-import { EventBus } from '@strata/reactive';
-import type { EntityEvent } from '@strata/reactive';
-import { defineEntity } from '@strata/schema';
-import { Repository } from '@strata/repo';
+import { createHlc } from '@/hlc';
+import { EventBus } from '@/reactive';
+import type { EntityEvent } from '@/reactive';
+import { defineEntity } from '@/schema';
+import { Repository } from '@/repo';
 
 type Task = {
   name: string;

@@ -5,10 +5,10 @@ import {
   defineEntity,
   MemoryStorageAdapter,
   resolveOptions,
-} from '@strata/index';
-import type { Tenant } from '@strata/index';
-import type { Repository } from '@strata/repo';
-import { writeMarkerBlob } from '@strata/tenant';
+} from '@/index';
+import type { Tenant } from '@/index';
+import type { Repository } from '@/repo';
+import { writeMarkerBlob } from '@/tenant';
 
 type Task = { title: string; done: boolean };
 type Note = { text: string };

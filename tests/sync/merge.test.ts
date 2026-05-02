@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { Hlc } from '@strata/hlc';
-import type { PartitionBlob } from '@strata/persistence';
-import { mergePartition } from '@strata/sync';
+import type { Hlc } from '@/hlc';
+import type { PartitionBlob } from '@/persistence';
+import { mergePartition } from '@/sync';
 
 function makeBlob(
   entityName: string,

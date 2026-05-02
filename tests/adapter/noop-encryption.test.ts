@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NOOP_ENCRYPTION_SERVICE } from '@strata/adapter';
+import { NOOP_ENCRYPTION_SERVICE } from '@/adapter';
 
 describe('NOOP_ENCRYPTION_SERVICE', () => {
   it('deriveKeys returns null', async () => {

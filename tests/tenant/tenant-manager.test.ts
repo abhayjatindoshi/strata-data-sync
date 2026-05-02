@@ -1,15 +1,15 @@
 import { DEFAULT_OPTIONS, createDataAdapter } from '../helpers';
 import { describe, it, expect } from 'vitest';
-import { NOOP_ENCRYPTION_SERVICE, InvalidEncryptionKeyError, MemoryStorageAdapter } from '@strata/adapter';
-import type { Tenant, StorageAdapter } from '@strata/adapter';
-import type { SyncEngineType } from '@strata/sync';
-import type { SyncEvent } from '@strata/sync';
-import type { ReactiveFlag } from '@strata/utils';
-import type { EntityStore } from '@strata/store';
-import type { DataAdapter } from '@strata/persistence';
-import { EventBus } from '@strata/reactive';
-import { loadTenantList, saveTenantList, TenantManager, TenantContext } from '@strata/tenant';
-import type { TenantManagerDeps } from '@strata/tenant';
+import { NOOP_ENCRYPTION_SERVICE, InvalidEncryptionKeyError, MemoryStorageAdapter } from '@/adapter';
+import type { Tenant, StorageAdapter } from '@/adapter';
+import type { SyncEngineType } from '@/sync';
+import type { SyncEvent } from '@/sync';
+import type { ReactiveFlag } from '@/utils';
+import type { EntityStore } from '@/store';
+import type { DataAdapter } from '@/persistence';
+import { EventBus } from '@/reactive';
+import { loadTenantList, saveTenantList, TenantManager, TenantContext } from '@/tenant';
+import type { TenantManagerDeps } from '@/tenant';
 
 function stubSyncEngine(): SyncEngineType {
   return {

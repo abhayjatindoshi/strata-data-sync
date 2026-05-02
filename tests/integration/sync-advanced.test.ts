@@ -6,21 +6,23 @@ import {
   MemoryStorageAdapter,
   serialize,
   mergePartition,
-} from '@strata/index';
-import type { SyncEvent, StorageAdapter } from '@strata/index';
-import type { Repository } from '@strata/repo';
+} from '@/index';
+import type { SyncEvent, StorageAdapter } from '@/index';
+import type { Repository } from '@/repo';
 
 type Task = { title: string; done: boolean; priority: number };
 
 const TaskDef = defineEntity<Task>('task');
 
 function createFailingAdapter(): StorageAdapter {
+  let shouldFail = false;
   return {
-    async read() { throw new Error('Cloud unreachable'); },
-    async write() { throw new Error('Cloud unreachable'); },
-    async delete() { throw new Error('Cloud unreachable'); },
-    async list() { throw new Error('Cloud unreachable'); },
-  };
+    async read() { if (shouldFail) throw new Error('Cloud unreachable'); return null; },
+    async write() { if (shouldFail) throw new Error('Cloud unreachable'); },
+    async delete() { if (shouldFail) throw new Error('Cloud unreachable'); return false; },
+    async list() { if (shouldFail) throw new Error('Cloud unreachable'); return []; },
+    startFailing() { shouldFail = true; },
+  } as StorageAdapter & { startFailing(): void };
 }
 
 describe('Sync advanced integration', () => {
@@ -57,6 +59,9 @@ describe('Sync advanced integration', () => {
       name: 'Test',
       meta: { bucket: 'test' },
     });
+
+    // Start failing after create so marker blob can be written
+    (failingCloud as StorageAdapter & { startFailing(): void }).startFailing();
 
     // Load tenant — cloud hydrate will fail, should fall back to local
     await strata.tenants.open(tenant.id);

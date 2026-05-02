@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { PartitionIndex } from '@strata/persistence';
-import { saveAllIndexes } from '@strata/persistence';
+import type { PartitionIndex } from '@/persistence';
+import { saveAllIndexes } from '@/persistence';
 import { createDataAdapter } from '../helpers';
-import { diffPartitions } from '@strata/sync';
-import { loadAllIndexPairs } from '@strata/sync/diff';
+import { diffPartitions } from '@/sync';
+import { loadAllIndexPairs } from '@/sync/diff';
 import { DEFAULT_OPTIONS } from '../helpers';
 
 describe('diffPartitions', () => {

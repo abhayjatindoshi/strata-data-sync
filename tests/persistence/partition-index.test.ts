@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { loadAllIndexes, saveAllIndexes, updatePartitionIndexEntry } from '@strata/persistence';
+import { loadAllIndexes, saveAllIndexes, updatePartitionIndexEntry } from '@/persistence';
 import { createDataAdapter } from '../helpers';
 import { DEFAULT_OPTIONS } from '../helpers';
 

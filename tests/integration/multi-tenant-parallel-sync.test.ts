@@ -10,10 +10,10 @@ import {
   updatePartitionIndexEntry,
   loadAllIndexes,
   resolveOptions,
-} from '@strata/index';
-import type { SyncEvent, Tenant } from '@strata/index';
-import type { DataAdapter } from '@strata/persistence';
-import type { Repository } from '@strata/repo';
+} from '@/index';
+import type { SyncEvent, Tenant } from '@/index';
+import type { DataAdapter } from '@/persistence';
+import type { Repository } from '@/repo';
 
 type Note = { title: string; body: string; priority: number };
 type Project = { name: string; active: boolean };

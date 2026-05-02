@@ -1,10 +1,10 @@
 import { DEFAULT_OPTIONS } from '../helpers';
 import { describe, it, expect } from 'vitest';
 import { createDataAdapter } from '../helpers';
-import { mergeTenantLists, pushTenantList, pullTenantList } from '@strata/tenant';
-import { saveTenantPrefs, loadTenantPrefs } from '@strata/tenant';
-import { saveTenantList, loadTenantList } from '@strata/tenant';
-import type { Tenant } from '@strata/tenant';
+import { mergeTenantLists, pushTenantList, pullTenantList } from '@/tenant';
+import { saveTenantPrefs, loadTenantPrefs } from '@/tenant';
+import { saveTenantList, loadTenantList } from '@/tenant';
+import type { Tenant } from '@/tenant';
 
 function makeTenant(overrides: Partial<Tenant> & { id: string; name: string }): Tenant {
   const now = new Date('2026-03-23T12:00:00Z');

@@ -5,9 +5,9 @@ import {
   defineEntity,
   MemoryStorageAdapter,
   resolveOptions,
-} from '@strata/index';
-import type { Repository } from '@strata/repo';
-import { loadAllIndexes } from '@strata/persistence';
+} from '@/index';
+import type { Repository } from '@/repo';
+import { loadAllIndexes } from '@/persistence';
 
 type Task = { title: string; done: boolean };
 

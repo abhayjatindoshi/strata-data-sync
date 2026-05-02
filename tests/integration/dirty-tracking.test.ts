@@ -3,8 +3,8 @@ import {
   Strata,
   defineEntity,
   MemoryStorageAdapter,
-} from '@strata/index';
-import type { Repository } from '@strata/repo';
+} from '@/index';
+import type { Repository } from '@/repo';
 
 type Task = { title: string; done: boolean };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Store } from '@strata/store';
+import { Store } from '@/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 
 describe('EntityStore', () => {

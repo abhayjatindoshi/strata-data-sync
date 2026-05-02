@@ -4,9 +4,9 @@ import {
   Strata,
   defineEntity,
   MemoryStorageAdapter,
-} from '@strata/index';
-import type { Repository, SingletonRepository } from '@strata/repo';
-import type { BaseEntity } from '@strata/schema';
+} from '@/index';
+import type { Repository, SingletonRepository } from '@/repo';
+import type { BaseEntity } from '@/schema';
 
 type Task = { title: string; done: boolean; priority: number };
 type Settings = { theme: string; fontSize: number };

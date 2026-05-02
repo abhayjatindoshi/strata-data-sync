@@ -6,9 +6,9 @@ import {
   MemoryStorageAdapter,
   resolveOptions,
   serialize,
-} from '@strata/index';
-import type { SyncEvent } from '@strata/index';
-import type { Repository, SingletonRepository } from '@strata/repo';
+} from '@/index';
+import type { SyncEvent } from '@/index';
+import type { Repository, SingletonRepository } from '@/repo';
 import { createTestEncryptionService } from './helpers';
 
 type Task = { title: string; done: boolean };

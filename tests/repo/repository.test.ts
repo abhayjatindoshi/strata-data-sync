@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Store } from '@strata/store';
+import { Store } from '@/store';
 import { DEFAULT_OPTIONS } from '../helpers';
-import { EventBus } from '@strata/reactive';
-import type { EntityEvent } from '@strata/reactive';
-import { defineEntity, partitioned } from '@strata/schema';
-import { Repository } from '@strata/repo';
-import type { Hlc } from '@strata/hlc';
+import { EventBus } from '@/reactive';
+import type { EntityEvent } from '@/reactive';
+import { defineEntity, partitioned } from '@/schema';
+import { Repository } from '@/repo';
+import type { Hlc } from '@/hlc';
 
 type Item = { name: string; category: string; price: number };
 

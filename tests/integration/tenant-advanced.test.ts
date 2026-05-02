@@ -10,8 +10,8 @@ import {
   pullTenantList,
   loadTenantList,
   resolveOptions,
-} from '@strata/index';
-import type { Tenant } from '@strata/index';
+} from '@/index';
+import type { Tenant } from '@/index';
 
 type Task = { title: string; done: boolean };
 

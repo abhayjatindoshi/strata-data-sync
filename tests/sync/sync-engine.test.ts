@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { SyncEngine } from '@strata/sync';
-import type { SyncEvent } from '@strata/sync';
+import { SyncEngine } from '@/sync';
+import type { SyncEvent } from '@/sync';
 import { createDataAdapter } from '../helpers';
-import { createHlc } from '@strata/hlc';
-import { saveAllIndexes } from '@strata/persistence';
-import { EventBus } from '@strata/reactive';
-import type { EntityEvent } from '@strata/reactive';
-import { Store } from '@strata/store';
+import { createHlc } from '@/hlc';
+import { saveAllIndexes } from '@/persistence';
+import { EventBus } from '@/reactive';
+import type { EntityEvent } from '@/reactive';
+import { Store } from '@/store';
 import { DEFAULT_OPTIONS } from '../helpers';
 
 function makeEngine(opts?: { cloud?: boolean }) {
@@ -16,7 +16,7 @@ function makeEngine(opts?: { cloud?: boolean }) {
   const hlcRef = { current: createHlc('test') };
   const eventBus = new EventBus<EntityEvent>();
   const syncEventBus = new EventBus<SyncEvent>();
-  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, syncEventBus, undefined, DEFAULT_OPTIONS);
+  const engine = new SyncEngine(store, local, cloud, ['task'], hlcRef, eventBus, syncEventBus, DEFAULT_OPTIONS);
   return { engine, store, local, cloud, hlcRef, eventBus, syncEventBus };
 }
 
@@ -189,7 +189,7 @@ describe('SyncEngine', () => {
       task: { 'task._.l1': { id: 'task._.l1', title: 'From Local', hlc: { timestamp: 500, counter: 0, nodeId: 'n2' } } },
       deleted: { task: {} },
     };
-    const { saveAllIndexes } = await import('@strata/persistence');
+    const { saveAllIndexes } = await import('@/persistence');
     await local.write(undefined, 'task._', blob);
     await saveAllIndexes(local, undefined, {
       task: { '_': { hash: 999, count: 1, deletedCount: 0, updatedAt: 500 } },

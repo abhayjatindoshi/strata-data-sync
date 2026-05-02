@@ -4,9 +4,9 @@ import {
   defineEntity,
   MemoryStorageAdapter,
   partitioned,
-} from '@strata/index';
-import type { StorageAdapter } from '@strata/index';
-import type { Repository } from '@strata/repo';
+} from '@/index';
+import type { StorageAdapter } from '@/index';
+import type { Repository } from '@/repo';
 
 type Item = { name: string; category: string };
 type Transaction = { amount: number; date: Date; accountId: string };

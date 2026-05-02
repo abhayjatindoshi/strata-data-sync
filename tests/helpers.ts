@@ -1,14 +1,60 @@
-import { resolveOptions } from '@strata/options';
-import type { ResolvedStrataOptions } from '@strata/options';
-import { MemoryStorageAdapter, NOOP_ENCRYPTION_SERVICE, InvalidEncryptionKeyError } from '@strata/adapter';
-import type { StorageAdapter, EncryptionService, EncryptionStrategy, EncryptionKeys } from '@strata/adapter';
-import { EncryptedDataAdapter } from '@strata/persistence';
-import type { DataAdapter } from '@strata/persistence';
-import { TenantContext } from '@strata/tenant';
-import {
-  pbkdf2DeriveKeyWithSalt, aesGcmGenerateKey, exportCryptoKey, importAesGcmKey,
-  aesGcmEncrypt, aesGcmDecrypt,
-} from '@strata/utils';
+import { resolveOptions } from '@/options';
+import type { ResolvedStrataOptions } from '@/options';
+import { MemoryStorageAdapter, NOOP_ENCRYPTION_SERVICE, InvalidEncryptionKeyError } from '@/adapter';
+import type { StorageAdapter, EncryptionService, EncryptionStrategy, EncryptionKeys } from '@/adapter';
+import { EncryptedDataAdapter } from '@/persistence';
+import type { DataAdapter } from '@/persistence';
+import { TenantContext } from '@/tenant';
+import { toBase64, fromBase64 } from '@/utils';
+
+// ── Inline crypto helpers (moved from @/utils to strata-adapters) ──
+
+const IV_LENGTH = 12;
+const ENCRYPTION_VERSION = 1;
+const PBKDF2_ITERATIONS = 600_000;
+
+function toArrayBuffer(data: Uint8Array): ArrayBuffer {
+  return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+}
+
+async function pbkdf2DeriveKeyWithSalt(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyMaterial = await globalThis.crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return globalThis.crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: toArrayBuffer(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'],
+  );
+}
+
+async function aesGcmGenerateKey(): Promise<CryptoKey> {
+  return globalThis.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+}
+
+async function exportCryptoKey(key: CryptoKey): Promise<string> {
+  const raw = await globalThis.crypto.subtle.exportKey('raw', key);
+  return toBase64(new Uint8Array(raw));
+}
+
+async function importAesGcmKey(base64: string): Promise<CryptoKey> {
+  return globalThis.crypto.subtle.importKey('raw', fromBase64(base64), { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+}
+
+async function aesGcmEncrypt(data: Uint8Array, key: CryptoKey): Promise<Uint8Array> {
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+  const ciphertext = await globalThis.crypto.subtle.encrypt({ name: 'AES-GCM', iv: toArrayBuffer(iv) }, key, toArrayBuffer(data));
+  const result = new Uint8Array(1 + IV_LENGTH + ciphertext.byteLength);
+  result[0] = ENCRYPTION_VERSION;
+  result.set(iv, 1);
+  result.set(new Uint8Array(ciphertext), 1 + IV_LENGTH);
+  return result;
+}
+
+async function aesGcmDecrypt(data: Uint8Array, key: CryptoKey): Promise<Uint8Array> {
+  const iv = data.slice(1, 1 + IV_LENGTH);
+  const ciphertext = data.slice(1 + IV_LENGTH);
+  const plaintext = await globalThis.crypto.subtle.decrypt({ name: 'AES-GCM', iv: toArrayBuffer(iv) }, key, toArrayBuffer(ciphertext));
+  return new Uint8Array(plaintext);
+}
 
 export const DEFAULT_OPTIONS: ResolvedStrataOptions = resolveOptions();
 

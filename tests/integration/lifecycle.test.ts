@@ -4,8 +4,8 @@ import {
   defineEntity,
   MemoryStorageAdapter,
   partitioned,
-} from '@strata/index';
-import type { Repository, SingletonRepository } from '@strata/repo';
+} from '@/index';
+import type { Repository, SingletonRepository } from '@/repo';
 
 type Task = { title: string; done: boolean };
 type Settings = { theme: string; fontSize: number };
