@@ -15,3 +15,5 @@ export type { TenantManagerDeps } from './tenant-manager';
 export { mergeTenantLists, pushTenantList, pullTenantList } from './tenant-sync';
 export { saveTenantPrefs, loadTenantPrefs } from './tenant-prefs';
 export { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-blob';
+export { TenantError } from './errors';
+export type { TenantErrorKind } from './errors';

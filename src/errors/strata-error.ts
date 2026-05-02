@@ -1,32 +1,25 @@
 /**
- * Base class for all data-sync errors emitted on `strata.observe('error')`.
+ * Base class for all typed errors in the strata framework.
  *
- * Subclassed in adapter packages (e.g. `strata-adapters`) to carry
- * provider-specific kinds (`auth-expired`, `quota-exceeded`, …). Core code
- * emits `StrataError` directly for sync, repo, and persistence failures.
+ * Each module defines one subclass with its own `kind` union.
+ * Use `error.kind` to discriminate, not `instanceof` per-kind.
+ * Use native `error.cause` (ES2022) for error chaining.
  */
-export type ErrorOperation = 'read' | 'write' | 'delete' | 'list' | 'sync' | 'resolve';
-
 export class StrataError extends Error {
   readonly kind: string;
-  readonly operation: ErrorOperation;
   readonly retryable: boolean;
-  readonly originalError?: Error;
 
   constructor(
     message: string,
     options: {
-      kind: string;
-      operation: ErrorOperation;
-      retryable?: boolean;
-      originalError?: Error;
+      readonly kind: string;
+      readonly retryable?: boolean;
+      readonly cause?: Error;
     },
   ) {
-    super(message);
+    super(message, { cause: options.cause });
     this.name = 'StrataError';
     this.kind = options.kind;
-    this.operation = options.operation;
     this.retryable = options.retryable ?? false;
-    this.originalError = options.originalError;
   }
 }

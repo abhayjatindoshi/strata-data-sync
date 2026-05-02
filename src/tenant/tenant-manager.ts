@@ -1,4 +1,3 @@
-import debug from 'debug';
 import type { EncryptionService, EncryptionKeys, StorageAdapter } from '@/adapter';
 import type { EntityStore } from '@/store';
 import type { DataAdapter } from '@/persistence';
@@ -20,8 +19,9 @@ import { loadTenantList, saveTenantList } from './tenant-list';
 import { pullTenantList, pushTenantList } from './tenant-sync';
 import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-blob';
 import { loadTenantPrefs } from './tenant-prefs';
-
-const log = debug('strata:tenant');
+import { TenantError } from './errors';
+import { SyncError } from '@/sync/errors';
+import { log } from '@/log';
 
 export type TenantManagerDeps = {
   readonly adapter: DataAdapter;
@@ -60,7 +60,7 @@ export class TenantManager implements TenantManagerType {
         try {
           await pullTenantList(this.deps.adapter, this.deps.cloudAdapter, this.deps.options);
         } catch {
-          log('cloud unreachable — using local tenant list');
+          log.tenant.warn('cloud unreachable — using local tenant list');
         }
       }
       this.cachedList = await loadTenantList(this.deps.adapter, this.deps.options);
@@ -75,7 +75,7 @@ export class TenantManager implements TenantManagerType {
       try {
         await pushTenantList(this.deps.adapter, this.deps.cloudAdapter, this.deps.options);
       } catch {
-        log('cloud unreachable — tenant list saved locally only');
+        log.tenant.warn('cloud unreachable — tenant list saved locally only');
       }
     }
   }
@@ -169,7 +169,7 @@ export class TenantManager implements TenantManagerType {
       this.deps.tenantContext.clear();
     }
 
-    log('created tenant %s', id);
+    log.tenant('created tenant %s', id);
 
     return tenant;
   }
@@ -195,10 +195,10 @@ export class TenantManager implements TenantManagerType {
     try {
       const marker = await readMarkerBlob(this.deps.adapter, tempTenant, this.deps.options);
       if (!marker) {
-        throw new Error('No strata workspace found at the specified location');
+        throw new TenantError('No strata workspace found at the specified location', { kind: 'workspace-not-found' });
       }
       if (!validateMarkerBlob(marker)) {
-        throw new Error('Incompatible strata workspace version');
+        throw new TenantError('Incompatible strata workspace version', { kind: 'workspace-incompatible' });
       }
       encrypted = !!marker.keyData;
     } catch (err) {
@@ -222,7 +222,7 @@ export class TenantManager implements TenantManagerType {
     };
 
     await this.persistList([...tenants, tenant]);
-    log('joined tenant %s', id);
+    log.tenant('joined tenant %s', id);
 
     return tenant;
   }
@@ -250,7 +250,7 @@ export class TenantManager implements TenantManagerType {
     if (this.deps.tenantContext.activeTenant?.id === tenantId) {
       this.deps.tenantContext.clear();
     }
-    log('%s tenant %s', opts?.purge ? 'deleted' : 'removed', tenantId);
+    log.tenant('%s tenant %s', opts?.purge ? 'deleted' : 'removed', tenantId);
   }
 
   // ─── Hot ops ─────────────────────────────────────────────
@@ -264,7 +264,7 @@ export class TenantManager implements TenantManagerType {
     const tenants = await this.getList();
     const tenant = tenants.find(t => t.id === tenantId);
     if (!tenant) {
-      throw new Error(`Tenant not found: ${tenantId}`);
+      throw new TenantError(`Tenant not found: ${tenantId}`, { kind: 'tenant-not-found' });
     }
 
     let keys: EncryptionKeys = null;
@@ -272,7 +272,7 @@ export class TenantManager implements TenantManagerType {
     // Encryption setup
     if (tenant.encrypted) {
       if (!opts?.credential) {
-        throw new Error('Credential required for encrypted tenant');
+        throw new TenantError('Credential required for encrypted tenant', { kind: 'credential-required' });
       }
       try {
         const rawBytes = await this.deps.rawAdapter.read(tenant, this.deps.options.markerKey);
@@ -305,7 +305,7 @@ export class TenantManager implements TenantManagerType {
     // Start scheduler
     this.deps.syncEngine.startScheduler(tenant, hasCloud, this.deps.dirtyTracker);
 
-    log('tenant %s opened', tenant.id);
+    log.tenant('tenant %s opened', tenant.id);
   }
 
   async close(): Promise<void> {
@@ -321,13 +321,13 @@ export class TenantManager implements TenantManagerType {
     this.deps.dirtyTracker.clear();
     this.deps.tenantContext.clear();
 
-    log('tenant closed');
+    log.tenant('tenant closed');
   }
 
   async sync(): Promise<SyncResult> {
     const tenant = this.deps.tenantContext.activeTenant;
-    if (!tenant) throw new Error('No tenant loaded');
-    if (!this.deps.cloudAdapter) throw new Error('No cloud adapter configured');
+    if (!tenant) throw new TenantError('No tenant loaded', { kind: 'no-tenant-loaded' });
+    if (!this.deps.cloudAdapter) throw new SyncError('No cloud adapter configured', { kind: 'cloud-not-configured' });
 
     const results = await this.deps.syncEngine.run(tenant, [
       ['memory', 'local'],
@@ -346,15 +346,15 @@ export class TenantManager implements TenantManagerType {
   // Security note: credential strings cannot be zeroed in JS — see open() comment.
   async changeCredential(oldCredential: string, newCredential: string): Promise<void> {
     const tenant = this.deps.tenantContext.activeTenant;
-    if (!tenant) throw new Error('No tenant loaded');
-    if (!tenant.encrypted) throw new Error('Current tenant is not encrypted');
+    if (!tenant) throw new TenantError('No tenant loaded', { kind: 'no-tenant-loaded' });
+    if (!tenant.encrypted) throw new TenantError('Current tenant is not encrypted', { kind: 'not-encrypted' });
 
     // Verify old credential by deriving keys and reading marker
     const rawBytes = await this.deps.rawAdapter.read(tenant, this.deps.options.markerKey);
     let keys = await this.deps.encryptionService.deriveKeys(oldCredential, this.deps.appId, rawBytes);
     this.deps.tenantContext.set(tenant, keys);
     const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
-    if (!marker) throw new Error('Failed to read marker blob');
+    if (!marker) throw new TenantError('Failed to read marker blob', { kind: 'workspace-not-found' });
     if (marker.keyData) {
       keys = await this.deps.encryptionService.loadKeyData(keys, marker.keyData);
       this.deps.tenantContext.set(tenant, keys);
@@ -384,6 +384,6 @@ export class TenantManager implements TenantManagerType {
       throw err;
     }
 
-    log('encryption credential changed');
+    log.tenant('encryption credential changed');
   }
 }

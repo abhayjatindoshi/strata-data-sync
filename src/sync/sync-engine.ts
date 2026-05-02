@@ -1,4 +1,3 @@
-import debug from 'debug';
 import type { Tenant } from '@/adapter';
 import type { Hlc } from '@/hlc';
 import { tick } from '@/hlc';
@@ -10,14 +9,14 @@ import type { DataAdapter } from '@/persistence';
 import { parseCompositeKey } from '@/utils';
 import type { ReactiveFlag } from '@/utils';
 import type { ResolvedStrataOptions } from '../options';
+import { SyncError } from './errors';
 import type {
   SyncLocation, SyncQueueItem, SyncEvent,
   SyncEnqueueResult, SyncBetweenResult,
   SyncEntityChange,
 } from './types';
 import { syncBetween } from './unified';
-
-const log = debug('strata:sync');
+import { log } from '@/log';
 
 export class SyncEngine {
   private readonly queue: SyncQueueItem[] = [];
@@ -42,7 +41,7 @@ export class SyncEngine {
       case 'memory': return this.store;
       case 'local': return this.localAdapter;
       case 'cloud':
-        if (!this.cloudAdapter) throw new Error('No cloud adapter configured');
+        if (!this.cloudAdapter) throw new SyncError('No cloud adapter configured', { kind: 'cloud-not-configured' });
         return this.cloudAdapter;
     }
   }
@@ -53,14 +52,14 @@ export class SyncEngine {
     tenant: Tenant | undefined,
   ): Promise<SyncEnqueueResult> {
     if (this.disposed) {
-      throw new Error('SyncEngine is disposed');
+      throw new SyncError('SyncEngine is disposed', { kind: 'sync-failed' });
     }
 
     const existing = this.queue.find(
       item => item.source === source && item.target === target,
     );
     if (existing) {
-      log('dedup: %s→%s already queued', source, target);
+      log.sync('dedup: %s→%s already queued', source, target);
       await existing.promise;
       return { result: EMPTY_RESULT, deduplicated: true };
     }
@@ -101,7 +100,7 @@ export class SyncEngine {
             partitionsSynced: syncResult.changesForA.length + syncResult.changesForB.length,
           },
         });
-        log('%s→%s sync complete', source, target);
+        log.sync('%s→%s sync complete', source, target);
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         this.syncEventBus.emit({ type: 'sync-failed', source, target, error });
@@ -173,7 +172,7 @@ export class SyncEngine {
 
     this.localTimer = setInterval(() => {
       this.sync('memory', 'local', tenant).catch((err: unknown) => {
-        log.extend('error')('local flush failed: %O', err);
+        log.sync.error('local flush failed: %O', err);
       });
     }, this.options.localFlushIntervalMs);
 
@@ -185,13 +184,13 @@ export class SyncEngine {
             await this.sync('local', 'memory', tenant);
             dirtyTracker?.clear();
           } catch (err) {
-            log.extend('error')('cloud sync failed: %O', err);
+            log.sync.error('cloud sync failed: %O', err);
           }
         })();
       }, this.options.cloudSyncIntervalMs);
     }
 
-    log('scheduler started (local=%dms, cloud=%dms)',
+    log.sync('scheduler started (local=%dms, cloud=%dms)',
       this.options.localFlushIntervalMs,
       this.options.cloudSyncIntervalMs,
     );

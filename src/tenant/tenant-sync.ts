@@ -1,10 +1,8 @@
-import debug from 'debug';
 import type { DataAdapter } from '@/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { Tenant } from './types';
 import { loadTenantList, saveTenantList } from './tenant-list';
-
-const log = debug('strata:tenant');
+import { log } from '@/log';
 
 export function mergeTenantLists(
   local: ReadonlyArray<Tenant>,
@@ -37,7 +35,7 @@ export async function pushTenantList(
   ]);
   const merged = mergeTenantLists(local, remote);
   await saveTenantList(cloudAdapter, merged, options);
-  log('pushed tenant list (%d tenants)', merged.length);
+  log.tenant('pushed tenant list (%d tenants)', merged.length);
 }
 
 export async function pullTenantList(
@@ -49,5 +47,5 @@ export async function pullTenantList(
   const remote = await loadTenantList(cloudAdapter, options);
   const merged = mergeTenantLists(local, remote);
   await saveTenantList(localAdapter, merged, options);
-  log('pulled tenant list (%d merged)', merged.length);
+  log.tenant('pulled tenant list (%d merged)', merged.length);
 }

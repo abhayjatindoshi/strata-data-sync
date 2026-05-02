@@ -1,4 +1,3 @@
-import debug from 'debug';
 import type { Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { createHlc } from '@/hlc';
@@ -28,8 +27,7 @@ import type {
   SyncEngineType,
 } from '@/sync';
 import { assertNotDisposed, ReactiveFlag } from '@/utils';
-
-const log = debug('strata:core');
+import { log } from '@/log';
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -201,7 +199,7 @@ export class Strata {
       this.syncEventBus.dispose();
       this.errorBus.dispose();
       await this.syncEngine.dispose();
-      log('strata disposed');
+      log.strata('disposed');
     })();
     return this.disposePromise;
   }

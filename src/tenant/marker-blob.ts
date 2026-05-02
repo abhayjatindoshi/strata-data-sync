@@ -1,9 +1,7 @@
-import debug from 'debug';
 import type { Tenant } from '@/adapter';
 import type { AllIndexes, PartitionBlob, DataAdapter } from '@/persistence';
 import type { ResolvedStrataOptions } from '../options';
-
-const log = debug('strata:tenant');
+import { log } from '@/log';
 
 export type MarkerData = {
   readonly version: number;
@@ -32,7 +30,7 @@ export async function writeMarkerBlob(
     deleted: {},
   };
   await adapter.write(tenant, options.markerKey, blob);
-  log('wrote marker blob');
+  log.tenant('wrote marker blob');
 }
 
 export async function readMarkerBlob(

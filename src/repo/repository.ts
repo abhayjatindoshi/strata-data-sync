@@ -1,4 +1,3 @@
-import debug from 'debug';
 import { startWith, map, distinctUntilChanged } from 'rxjs/operators';
 import type { Hlc } from '@/hlc';
 import { tick } from '@/hlc';
@@ -12,8 +11,7 @@ import type { EntityStore } from '@/store';
 import type { QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
 import { assertNotDisposed } from '@/utils';
-
-const log = debug('strata:repo');
+import { log } from '@/log';
 
 function entityComparator<T extends BaseEntity>(
   a: (T & BaseEntity) | undefined,
@@ -90,7 +88,7 @@ export class Repository<T> {
 
     this.store.setEntity(entityKey, id, entity);
     this.hlc.current = nextHlc;
-    log('saved %s', id);
+    log.repo('saved %s', id);
 
     return id;
   }
@@ -121,7 +119,7 @@ export class Repository<T> {
     }
     const deleted = this.store.deleteEntity(entityKey, id);
     if (deleted) {
-      log('deleted %s', id);
+      log.repo('deleted %s', id);
     }
     return deleted;
   }
@@ -208,6 +206,6 @@ export class Repository<T> {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    log('disposed %s repository', this.definition.name);
+    log.repo('disposed %s repository', this.definition.name);
   }
 }

@@ -1,4 +1,3 @@
-import debug from 'debug';
 import type { Tenant } from '@/adapter';
 import { partitionBlobKey } from '@/adapter';
 import type { DataAdapter, PartitionBlob } from '@/persistence';
@@ -6,8 +5,7 @@ import type { BlobMigration } from '@/schema/migration';
 import { migrateBlob } from '@/schema/migration';
 import type { Hlc } from '@/hlc';
 import type { EntityStore } from './types';
-
-const log = debug('strata:store');
+import { log } from '@/log';
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -57,7 +55,7 @@ export async function loadPartitionFromAdapter(
   }
 
   if (!validateBlob(blob, entityName)) {
-    log('malformed blob for partition %s — skipping', key);
+    log.store.warn('malformed blob for partition %s — skipping', key);
     return new Map();
   }
 

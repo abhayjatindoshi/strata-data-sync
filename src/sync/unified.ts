@@ -1,4 +1,3 @@
-import debug from 'debug';
 import type { Tenant } from '@/adapter';
 import { partitionBlobKey } from '@/adapter';
 import type { Hlc } from '@/hlc';
@@ -12,8 +11,7 @@ import type { ResolvedStrataOptions } from '../options';
 import { diffPartitions } from './diff';
 import { mergePartition } from './merge';
 import type { SyncEntity, SyncEntityChange, SyncBetweenResult } from './types';
-
-const log = debug('strata:sync');
+import { log } from '@/log';
 
 type SyncChange = {
   readonly entityName: string;
@@ -113,7 +111,7 @@ async function planMerges(
       adapterB.read(tenant, key),
     ]);
     if (!blobA || !blobB) {
-      log('skipping merge for %s: missing blob', key);
+      log.sync('skipping merge for %s: missing blob', key);
       continue;
     }
     if (migrations) {
@@ -301,7 +299,7 @@ export async function syncBetween(
   const allApplied = deduplicateChanges([...appliedToA, ...plan.applyToB]);
   const maxHlc = findMaxHlc(allApplied);
 
-  log(
+  log.sync(
     'syncBetween complete: %d→B, %d→A, stale=%s',
     plan.applyToB.length, stale ? 0 : plan.applyToA.length, stale,
   );

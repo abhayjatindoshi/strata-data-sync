@@ -1,11 +1,9 @@
-import debug from 'debug';
 import type { Tenant } from '@/adapter';
 import type { AllIndexes, PartitionIndex, PartitionIndexEntry, DataAdapter } from '@/persistence';
 import { loadAllIndexes } from '@/persistence';
 import type { ResolvedStrataOptions } from '../options';
 import type { PartitionDiffResult } from './types';
-
-const log = debug('strata:sync');
+import { log } from '@/log';
 
 export async function loadAllIndexPairs(
   localAdapter: DataAdapter,
@@ -17,7 +15,7 @@ export async function loadAllIndexPairs(
     loadAllIndexes(localAdapter, tenant, options),
     loadAllIndexes(cloudAdapter, tenant, options),
   ]);
-  log('loaded all index pairs');
+  log.sync('loaded all index pairs');
   return { localIndexes, cloudIndexes };
 }
 

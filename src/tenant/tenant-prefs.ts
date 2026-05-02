@@ -1,8 +1,6 @@
-import debug from 'debug';
 import type { Tenant } from '@/adapter';
 import type { PartitionBlob, DataAdapter } from '@/persistence';
-
-const log = debug('strata:tenant');
+import { log } from '@/log';
 
 const TENANT_PREFS_KEY = '__tenant_prefs';
 const PREFS_ENTITY_KEY = '__prefs';
@@ -21,7 +19,7 @@ export async function saveTenantPrefs(
     deleted: {},
   };
   await adapter.write(tenant, TENANT_PREFS_KEY, blob);
-  log('saved tenant prefs');
+  log.tenant('saved tenant prefs');
 }
 
 export async function loadTenantPrefs(

@@ -18,3 +18,5 @@ export { resolveConflict, resolveEntityTombstone } from './conflict';
 export { mergePartition } from './merge';
 export { SyncEngine } from './sync-engine';
 export { syncBetween } from './unified';
+export { SyncError } from './errors';
+export type { SyncErrorKind } from './errors';
