@@ -37,9 +37,11 @@ export const NOOP_ENCRYPTION_SERVICE: EncryptionService = {
   rekey: (keys) => Promise.resolve({ keys }),
 };
 
-export class InvalidEncryptionKeyError extends Error {
+import { StrataError } from '@/errors';
+
+export class InvalidEncryptionKeyError extends StrataError {
   constructor(message = 'Invalid encryption key') {
-    super(message);
+    super(message, { kind: 'invalid-key', retryable: false });
     this.name = 'InvalidEncryptionKeyError';
   }
 }

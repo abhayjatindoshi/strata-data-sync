@@ -13,6 +13,7 @@ import { validateMigrations } from '@/schema/migration';
 import { EventBus } from '@/reactive';
 import type { EntityEvent } from '@/reactive';
 import { StrataError } from '@/errors';
+import { StrataConfigError } from '@/errors';
 import { EncryptedDataAdapter } from '@/persistence';
 import { Store } from '@/store';
 import { Repository, SingletonRepository } from '@/repo';
@@ -55,15 +56,15 @@ export function validateEntityDefinitions(
   entities: ReadonlyArray<EntityDefinition<any>>,
 ): void {
   if (entities.length === 0) {
-    throw new Error('At least one entity definition is required');
+    throw new StrataConfigError('At least one entity definition is required');
   }
   const names = new Set<string>();
   for (const def of entities) {
     if (!def.name) {
-      throw new Error('Entity definition must have a name');
+      throw new StrataConfigError('Entity definition must have a name');
     }
     if (names.has(def.name)) {
-      throw new Error(`Duplicate entity name: ${def.name}`);
+      throw new StrataConfigError(`Duplicate entity name: ${def.name}`);
     }
     names.add(def.name);
   }
@@ -158,7 +159,7 @@ export class Strata {
   repo<T>(def: EntityDefinition<T>): RepositoryType<T> | SingletonRepositoryType<T> {
     assertNotDisposed(this.disposed, 'Strata instance');
     const r = this.repoMap.get(def.name);
-    if (!r) throw new Error(`Unknown entity definition: ${def.name}`);
+    if (!r) throw new StrataConfigError(`Unknown entity definition: ${def.name}`);
     return r as RepositoryType<T> | SingletonRepositoryType<T>;
   }
 

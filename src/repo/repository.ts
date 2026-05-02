@@ -8,6 +8,7 @@ import type { EventBus } from '@/reactive';
 import type { EntityEvent } from '@/reactive';
 import { filter } from 'rxjs/operators';
 import type { EntityStore } from '@/store';
+import { StrataConfigError } from '@/errors';
 import type { QueryOptions } from './types';
 import { applyWhere, applyRange, applyOrderBy, applyPagination } from './query';
 import { assertNotDisposed } from '@/utils';
@@ -54,7 +55,7 @@ export class Repository<T> {
 
     if (partial.id) {
       if (!partial.id.startsWith(this.definition.name + '.')) {
-        throw new Error(`Entity ID "${partial.id}" does not belong to repository "${this.definition.name}"`);
+        throw new StrataConfigError(`Entity ID "${partial.id}" does not belong to repository "${this.definition.name}"`);
       }
       id = partial.id;
       entityKey = parseEntityKey(id);
@@ -68,7 +69,7 @@ export class Repository<T> {
     }
 
     if (id.length > 256) {
-      throw new Error(`Entity ID exceeds maximum length of 256 characters (got ${id.length})`);
+      throw new StrataConfigError(`Entity ID exceeds maximum length of 256 characters (got ${id.length})`);
     }
 
     const existing = this.store.getEntity(entityKey, id) as (T & BaseEntity) | undefined;

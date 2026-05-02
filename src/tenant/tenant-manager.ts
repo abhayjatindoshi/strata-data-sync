@@ -6,7 +6,8 @@ import type { SyncEngineType, SyncResult, SyncEvent } from '@/sync';
 import type { ReactiveFlag } from '@/utils';
 import type { EventBus } from '@/reactive';
 import { generateId } from '@/utils';
-import { partitionBlobKey, InvalidEncryptionKeyError } from '@/adapter';
+import { partitionBlobKey } from '@/adapter';
+import { StrataError } from '@/errors';
 import type {
   Tenant,
   ProbeResult,
@@ -109,7 +110,7 @@ export class TenantManager implements TenantManagerType {
       if (!marker) return { exists: false };
       return { exists: true, encrypted: !!marker.keyData, tenantId: id };
     } catch (err) {
-      if (err instanceof InvalidEncryptionKeyError) {
+      if (err instanceof StrataError && err.kind === 'invalid-key') {
         return { exists: true, encrypted: true, tenantId: id };
       }
       throw err;
@@ -202,7 +203,7 @@ export class TenantManager implements TenantManagerType {
       }
       encrypted = !!marker.keyData;
     } catch (err) {
-      if (err instanceof InvalidEncryptionKeyError) {
+      if (err instanceof StrataError && err.kind === 'invalid-key') {
         encrypted = true;
       } else {
         throw err;
