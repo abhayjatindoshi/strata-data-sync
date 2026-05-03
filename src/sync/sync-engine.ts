@@ -10,6 +10,7 @@ import { parseCompositeKey } from '@/utils';
 import type { ReactiveFlag } from '@/utils';
 import type { ResolvedStrataOptions } from '../options';
 import { SyncError } from './errors';
+import { StrataError } from '@/errors';
 import type {
   SyncLocation, SyncQueueItem, SyncEvent,
   SyncEnqueueResult, SyncBetweenResult,
@@ -102,7 +103,7 @@ export class SyncEngine {
         });
         log.sync('%s→%s sync complete', source, target);
       } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
+        const error = err instanceof Error ? err : new StrataError(String(err), { kind: 'unknown' });
         this.syncEventBus.emit({ type: 'sync-failed', source, target, error });
         throw err;
       }
@@ -124,7 +125,7 @@ export class SyncEngine {
       const item = this.queue[0];
       const p = item.fn().then(
         () => { item.resolve(); },
-        (err: unknown) => { item.reject(err instanceof Error ? err : new Error(String(err))); },
+        (err: unknown) => { item.reject(err instanceof Error ? err : new StrataError(String(err), { kind: 'unknown' })); },
       );
       this.inFlight = p;
       await p;
@@ -211,7 +212,7 @@ export class SyncEngine {
     this.stopScheduler();
     this.disposed = true;
     for (const item of this.queue) {
-      item.reject(new Error('SyncEngine disposed'));
+      item.reject(new SyncError('SyncEngine disposed', { kind: 'sync-failed' }));
     }
     this.queue.length = 0;
     if (this.inFlight) {

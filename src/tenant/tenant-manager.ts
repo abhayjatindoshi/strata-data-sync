@@ -7,7 +7,6 @@ import type { ReactiveFlag } from '@/utils';
 import type { EventBus } from '@/reactive';
 import { generateId } from '@/utils';
 import { partitionBlobKey } from '@/adapter';
-import { StrataError } from '@/errors';
 import type {
   Tenant,
   ProbeResult,
@@ -16,10 +15,8 @@ import type {
   TenantManager as TenantManagerType,
 } from './types';
 import type { TenantContext } from './tenant-context';
-import { loadTenantList, saveTenantList } from './tenant-list';
-import { pullTenantList, pushTenantList } from './tenant-sync';
-import { writeMarkerBlob, readMarkerBlob, validateMarkerBlob } from './marker-blob';
-import { loadTenantPrefs } from './tenant-prefs';
+import { TenantListManager } from './tenant-list-manager';
+import { writeMarkerBlob, readMarkerBlob } from './marker-blob';
 import { TenantError } from './errors';
 import { SyncError } from '@/sync/errors';
 import { log } from '@/log';
@@ -41,45 +38,26 @@ export type TenantManagerDeps = {
 };
 
 export class TenantManager implements TenantManagerType {
-  private cachedList: Tenant[] | null = null;
+  private readonly tenantList: TenantListManager;
 
   readonly activeTenant$;
+  readonly tenants$;
 
   get activeTenant(): Tenant | undefined {
     return this.deps.tenantContext.activeTenant;
   }
 
+  get tenants(): readonly Tenant[] {
+    return this.tenantList.tenants;
+  }
+
   constructor(private readonly deps: TenantManagerDeps) {
     this.activeTenant$ = deps.tenantContext.activeTenant$;
+    this.tenantList = new TenantListManager(deps.adapter, deps.cloudAdapter, deps.options);
+    this.tenants$ = this.tenantList.tenants$;
   }
 
   // ─── Internals ───────────────────────────────────────────
-
-  private async getList(): Promise<Tenant[]> {
-    if (!this.cachedList) {
-      if (this.deps.cloudAdapter) {
-        try {
-          await pullTenantList(this.deps.adapter, this.deps.cloudAdapter, this.deps.options);
-        } catch {
-          log.tenant.warn('cloud unreachable — using local tenant list');
-        }
-      }
-      this.cachedList = await loadTenantList(this.deps.adapter, this.deps.options);
-    }
-    return this.cachedList;
-  }
-
-  private async persistList(tenants: Tenant[]): Promise<void> {
-    this.cachedList = tenants;
-    await saveTenantList(this.deps.adapter, tenants, this.deps.options);
-    if (this.deps.cloudAdapter) {
-      try {
-        await pushTenantList(this.deps.adapter, this.deps.cloudAdapter, this.deps.options);
-      } catch {
-        log.tenant.warn('cloud unreachable — tenant list saved locally only');
-      }
-    }
-  }
 
   private deriveId(meta: Record<string, unknown>): string {
     if (this.deps.rawCloudAdapter?.deriveTenantId) {
@@ -90,151 +68,105 @@ export class TenantManager implements TenantManagerType {
 
   // ─── Cold ops ────────────────────────────────────────────
 
-  async list(): Promise<ReadonlyArray<Tenant>> {
-    return this.getList();
-  }
-
   async probe(ref: { meta: Record<string, unknown> }): Promise<ProbeResult> {
     const id = this.deriveId(ref.meta);
     const tempTenant: Tenant = {
-      id,
-      name: '',
-      encrypted: false,
-      meta: ref.meta,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      id, name: '', encrypted: false, meta: ref.meta,
+      createdAt: new Date(), updatedAt: new Date(),
     };
 
+    // Check if marker blob exists using the raw adapter (no deserialization)
+    const raw = await this.deps.rawAdapter.read(tempTenant, this.deps.options.markerKey);
+    if (!raw) return { exists: false };
+
+    // Try reading through the encrypted adapter to detect encryption
     try {
       const marker = await readMarkerBlob(this.deps.adapter, tempTenant, this.deps.options);
       if (!marker) return { exists: false };
       return { exists: true, encrypted: !!marker.keyData, tenantId: id };
-    } catch (err) {
-      if (err instanceof StrataError && err.kind === 'invalid-key') {
-        return { exists: true, encrypted: true, tenantId: id };
-      }
-      throw err;
+    } catch {
+      // Deserialization or decryption failed — marker exists but is encrypted
+      return { exists: true, encrypted: true, tenantId: id };
     }
   }
 
   async create(opts: CreateTenantOptions): Promise<Tenant> {
-    const tenants = await this.getList();
-
-    let id: string;
-    if (opts.id) {
-      id = opts.id;
-    } else {
-      id = this.deriveId(opts.meta);
-    }
-
-    const existing = tenants.find(t => t.id === id);
-    if (existing) return existing;
-
-    const now = new Date();
-    const encrypted = !!opts.encryption;
-    const tenant: Tenant = {
-      id,
-      name: opts.name,
-      encrypted,
-      meta: opts.meta,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    let keyData: Record<string, unknown> | undefined;
-    if (opts.encryption) {
-      let keys = await this.deps.encryptionService.deriveKeys(
-        opts.encryption.credential, this.deps.appId,
-      );
-      const result = await this.deps.encryptionService.generateKeyData(keys);
-      keys = result.keys;
-      keyData = result.keyData;
-      this.deps.tenantContext.set(tenant, keys);
-    }
-
-    // Persist list first — if marker write fails, tenant is listed but recoverable on open().
-    // Reverse order would leave an invisible orphaned marker blob.
-    await this.persistList([...tenants, tenant]);
-
-    await writeMarkerBlob(
-      this.deps.adapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
-    );
-
-    if (this.deps.cloudAdapter) {
-      await writeMarkerBlob(
-        this.deps.cloudAdapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
-      );
-    }
-
-    if (opts.encryption) {
-      this.deps.tenantContext.clear();
-    }
-
-    log.tenant('created tenant %s', id);
-
-    return tenant;
+    return this.register({ ...opts, mode: 'create' });
   }
 
   async join(opts: JoinTenantOptions): Promise<Tenant> {
-    const id = this.deriveId(opts.meta);
+    return this.register({ ...opts, mode: 'join' });
+  }
 
-    const tenants = await this.getList();
-    const existing = tenants.find(t => t.id === id);
+  private async register(opts: {
+    readonly name: string;
+    readonly meta: Record<string, unknown>;
+    readonly mode: 'create' | 'join';
+    readonly encryption?: { readonly credential: string };
+  }): Promise<Tenant> {
+    const id = this.deriveId(opts.meta);
+    const existing = this.tenantList.find(id);
     if (existing) return existing;
 
-    const tempTenant: Tenant = {
-      id,
-      name: opts.name ?? 'Shared Workspace',
-      encrypted: false,
-      meta: opts.meta,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const probe = await this.probe({ meta: opts.meta });
 
-    // Probe to detect if workspace exists and whether it's encrypted
-    let encrypted: boolean;
-    try {
-      const marker = await readMarkerBlob(this.deps.adapter, tempTenant, this.deps.options);
-      if (!marker) {
-        throw new TenantError('No strata workspace found at the specified location', { kind: 'workspace-not-found' });
-      }
-      if (!validateMarkerBlob(marker)) {
-        throw new TenantError('Incompatible strata workspace version', { kind: 'workspace-incompatible' });
-      }
-      encrypted = !!marker.keyData;
-    } catch (err) {
-      if (err instanceof StrataError && err.kind === 'invalid-key') {
-        encrypted = true;
-      } else {
-        throw err;
-      }
+    if (opts.mode === 'create' && probe.exists) {
+      throw new TenantError('Workspace already exists at this location', { kind: 'workspace-exists' });
+    }
+    if (opts.mode === 'join' && !probe.exists) {
+      throw new TenantError('No workspace found at this location', { kind: 'workspace-not-found' });
     }
 
-    const prefs = encrypted ? undefined : await loadTenantPrefs(this.deps.adapter, tempTenant);
+    const encrypted = opts.mode === 'create'
+      ? !!opts.encryption
+      : probe.exists ? probe.encrypted : false;
 
     const now = new Date();
     const tenant: Tenant = {
-      id,
-      name: prefs?.name ?? opts.name ?? 'Shared Workspace',
-      encrypted,
-      meta: opts.meta,
-      createdAt: now,
-      updatedAt: now,
+      id, name: opts.name, encrypted, meta: opts.meta,
+      createdAt: now, updatedAt: now,
     };
 
-    await this.persistList([...tenants, tenant]);
-    log.tenant('joined tenant %s', id);
+    // Create-only: encryption setup + marker write
+    if (opts.mode === 'create') {
+      let keyData: Record<string, unknown> | undefined;
+      if (opts.encryption) {
+        let keys = await this.deps.encryptionService.deriveKeys(
+          opts.encryption.credential, this.deps.appId,
+        );
+        const result = await this.deps.encryptionService.generateKeyData(keys);
+        keys = result.keys;
+        keyData = result.keyData;
+        this.deps.tenantContext.set(tenant, keys);
+      }
 
+      await this.tenantList.add(tenant);
+
+      await writeMarkerBlob(
+        this.deps.adapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
+      );
+      if (this.deps.cloudAdapter) {
+        await writeMarkerBlob(
+          this.deps.cloudAdapter, tenant, this.deps.entityTypes, this.deps.options, keyData,
+        );
+      }
+
+      if (opts.encryption) {
+        this.deps.tenantContext.clear();
+      }
+    } else {
+      await this.tenantList.add(tenant);
+    }
+
+    log.tenant('%s tenant %s', opts.mode === 'create' ? 'created' : 'joined', id);
     return tenant;
   }
 
   async remove(tenantId: string, opts?: { purge?: boolean }): Promise<void> {
-    const tenants = await this.getList();
-    const tenant = tenants.find(t => t.id === tenantId);
+    const tenant = this.tenantList.find(tenantId);
 
     // Update list first — safer on crash (leaves orphaned data, not orphaned listing)
-    const filtered = tenants.filter(t => t.id !== tenantId);
-    await this.persistList(filtered);
+    await this.tenantList.remove(tenantId);
 
     if (opts?.purge && tenant) {
       const marker = await readMarkerBlob(this.deps.adapter, tenant, this.deps.options);
@@ -262,8 +194,7 @@ export class TenantManager implements TenantManagerType {
   async open(tenantId: string, opts?: { credential?: string }): Promise<void> {
     await this.close();
 
-    const tenants = await this.getList();
-    const tenant = tenants.find(t => t.id === tenantId);
+    const tenant = this.tenantList.find(tenantId);
     if (!tenant) {
       throw new TenantError(`Tenant not found: ${tenantId}`, { kind: 'tenant-not-found' });
     }
@@ -298,7 +229,7 @@ export class TenantManager implements TenantManagerType {
       try {
         await this.deps.syncEngine.run(tenant, [['cloud', 'local']]);
       } catch {
-        this.deps.syncEventBus.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new Error('Cloud unreachable') });
+        this.deps.syncEventBus.emit({ type: 'sync-failed', source: 'local', target: 'cloud', error: new SyncError('Cloud unreachable', { kind: 'sync-failed' }) });
       }
     }
     await this.deps.syncEngine.run(tenant, [['local', 'memory']]);
@@ -315,6 +246,13 @@ export class TenantManager implements TenantManagerType {
     const tenant = this.deps.tenantContext.activeTenant;
     if (tenant) {
       await this.deps.syncEngine.run(tenant, [['memory', 'local']]);
+      if (this.deps.cloudAdapter) {
+        try {
+          await this.deps.syncEngine.run(tenant, [['local', 'cloud']]);
+        } catch {
+          log.tenant.warn('cloud unreachable — changes saved locally only');
+        }
+      }
     }
     await this.deps.syncEngine.drain();
 

@@ -4,10 +4,10 @@ export type TenantErrorKind =
   | 'tenant-not-found'
   | 'credential-required'
   | 'workspace-not-found'
+  | 'workspace-exists'
   | 'workspace-incompatible'
   | 'no-tenant-loaded'
-  | 'not-encrypted'
-  | 'cloud-not-configured';
+  | 'not-encrypted';
 
 export class TenantError extends StrataError {
   constructor(message: string, options: {
